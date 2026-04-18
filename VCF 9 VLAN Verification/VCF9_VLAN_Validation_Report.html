@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VCF 9 — Rapport de Validation VLAN & IP</title>
+<style>
+  :root {
+    --blue-dark: #0d1b2a;
+    --blue-mid: #1b3a5c;
+    --blue-accent: #1e6abf;
+    --blue-light: #3a9bd5;
+    --green: #27ae60;
+    --orange: #e67e22;
+    --red: #c0392b;
+    --yellow: #f39c12;
+    --gray-light: #f4f6f9;
+    --gray-border: #dce1e9;
+    --text-dark: #1a1a2e;
+    --text-muted: #5a6a7a;
+    --white: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-light); color: var(--text-dark); font-size: 13px; line-height: 1.5; }
+
+  /* HEADER */
+  .report-header {
+    background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
+    color: white; padding: 32px 40px 24px; display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .report-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .report-header .subtitle { font-size: 13px; color: #a8c4de; }
+  .report-meta { text-align: right; font-size: 12px; color: #a8c4de; }
+  .report-meta span { display: block; }
+
+  /* SCORE BADGE */
+  .score-banner {
+    background: var(--blue-mid); color: white;
+    padding: 16px 40px; display: flex; align-items: center; gap: 32px;
+    border-bottom: 3px solid var(--blue-accent);
+  }
+  .score-circle {
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 4px solid var(--yellow);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.3);
+  }
+  .score-circle .pct { font-size: 24px; font-weight: 700; color: var(--yellow); }
+  .score-circle .lbl { font-size: 9px; color: #aaa; text-transform: uppercase; }
+  .score-details { flex: 1; }
+  .score-details h2 { font-size: 15px; margin-bottom: 8px; }
+  .score-bar { background: rgba(255,255,255,0.15); border-radius: 8px; height: 10px; width: 400px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--orange), var(--yellow)); width: 72%; }
+  .score-badges { display: flex; gap: 16px; margin-top: 10px; }
+  .badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge.crit { background: var(--red); }
+  .badge.maj { background: var(--orange); }
+  .badge.min { background: var(--yellow); color: #333; }
+  .badge.ok { background: var(--green); }
+
+  /* CONTAINER */
+  .container { padding: 24px 40px; max-width: 1400px; margin: 0 auto; }
+  section { margin-bottom: 30px; }
+  h2.section-title {
+    font-size: 15px; font-weight: 700; color: var(--blue-mid);
+    border-left: 4px solid var(--blue-accent); padding-left: 12px;
+    margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* TABLES */
+  .tbl-wrap { overflow-x: auto; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; background: white; font-size: 12px; }
+  thead tr { background: var(--blue-mid); color: white; }
+  thead th { padding: 10px 12px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--gray-border); }
+  tbody tr:hover { background: #f0f5fb; }
+  tbody td { padding: 9px 12px; vertical-align: middle; }
+  .domain-group td:first-child { font-weight: 600; color: var(--blue-accent); }
+  .sub-header td { background: #e8f0fa; font-weight: 700; color: var(--blue-mid); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* STATUS BADGES */
+  .st { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .st-ok { background: #e8f8f0; color: #1a7a43; }
+  .st-warn { background: #fef6e8; color: #b05a00; }
+  .st-err { background: #fde8e8; color: #8b0000; }
+  .st-miss { background: #f0e8fe; color: #5a0099; }
+  .st-new { background: #e8f0fe; color: #0040aa; }
+  .st-phase2 { background: #e0f0ff; color: #005b99; }
+
+  /* ANOMALIES */
+  .anomaly-block { margin-bottom: 10px; border-radius: 8px; overflow: hidden; border-left: 5px solid; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .anomaly-block.crit { border-color: var(--red); }
+  .anomaly-block.maj { border-color: var(--orange); }
+  .anomaly-block.min { border-color: var(--yellow); }
+  .anomaly-block.info { border-color: var(--blue-accent); }
+  .anomaly-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(0,0,0,0.03); }
+  .anomaly-sev { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; color: white; text-transform: uppercase; }
+  .anomaly-sev.crit { background: var(--red); }
+  .anomaly-sev.maj { background: var(--orange); }
+  .anomaly-sev.min { background: var(--yellow); color: #333; }
+  .anomaly-sev.info { background: var(--blue-accent); }
+  .anomaly-title { font-weight: 700; font-size: 13px; flex: 1; }
+  .anomaly-body { padding: 10px 14px; font-size: 12px; color: #333; }
+  .anomaly-body ul { margin: 4px 0 0 16px; }
+  .anomaly-body li { margin-bottom: 3px; }
+  .anomaly-rec { background: #f0f5ff; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 12px; }
+  .anomaly-rec strong { color: var(--blue-accent); }
+
+  /* IP ALLOCATION */
+  .ip-tag { font-family: 'Courier New', monospace; font-size: 11px; background: #f0f5fa; padding: 1px 6px; border-radius: 4px; border: 1px solid #ccd7e8; color: #1a3a6b; }
+  .ip-new { background: #e8f0fe; border-color: #4a80d4; color: #1a3899; font-weight: 600; }
+  .ip-vip { background: #fef0e8; border-color: #d47a30; color: #8b3800; font-weight: 600; }
+  .ip-rec { background: #e8faf0; border-color: #27ae60; color: #1a5c2e; font-weight: 600; }
+  .component-tag { font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+  /* MISSING ALERT */
+  .alert-box { border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .alert-box.danger { background: #fde8e8; border: 1px solid #f5b5b5; }
+  .alert-box.warning { background: #fff4e8; border: 1px solid #f5d5a5; }
+  .alert-box.info { background: #e8f0fe; border: 1px solid #a5c0f5; }
+  .alert-box.success { background: #e8f8f0; border: 1px solid #a5d5b5; }
+  .alert-icon { font-size: 18px; flex-shrink: 0; }
+  .alert-body strong { display: block; margin-bottom: 4px; }
+
+  /* SUMMARY CARDS */
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .summary-card { background: white; border-radius: 8px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-top: 3px solid; text-align: center; }
+  .summary-card.ok { border-color: var(--green); }
+  .summary-card.crit { border-color: var(--red); }
+  .summary-card.maj { border-color: var(--orange); }
+  .summary-card.min { border-color: var(--yellow); }
+  .summary-card .num { font-size: 28px; font-weight: 700; }
+  .summary-card.ok .num { color: var(--green); }
+  .summary-card.crit .num { color: var(--red); }
+  .summary-card.maj .num { color: var(--orange); }
+  .summary-card.min .num { color: var(--yellow); }
+  .summary-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-top: 4px; }
+
+  /* SIZING TABLE */
+  .sizing-recommended { background: #e8faf0 !important; font-weight: 600; color: #1a5c2e; }
+
+  footer { text-align: center; padding: 24px; color: var(--text-muted); font-size: 11px; background: white; border-top: 1px solid var(--gray-border); margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<div class="report-header">
+  <div>
+    <h1>🔍 VCF 9 — Rapport de Validation Réseau (v2)</h1>
+    <div class="subtitle">VMware Cloud Foundation 9.x · Management Domain + 2 Workload Domains · 12 nœuds ESXi</div>
+  </div>
+  <div class="report-meta">
+    <span><strong>Date :</strong> 16 avril 2026</span>
+    <span><strong>Hôtes :</strong> MD × 4 · WD1 × 4 · WD2 × 4</span>
+    <span><strong>Mode vCenter :</strong> Standard (single instance)</span>
+    <span><strong>Mode NSX Manager :</strong> Cluster 3 nœuds (obligatoire VCF 9)</span>
+    <span><strong>WD1 :</strong> Workloads VKS/Tanzu · <strong>WD2 :</strong> Workloads VM standard</span>
+    <span><strong>Ref :</strong> VCF 9 Planning &amp; Preparation Workbook</span>
+  </div>
+</div>
+
+<!-- ═══════════════ SCORE BANNER ═══════════════ -->
+<div class="score-banner">
+  <div class="score-circle">
+    <span class="pct">72%</span>
+    <span class="lbl">Conformité</span>
+  </div>
+  <div class="score-details">
+    <h2>Score de Conformité VCF 9 — Plan v2 corrigé</h2>
+    <div class="score-bar"><div class="score-bar-fill"></div></div>
+    <div class="score-badges" style="margin-top:10px;">
+      <span class="badge crit">⛔ 1 Critique</span>
+      <span class="badge maj">⚠️ 2 Majeures</span>
+      <span class="badge min">ℹ️ 2 Mineures</span>
+      <span class="badge ok">✅ 11 Contrôles OK</span>
+    </div>
+    <div style="margin-top:8px; font-size:11px; color:#a8c4de;">Structure réseau saine · Pas de chevauchement IP · Ségrégation vSAN OK · Tous vCenter centralisés dans MD VM Management ✅ · VLAN IDs à définir en Phase 2.</div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════ RÉSUMÉ RAPIDE ═══════════════ -->
+<div class="summary-grid" style="margin-top:20px;">
+  <div class="summary-card crit"><div class="num">1</div><div class="label">Anomalie Critique</div></div>
+  <div class="summary-card maj"><div class="num">2</div><div class="label">Anomalies Majeures</div></div>
+  <div class="summary-card min"><div class="num">2</div><div class="label">Anomalies Mineures</div></div>
+  <div class="summary-card ok"><div class="num">11</div><div class="label">Contrôles Validés</div></div>
+</div>
+
+<!-- ═══════════════ ALERTES PRIORITAIRES ═══════════════ -->
+<section>
+  <h2 class="section-title">⚡ Alertes Prioritaires</h2>
+
+  <div class="alert-box danger">
+    <div class="alert-icon">⛔</div>
+    <div class="alert-body">
+      <strong>NSX TEP IPs sous-estimées — Les 3 domaines (MD, WD1, WD2)</strong>
+      Le plan déclare 6 IPs TEP par domaine alors que le calcul réel (VCF 9 Planning Workbook) exige : 4 hôtes × 2 TEP (ECMP) = 8 IPs + 2 NSX Edge nodes × 2 TEP = 4 IPs → <strong>12 IPs minimum par domaine</strong>. Les subnets /24 déclarés sont suffisants, mais le comptage doit être corrigé dans votre plan avant de renseigner le VCF 9 Preparation Workbook.
+    </div>
+  </div>
+
+  <div class="alert-box warning">
+    <div class="alert-icon">⚠️</div>
+    <div class="alert-body">
+      <strong>Gateways non définies — Bloquant pour la validation pre-flight SDDC Manager</strong>
+      Aucune gateway (SVI ToR) n'est documentée pour les 20 réseaux du plan. Le SDDC Manager vérifie la connectivité vers chaque gateway lors du pre-flight check. À définir avant de générer le fichier de déploiement JSON.
+    </div>
+  </div>
+
+  <div class="alert-box info">
+    <div class="alert-icon">ℹ️</div>
+    <div class="alert-body">
+      <strong>VLAN IDs — À définir en Phase 2 (non bloquant à ce stade)</strong>
+      Les VLAN IDs seront assignés après validation des prérequis IP. Cette démarche est correcte : le plan d'adressage IP est la base pour le design VLAN. Les VLAN IDs devront être fournis lors de la saisie dans le VCF 9 Planning &amp; Preparation Workbook (avant génération du JSON SDDC Manager).
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ TABLEAU VLANS ═══════════════ -->
+<section>
+  <h2 class="section-title">1 · Tableau de Synthèse VLANs</h2>
+  <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+    ℹ️ Les VLAN IDs sont volontairement absents — ils seront définis en Phase 2 sur la base des prérequis IP validés. Ce n'est pas une anomalie. <br>
+    📌 <strong>Point clé architectural</strong> : Tous les composants de management VCF (vCenter MD/WD1/WD2, NSX Manager MD/WD1/WD2, SDDC Manager, NSX Edges) résident dans le <strong>réseau VM Management du Management Domain</strong>. WD1 et WD2 n'ont donc pas de réseau "VM Management" propre.
+  </p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Domaine</th>
+          <th>Réseau / Rôle</th>
+          <th>VLAN ID</th>
+          <th>Subnet Actuel</th>
+          <th>Subnet Recommandé (+30%)</th>
+          <th>Obligatoire VCF 9</th>
+          <th>Statut</th>
+          <th>Commentaire</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- MANAGEMENT DOMAIN -->
+        <tr class="sub-header"><td colspan="8">🏛️ Management Domain — 4 hôtes ESXi · Héberge TOUS les composants de management VCF</td></tr>
+        <tr>
+          <td>MD</td><td>VM Management <em>(vCenter MD/WD1/WD2, NSX Mgr ×3, SDDC Mgr, NSX Edges ×6)</em></td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.10.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/26 (62 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-ok">✅ OK</span></td>
+          <td>22 composants de mgmt — /24 trop large, /26 recommandé</td>
+        </tr>
+        <tr>
+          <td>MD</td><td>ESXi Management (vmk0)</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.20.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — /24 surdimensionné</td>
+        </tr>
+        <tr>
+          <td>MD</td><td>vMotion</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.30.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — /24 surdimensionné</td>
+        </tr>
+        <tr>
+          <td>MD</td><td>vSAN ESA</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.40.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — VLAN strictement isolé ✅</td>
+        </tr>
+        <tr>
+          <td>MD</td><td>NSX TEP Overlay</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.50.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-err">❌ Comptage erroné</span></td>
+          <td>12 IPs requises (déclaré : 6) — /24 OK, comptage à corriger</td>
+        </tr>
+        <tr>
+          <td>MD</td><td>NSX Edge Uplink 1</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.60.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>2 IPs requises — /24 très surdimensionné</td>
+        </tr>
+        <tr>
+          <td>MD</td><td>NSX Edge Uplink 2</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.70.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>2 IPs requises — /24 très surdimensionné</td>
+        </tr>
+        <tr>
+          <td>MD</td><td>Fleet Management (VCF Ops, VCFA, Aria Logs…)</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.10.80.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>⚠️ VCF Ops</td>
+          <td><span class="st st-ok">✅ OK</span></td>
+          <td>14 IPs cluster — /24 OK si espace disponible</td>
+        </tr>
+
+        <!-- WORKLOAD DOMAIN 1 -->
+        <tr class="sub-header"><td colspan="8">🔧 Workload Domain 1 — 4 hôtes ESXi · VKS/Tanzu activé</td></tr>
+        <tr>
+          <td>WD1</td><td>ESXi Management (vmk0)</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.10.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — /24 surdimensionné</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>vMotion WD1</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.20.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — /24 surdimensionné</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>vSAN ESA WD1</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.30.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — VLAN strictement isolé ✅</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>NSX TEP Overlay WD1</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.40.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-err">❌ Comptage erroné</span></td>
+          <td>12 IPs requises (déclaré : 6)</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>NSX Edge Uplink 1 WD1</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.50.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>2 IPs requises</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>NSX Edge Uplink 2 WD1</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.60.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>2 IPs requises</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>AVI / NSX ALB Management</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.70.0/28</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui (VKS)</td>
+          <td><span class="st st-ok">✅ OK</span></td>
+          <td>5 IPs requises — /28 dimensionné avec 30% marge ✅</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>VKS Supervisor Control Plane</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.80.0/28</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui (VKS)</td>
+          <td><span class="st st-ok">✅ OK</span></td>
+          <td>4 IPs — 3 nœuds Supervisor + 1 API VIP ✅</td>
+        </tr>
+        <tr>
+          <td>WD1</td><td>VKS LoadBalancer VIP Pool</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.20.90.0/27</span></td>
+          <td><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>✅ Oui (VKS)</td>
+          <td><span class="st st-ok">✅ OK</span></td>
+          <td>Pool VIP services K8s — taille correcte ✅</td>
+        </tr>
+
+        <!-- WORKLOAD DOMAIN 2 -->
+        <tr class="sub-header"><td colspan="8">🔧 Workload Domain 2 — 4 hôtes ESXi · Workloads VM standard (sans VKS/Tanzu)</td></tr>
+        <tr>
+          <td>WD2</td><td>ESXi Management (vmk0)</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.30.10.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — /24 surdimensionné</td>
+        </tr>
+        <tr>
+          <td>WD2</td><td>vMotion WD2</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.30.20.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — /24 surdimensionné</td>
+        </tr>
+        <tr>
+          <td>WD2</td><td>vSAN ESA WD2</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.30.30.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>4 IPs requises — VLAN strictement isolé ✅</td>
+        </tr>
+        <tr>
+          <td>WD2</td><td>NSX TEP Overlay WD2</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.30.40.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-err">❌ Comptage erroné</span></td>
+          <td>12 IPs requises (déclaré : 6)</td>
+        </tr>
+        <tr>
+          <td>WD2</td><td>NSX Edge Uplink 1 WD2</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.30.50.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>2 IPs requises</td>
+        </tr>
+        <tr>
+          <td>WD2</td><td>NSX Edge Uplink 2 WD2</td>
+          <td><span class="st st-phase2">Phase 2</span></td>
+          <td><span class="ip-tag">10.30.60.0/24</span></td>
+          <td><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>✅ Oui</td>
+          <td><span class="st st-warn">⚠️ Oversized</span></td>
+          <td>2 IPs requises — AVI/VKS non requis sur WD2 ✅</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════ TABLEAU DIMENSIONNEMENT ═══════════════ -->
+<section>
+  <h2 class="section-title">2 · Tableau de Dimensionnement — Subnets Recommandés (+30% marge)</h2>
+  <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+    Calcul : IPs requises × 1,3 → arrondi à la puissance de 2 supérieure. La marge de 30% couvre l'ajout de nœuds sans resubnet.
+  </p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Réseau</th><th>IPs Requises (actuel)</th><th>IPs avec +30%</th><th>Subnet Actuel</th><th>Subnet Recommandé</th><th>Usables</th><th>IPs Libres</th><th>Marge réelle</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="sub-header"><td colspan="8">🏛️ Management Domain</td></tr>
+        <tr>
+          <td><strong>VM Management MD</strong> <em>(tous composants centraux)</em></td>
+          <td>22 composants</td><td>29 minimum</td>
+          <td><span class="ip-tag">10.10.10.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/26 (62 usables)</span></td>
+          <td>62</td><td>40 libres</td><td>64% ✅✅</td>
+        </tr>
+        <tr>
+          <td>ESXi Management MD</td>
+          <td>4 hôtes</td><td>6 minimum</td>
+          <td><span class="ip-tag">10.10.20.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>14</td><td>9 libres</td><td>64% ✅</td>
+        </tr>
+        <tr>
+          <td>vMotion MD</td>
+          <td>4 hôtes</td><td>6 minimum</td>
+          <td><span class="ip-tag">10.10.30.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>14</td><td>9 libres</td><td>64% ✅</td>
+        </tr>
+        <tr>
+          <td>vSAN ESA MD</td>
+          <td>4 hôtes</td><td>6 minimum</td>
+          <td><span class="ip-tag">10.10.40.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>14</td><td>9 libres</td><td>64% ✅</td>
+        </tr>
+        <tr>
+          <td>NSX TEP MD</td>
+          <td>12 (4 hôtes×2 + 2 Edges×2)</td><td>16 minimum</td>
+          <td><span class="ip-tag">10.10.50.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>30</td><td>17 libres</td><td>57% ✅</td>
+        </tr>
+        <tr>
+          <td>NSX Edge Uplink 1 MD</td>
+          <td>2 (Edge 1 + Edge 2)</td><td>3 minimum</td>
+          <td><span class="ip-tag">10.10.60.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>6</td><td>3 libres</td><td>50% ✅</td>
+        </tr>
+        <tr>
+          <td>NSX Edge Uplink 2 MD</td>
+          <td>2 (Edge 1 + Edge 2)</td><td>3 minimum</td>
+          <td><span class="ip-tag">10.10.70.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>6</td><td>3 libres</td><td>50% ✅</td>
+        </tr>
+        <tr>
+          <td>Fleet Management MD</td>
+          <td>14 (cluster complet)</td><td>19 minimum</td>
+          <td><span class="ip-tag">10.10.80.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>30</td><td>15 libres</td><td>50% ✅</td>
+        </tr>
+
+        <tr class="sub-header"><td colspan="8">🔧 Workload Domain 1 (identique pour WD2 sauf AVI/VKS)</td></tr>
+        <tr>
+          <td>ESXi Management WD1/WD2</td>
+          <td>4 hôtes</td><td>6 minimum</td>
+          <td><span class="ip-tag">10.x0.10.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>14</td><td>9 libres</td><td>64% ✅</td>
+        </tr>
+        <tr>
+          <td>vMotion WD1/WD2</td>
+          <td>4 hôtes</td><td>6 minimum</td>
+          <td><span class="ip-tag">10.x0.x0.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>14</td><td>9 libres</td><td>64% ✅</td>
+        </tr>
+        <tr>
+          <td>vSAN ESA WD1/WD2</td>
+          <td>4 hôtes</td><td>6 minimum</td>
+          <td><span class="ip-tag">10.x0.x0.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables)</span></td>
+          <td>14</td><td>9 libres</td><td>64% ✅</td>
+        </tr>
+        <tr>
+          <td>NSX TEP WD1/WD2</td>
+          <td>12 (4 hôtes×2 + 2 Edges×2)</td><td>16 minimum</td>
+          <td><span class="ip-tag">10.x0.x0.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/27 (30 usables)</span></td>
+          <td>30</td><td>17 libres</td><td>57% ✅</td>
+        </tr>
+        <tr>
+          <td>NSX Edge Uplink 1/2 WD1/WD2</td>
+          <td>2 (Edge 1 + Edge 2)</td><td>3 minimum</td>
+          <td><span class="ip-tag">10.x0.x0.0/24</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/29 (6 usables)</span></td>
+          <td>6</td><td>3 libres</td><td>50% ✅</td>
+        </tr>
+        <tr>
+          <td>AVI/NSX ALB Management WD1</td>
+          <td>5 (3 Controllers + 1 VIP + 1 spare)</td><td>7 minimum</td>
+          <td><span class="ip-tag">10.20.70.0/28</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables) ✅</span></td>
+          <td>14</td><td>8 libres</td><td>57% ✅</td>
+        </tr>
+        <tr>
+          <td>VKS Supervisor Control Plane WD1</td>
+          <td>4 (3 nœuds + 1 API VIP)</td><td>6 minimum</td>
+          <td><span class="ip-tag">10.20.80.0/28</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/28 (14 usables) ✅</span></td>
+          <td>14</td><td>9 libres</td><td>64% ✅</td>
+        </tr>
+        <tr>
+          <td>VKS LB VIP Pool WD1</td>
+          <td>16 (pool services K8s)</td><td>21 minimum</td>
+          <td><span class="ip-tag">10.20.90.0/27</span></td>
+          <td class="sizing-recommended"><span class="ip-tag ip-rec">/27 (30 usables) ✅</span></td>
+          <td>30</td><td>13 libres</td><td>43% ✅</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════ ALLOCATION IP MD VM MANAGEMENT ═══════════════ -->
+<section>
+  <h2 class="section-title">3 · Allocation IP Détaillée — MD VM Management (réseau centralisé)</h2>
+  <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+    En VCF 9 avec vCenter en mode <strong>standard (single instance)</strong>, <strong>tous les vCenter</strong> (MD, WD1, WD2) ainsi que tous les <strong>NSX Manager clusters</strong> et <strong>NSX Edges</strong> résident dans le réseau VM Management du Management Domain. Les WDs n'ont pas de réseau VM Management propre.
+  </p>
+
+  <div style="font-weight:700; color:var(--blue-mid); margin:16px 0 8px; font-size:13px;">
+    🏛️ MD — VM Management · <span class="ip-tag">10.10.10.0/24</span> actuel · <span class="ip-tag ip-rec">Recommandé : /26</span> · Total : <strong>22 composants</strong>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Composant</th><th>IP (exemple)</th><th>Rôle</th><th>Statut</th></tr></thead>
+      <tbody>
+        <tr class="sub-header"><td colspan="5">📌 Composants Infrastructure VCF</td></tr>
+        <tr><td>1</td><td>SDDC Manager</td><td><span class="ip-tag">10.10.10.10</span></td><td>Management VCF central</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>2</td><td>vCenter — Management Domain</td><td><span class="ip-tag">10.10.10.11</span></td><td>vCenter MD (mode standard)</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>3</td><td>vCenter — Workload Domain 1</td><td><span class="ip-tag">10.10.10.12</span></td><td>vCenter WD1 (mode standard) — dans MD VM Mgmt</td><td><span class="st st-ok">✅ Correct</span></td></tr>
+        <tr><td>4</td><td>vCenter — Workload Domain 2</td><td><span class="ip-tag">10.10.10.13</span></td><td>vCenter WD2 (mode standard) — dans MD VM Mgmt</td><td><span class="st st-ok">✅ Correct</span></td></tr>
+
+        <tr class="sub-header"><td colspan="5">📌 NSX Manager Cluster — Management Domain (3 nœuds + VIP)</td></tr>
+        <tr><td>5</td><td>NSX Manager MD — Nœud 1</td><td><span class="ip-tag">10.10.10.20</span></td><td>NSX Manager MD primaire</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>6</td><td>NSX Manager MD — Nœud 2</td><td><span class="ip-tag ip-vip">10.10.10.21</span></td><td>NSX Manager MD — cluster obligatoire VCF 9</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+        <tr><td>7</td><td>NSX Manager MD — Nœud 3</td><td><span class="ip-tag ip-vip">10.10.10.22</span></td><td>NSX Manager MD — cluster obligatoire VCF 9</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+        <tr><td>8</td><td><strong>NSX Manager MD — VIP Cluster</strong></td><td><span class="ip-tag ip-vip">10.10.10.23</span></td><td>VIP d'accès au cluster NSX MD</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+
+        <tr class="sub-header"><td colspan="5">📌 NSX Manager Cluster — Workload Domain 1 (3 nœuds + VIP)</td></tr>
+        <tr><td>9</td><td>NSX Manager WD1 — Nœud 1</td><td><span class="ip-tag">10.10.10.24</span></td><td>NSX Manager WD1 primaire</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>10</td><td>NSX Manager WD1 — Nœud 2</td><td><span class="ip-tag ip-vip">10.10.10.25</span></td><td>NSX Manager WD1 — cluster</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+        <tr><td>11</td><td>NSX Manager WD1 — Nœud 3</td><td><span class="ip-tag ip-vip">10.10.10.26</span></td><td>NSX Manager WD1 — cluster</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+        <tr><td>12</td><td><strong>NSX Manager WD1 — VIP Cluster</strong></td><td><span class="ip-tag ip-vip">10.10.10.27</span></td><td>VIP d'accès au cluster NSX WD1</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+
+        <tr class="sub-header"><td colspan="5">📌 NSX Manager Cluster — Workload Domain 2 (3 nœuds + VIP)</td></tr>
+        <tr><td>13</td><td>NSX Manager WD2 — Nœud 1</td><td><span class="ip-tag">10.10.10.28</span></td><td>NSX Manager WD2 primaire</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>14</td><td>NSX Manager WD2 — Nœud 2</td><td><span class="ip-tag ip-vip">10.10.10.29</span></td><td>NSX Manager WD2 — cluster</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+        <tr><td>15</td><td>NSX Manager WD2 — Nœud 3</td><td><span class="ip-tag ip-vip">10.10.10.30</span></td><td>NSX Manager WD2 — cluster</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+        <tr><td>16</td><td><strong>NSX Manager WD2 — VIP Cluster</strong></td><td><span class="ip-tag ip-vip">10.10.10.31</span></td><td>VIP d'accès au cluster NSX WD2</td><td><span class="st st-new">🔵 À allouer</span></td></tr>
+
+        <tr class="sub-header"><td colspan="5">📌 NSX Edge Nodes — Management Interfaces (6 Edges au total)</td></tr>
+        <tr><td>17</td><td>NSX Edge MD — Nœud 1</td><td><span class="ip-tag">10.10.10.40</span></td><td>Interface de management Edge MD-1</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>18</td><td>NSX Edge MD — Nœud 2</td><td><span class="ip-tag">10.10.10.41</span></td><td>Interface de management Edge MD-2</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>19</td><td>NSX Edge WD1 — Nœud 1</td><td><span class="ip-tag">10.10.10.42</span></td><td>Interface de management Edge WD1-1</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>20</td><td>NSX Edge WD1 — Nœud 2</td><td><span class="ip-tag">10.10.10.43</span></td><td>Interface de management Edge WD1-2</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>21</td><td>NSX Edge WD2 — Nœud 1</td><td><span class="ip-tag">10.10.10.44</span></td><td>Interface de management Edge WD2-1</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>22</td><td>NSX Edge WD2 — Nœud 2</td><td><span class="ip-tag">10.10.10.45</span></td><td>Interface de management Edge WD2-2</td><td><span class="st st-ok">✅ Présent</span></td></tr>
+        <tr><td>GW</td><td>Gateway (SVI ToR)</td><td><span class="ip-tag ip-new">10.10.10.1</span></td><td>Passerelle du réseau — à créer sur ToR</td><td><span class="st st-new">🔵 À définir</span></td></tr>
+
+        <tr style="background:#e8faf0;">
+          <td colspan="2"><strong>Total — 22 composants actifs</strong></td>
+          <td colspan="3">
+            <strong>/24 actuel (254 usables) → largement suffisant mais très oversized</strong><br>
+            <strong>Recommandé : /26 (62 usables) → 40 IPs libres = 65% de marge ✅</strong>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- NSX TEP Recap -->
+  <div style="font-weight:700; color:var(--blue-mid); margin:20px 0 8px; font-size:13px;">📊 Récapitulatif NSX TEP — Calcul Corrigé (par domaine)</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Composant</th><th>Nombre TEPs</th><th>IPs Requises</th><th>Commentaire</th></tr></thead>
+      <tbody>
+        <tr><td>ESXi Host 1–4 × 2 TEP (ECMP)</td><td>4 × 2 = 8</td><td><strong>8 IPs</strong></td><td>2 TEPs par hôte pour l'équilibrage de charge ECMP</td></tr>
+        <tr><td>NSX Edge Node 1 × 2 TEP</td><td>1 × 2 = 2</td><td><strong>2 IPs</strong></td><td>TEP inner/outer pour Tier-0 HA</td></tr>
+        <tr><td>NSX Edge Node 2 × 2 TEP</td><td>1 × 2 = 2</td><td><strong>2 IPs</strong></td><td>TEP inner/outer pour Tier-0 HA</td></tr>
+        <tr style="background:#fde8e8;"><td colspan="2"><strong>TOTAL REQUIS (par domaine)</strong></td><td><strong>12 IPs</strong></td><td>Déclaré dans le plan : 6 → ❌ sous-estimé de 50%</td></tr>
+        <tr><td colspan="2">+ Gateway SVI</td><td>1 IP</td><td>À créer sur le switch physique (ToR)</td></tr>
+        <tr style="background:#e8faf0;"><td colspan="2"><strong>Subnet recommandé (+30% marge)</strong></td><td><strong>/27 (30 usables)</strong></td><td>12 IPs × 1.3 = 15.6 → /27 ✅ · Pour MD+WD1+WD2 : 3 × /27</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════ TABLEAU IP SYNTHÈSE ═══════════════ -->
+<section>
+  <h2 class="section-title">4 · Tableau de Synthèse IP — Tous Réseaux</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Domaine</th><th>Réseau</th><th>Subnet Actuel</th><th>Gateway</th>
+          <th>IPs Déclarées</th><th>IPs Requises</th><th>Subnet Recommandé</th><th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="sub-header"><td colspan="8">🏛️ Management Domain</td></tr>
+        <tr><td>MD</td><td>VM Management (centralisé tous WDs)</td><td>10.10.10.0/24</td><td>10.10.10.1 ⚠️</td><td>13 (partiel)</td><td><strong>22</strong></td><td><span class="ip-tag ip-rec">/26</span></td><td><span class="st st-warn">⚠️ À compléter</span></td></tr>
+        <tr><td>MD</td><td>ESXi Management</td><td>10.10.20.0/24</td><td>10.10.20.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>MD</td><td>vMotion</td><td>10.10.30.0/24</td><td>10.10.30.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>MD</td><td>vSAN ESA</td><td>10.10.40.0/24</td><td>10.10.40.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>MD</td><td>NSX TEP Overlay</td><td>10.10.50.0/24</td><td>10.10.50.1 ⚠️</td><td><strong style="color:red">6 ❌</strong></td><td><strong>12</strong></td><td><span class="ip-tag ip-rec">/27</span></td><td><span class="st st-err">❌ Comptage erroné</span></td></tr>
+        <tr><td>MD</td><td>NSX Edge UL1</td><td>10.10.60.0/24</td><td>10.10.60.1 ⚠️</td><td>2</td><td>2</td><td><span class="ip-tag ip-rec">/29</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>MD</td><td>NSX Edge UL2</td><td>10.10.70.0/24</td><td>10.10.70.1 ⚠️</td><td>2</td><td>2</td><td><span class="ip-tag ip-rec">/29</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>MD</td><td>Fleet Management</td><td>10.10.80.0/24</td><td>10.10.80.1 ⚠️</td><td>6</td><td>14 (cluster)</td><td><span class="ip-tag ip-rec">/27</span></td><td><span class="st st-warn">⚠️ IPs à détailler</span></td></tr>
+
+        <tr class="sub-header"><td colspan="8">🔧 Workload Domain 1 (ESXi + VKS)</td></tr>
+        <tr><td>WD1</td><td>ESXi Management</td><td>10.20.10.0/24</td><td>10.20.10.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD1</td><td>vMotion WD1</td><td>10.20.20.0/24</td><td>10.20.20.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD1</td><td>vSAN ESA WD1</td><td>10.20.30.0/24</td><td>10.20.30.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD1</td><td>NSX TEP WD1</td><td>10.20.40.0/24</td><td>10.20.40.1 ⚠️</td><td><strong style="color:red">6 ❌</strong></td><td><strong>12</strong></td><td><span class="ip-tag ip-rec">/27</span></td><td><span class="st st-err">❌ Comptage erroné</span></td></tr>
+        <tr><td>WD1</td><td>NSX Edge UL1 WD1</td><td>10.20.50.0/24</td><td>10.20.50.1 ⚠️</td><td>2</td><td>2</td><td><span class="ip-tag ip-rec">/29</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD1</td><td>NSX Edge UL2 WD1</td><td>10.20.60.0/24</td><td>10.20.60.1 ⚠️</td><td>2</td><td>2</td><td><span class="ip-tag ip-rec">/29</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD1</td><td>AVI Management</td><td>10.20.70.0/28</td><td>10.20.70.1 ⚠️</td><td>5</td><td>5</td><td><span class="ip-tag ip-rec">/28 ✅</span></td><td><span class="st st-ok">✅ OK</span></td></tr>
+        <tr><td>WD1</td><td>VKS Supervisor CP</td><td>10.20.80.0/28</td><td>10.20.80.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28 ✅</span></td><td><span class="st st-ok">✅ OK</span></td></tr>
+        <tr><td>WD1</td><td>VKS LB VIP Pool</td><td>10.20.90.0/27</td><td>10.20.90.1 ⚠️</td><td>16</td><td>16</td><td><span class="ip-tag ip-rec">/27 ✅</span></td><td><span class="st st-ok">✅ OK</span></td></tr>
+
+        <tr class="sub-header"><td colspan="8">🔧 Workload Domain 2 (ESXi — VM standard, sans VKS)</td></tr>
+        <tr><td>WD2</td><td>ESXi Management</td><td>10.30.10.0/24</td><td>10.30.10.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD2</td><td>vMotion WD2</td><td>10.30.20.0/24</td><td>10.30.20.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD2</td><td>vSAN ESA WD2</td><td>10.30.30.0/24</td><td>10.30.30.1 ⚠️</td><td>4</td><td>4</td><td><span class="ip-tag ip-rec">/28</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD2</td><td>NSX TEP WD2</td><td>10.30.40.0/24</td><td>10.30.40.1 ⚠️</td><td><strong style="color:red">6 ❌</strong></td><td><strong>12</strong></td><td><span class="ip-tag ip-rec">/27</span></td><td><span class="st st-err">❌ Comptage erroné</span></td></tr>
+        <tr><td>WD2</td><td>NSX Edge UL1 WD2</td><td>10.30.50.0/24</td><td>10.30.50.1 ⚠️</td><td>2</td><td>2</td><td><span class="ip-tag ip-rec">/29</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+        <tr><td>WD2</td><td>NSX Edge UL2 WD2</td><td>10.30.60.0/24</td><td>10.30.60.1 ⚠️</td><td>2</td><td>2</td><td><span class="ip-tag ip-rec">/29</span></td><td><span class="st st-warn">⚠️ Oversized</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">⚠️ Gateways marquées "⚠️" = à confirmer (non documentées dans le plan actuel).</p>
+</section>
+
+<!-- ═══════════════ ANOMALIES ═══════════════ -->
+<section>
+  <h2 class="section-title">5 · Liste des Anomalies — Par Sévérité</h2>
+
+  <!-- CRITIQUE -->
+  <div class="anomaly-block crit">
+    <div class="anomaly-header">
+      <span class="anomaly-sev crit">⛔ Critique</span>
+      <span class="anomaly-title">C-01 · NSX TEP IPs sous-estimées — MD, WD1 et WD2</span>
+    </div>
+    <div class="anomaly-body">
+      Le plan déclare <strong>6 IPs TEP par domaine</strong>. Le calcul VCF 9 Planning &amp; Preparation Workbook exige :
+      <ul>
+        <li><strong>4 hôtes ESXi × 2 TEP (ECMP) = 8 IPs</strong> par domaine</li>
+        <li><strong>2 NSX Edge nodes × 2 TEP = 4 IPs</strong> par domaine</li>
+        <li>Total = <strong>12 IPs minimum</strong> par domaine · 36 IPs TEP au total pour MD + WD1 + WD2</li>
+      </ul>
+      Les subnets /24 déclarés sont largement suffisants en capacité. C'est uniquement le comptage déclaré (6) qui est erroné et doit être corrigé dans votre plan avant saisie dans le VCF 9 Preparation Workbook.
+      <div class="anomaly-rec"><strong>Action :</strong> Corriger le comptage à 12 IPs TEP par domaine dans votre plan d'adressage. Ajuster les subnets à /27 (30 usables) si vous souhaitez optimiser l'espace IP (option recommandée pour rationaliser le plan).</div>
+    </div>
+  </div>
+
+  <!-- MAJEURES -->
+  <div class="anomaly-block maj">
+    <div class="anomaly-header">
+      <span class="anomaly-sev maj">⚠️ Majeure</span>
+      <span class="anomaly-title">M-01 · Gateways non définies pour aucun des 20 réseaux</span>
+    </div>
+    <div class="anomaly-body">
+      Le VCF 9 Planning &amp; Preparation Workbook exige une gateway (SVI) par réseau. Sans gateway documentée, la validation pre-flight du SDDC Manager échouera sur le test de connectivité réseau. Ces SVIs doivent exister sur vos switches ToR avant le déploiement.
+      <div class="anomaly-rec"><strong>Action :</strong> Définir une gateway pour chaque sous-réseau (convention suggérée : .1 — ex. 10.10.10.1, 10.10.20.1…). Valider que les SVIs correspondantes sont créées sur vos ToR avant de lancer le déploiement SDDC Manager.</div>
+    </div>
+  </div>
+
+  <div class="anomaly-block maj">
+    <div class="anomaly-header">
+      <span class="anomaly-sev maj">⚠️ Majeure</span>
+      <span class="anomaly-title">M-02 · NSX Manager Cluster — IPs nœuds 2 &amp; 3 et VIPs non allouées</span>
+    </div>
+    <div class="anomaly-body">
+      En VCF 9, le NSX Manager est toujours déployé en cluster de 3 nœuds (obligatoire pour la production). Le plan actuel ne documente qu'1 IP NSX Manager par domaine. Il manque donc, pour chacun des 3 domaines :
+      <ul>
+        <li>NSX Manager Nœud 2 : 1 IP (×3 domaines = 3 IPs)</li>
+        <li>NSX Manager Nœud 3 : 1 IP (×3 domaines = 3 IPs)</li>
+        <li>NSX Manager VIP Cluster : 1 IP (×3 domaines = 3 IPs)</li>
+      </ul>
+      Total à allouer : <strong>9 IPs supplémentaires</strong> dans le réseau MD VM Management.
+      <div class="anomaly-rec"><strong>Action :</strong> Allouer 9 IPs supplémentaires dans 10.10.10.0/xx pour les nœuds 2 &amp; 3 et VIPs des clusters NSX Manager MD, WD1 et WD2. Voir tableau Section 3 pour les IPs proposées.</div>
+    </div>
+  </div>
+
+  <!-- MINEURES -->
+  <div class="anomaly-block min">
+    <div class="anomaly-header">
+      <span class="anomaly-sev min">ℹ️ Mineure</span>
+      <span class="anomaly-title">m-01 · Subnets /24 oversized — 14 réseaux sur 20 concernés</span>
+    </div>
+    <div class="anomaly-body">
+      La majorité des réseaux ESXi Management, vMotion, vSAN et NSX Edge Uplinks utilisent des /24 (254 usables) pour seulement 2 à 4 IPs requises. Ce surdimensionnement n'est pas bloquant si l'espace IP est disponible, mais impacte l'efficacité du plan d'adressage et peut compliquer la numérotation VLAN future.
+      <div class="anomaly-rec"><strong>Action :</strong> Adopter les subnets recommandés du tableau Section 2 (/28 pour ESXi Mgmt/vMotion/vSAN, /29 pour Edge Uplinks, /27 pour NSX TEP). Si l'espace IP n'est pas contraint, les /24 actuels restent techniquement valides.</div>
+    </div>
+  </div>
+
+  <div class="anomaly-block min">
+    <div class="anomaly-header">
+      <span class="anomaly-sev min">ℹ️ Mineure</span>
+      <span class="anomaly-title">m-02 · Fleet Management — IPs composants non détaillées individuellement</span>
+    </div>
+    <div class="anomaly-body">
+      Le réseau Fleet Management (10.10.80.0/24) déclare 6 IPs sans détail par composant (VCF Ops, VCFA, Aria Logs, Aria Networks). Les clusters de ces composants nécessitent 14 IPs au total. Une documentation IP par composant est requise pour la validation SDDC Manager.
+      <div class="anomaly-rec"><strong>Action :</strong> Documenter l'allocation IP composant par composant dans le Fleet Management. Exemple : VCF Operations Nœud 1 = .10, Nœud 2 = .11, Nœud 3 = .12, VIP = .13 · VCF Automation : .20–.23 · etc.</div>
+    </div>
+  </div>
+
+  <!-- INFO VLAN -->
+  <div class="anomaly-block info">
+    <div class="anomaly-header">
+      <span class="anomaly-sev info">ℹ️ Info</span>
+      <span class="anomaly-title">I-01 · VLAN IDs — À définir en Phase 2 (non bloquant à ce stade)</span>
+    </div>
+    <div class="anomaly-body">
+      Les VLAN IDs seront assignés après validation des prérequis IP, selon votre plan VLAN physique (ToR). Cette démarche est correcte et recommandée (IP d'abord, VLAN ensuite). Ils devront être communiqués au moment de la saisie dans le VCF 9 Planning &amp; Preparation Workbook.
+      <div class="anomaly-rec"><strong>À prévoir :</strong> 20 VLAN IDs distincts (plage 1–4094), sans doublons inter-domaines ni conflits avec l'infrastructure physique existante. Convention suggérée : MD = 100–107, WD1 = 110–118, WD2 = 120–125.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ INFORMATIONS MANQUANTES ═══════════════ -->
+<section>
+  <h2 class="section-title">6 · Informations Encore Manquantes — À Fournir</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Information Manquante</th><th>Impact</th><th>Priorité</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Gateways de chaque sous-réseau (SVI ToR)</td><td>Bloquant — Requis par le pre-flight check SDDC Manager</td><td><span class="st st-err">⛔ Critique</span></td></tr>
+        <tr><td>2</td><td>DNS primaire et secondaire (résolution FQDN composants VCF)</td><td>Requis dans le VCF 9 Planning Workbook avant déploiement</td><td><span class="st st-err">⛔ Critique</span></td></tr>
+        <tr><td>3</td><td>Serveur NTP (adresse IP ou FQDN)</td><td>Requis avant déploiement (synchronisation ESXi + composants)</td><td><span class="st st-err">⛔ Critique</span></td></tr>
+        <tr><td>4</td><td>FQDNs des composants (vCenter ×3, NSX Mgr ×9, SDDC Mgr, NSX Edges ×6)</td><td>Requis pour les certificats TLS et la configuration DNS</td><td><span class="st st-warn">⚠️ Majeure</span></td></tr>
+        <tr><td>5</td><td>Mapping NIC physique → DVS (vmnic0/1/2/3 par hôte)</td><td>Validation architecture NIC/DVS obligatoire VCF 9</td><td><span class="st st-warn">⚠️ Majeure</span></td></tr>
+        <tr><td>6</td><td>IPs détaillées Fleet Management par composant (VCFA, Ops, Logs, Networks)</td><td>Requis pour la validation pré-déploiement SDDC Manager</td><td><span class="st st-warn">⚠️ Majeure</span></td></tr>
+        <tr><td>7</td><td>Plage overlay NSX (CIDR des segments VM workloads)</td><td>Doit être documenté et non-chevauchant avec les subnets physiques</td><td><span class="st st-min">ℹ️ Mineure</span></td></tr>
+        <tr><td>8</td><td>VLAN IDs (Phase 2 — post-validation IP)</td><td>Requis avant génération du JSON SDDC Manager</td><td><span class="st st-min">ℹ️ Phase 2</span></td></tr>
+        <tr><td>9</td><td>Modèle de topologie NSX Edge (Active/Active ou Active/Standby)</td><td>Impact sur le comptage IP TEP et la configuration BGP</td><td><span class="st st-min">ℹ️ Mineure</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════ CONTRÔLES OK ═══════════════ -->
+<section>
+  <h2 class="section-title">7 · Contrôles Validés ✅</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Contrôle</th><th>Résultat</th><th>Commentaire</th></tr></thead>
+      <tbody>
+        <tr><td>Pas de chevauchement IP entre domaines (MD / WD1 / WD2)</td><td><span class="st st-ok">✅ OK</span></td><td>10.10.x, 10.20.x, 10.30.x — aucun overlap détecté</td></tr>
+        <tr><td>Pas de chevauchement intra-domaine</td><td><span class="st st-ok">✅ OK</span></td><td>Tous les réseaux par domaine sont distincts</td></tr>
+        <tr><td>vSAN sur VLAN strictement isolé (MD, WD1, WD2)</td><td><span class="st st-ok">✅ OK</span></td><td>vSAN ESA séparé — aucun autre trafic possible sur ce VLAN</td></tr>
+        <tr><td>ESXi Management distinct de VM Management</td><td><span class="st st-ok">✅ OK</span></td><td>Deux réseaux distincts par domaine</td></tr>
+        <tr><td>Tous les vCenter dans MD VM Management (mode standard)</td><td><span class="st st-ok">✅ OK</span></td><td>vCenter MD, WD1, WD2 → tous dans 10.10.10.0/xx ✅ Architecture correcte</td></tr>
+        <tr><td>NSX Edge Uplink 1 ≠ NSX Edge Uplink 2 (tous domaines)</td><td><span class="st st-ok">✅ OK</span></td><td>Deux VLANs uplink distincts par domaine</td></tr>
+        <tr><td>AVI Management + VKS CP + VKS LB correctement prévus pour WD1</td><td><span class="st st-ok">✅ OK</span></td><td>Réseaux VKS/Tanzu corrects pour WD1 — subnets /28 et /27 bien dimensionnés</td></tr>
+        <tr><td>WD2 sans réseaux VKS/Tanzu (workloads VM standard)</td><td><span class="st st-ok">✅ OK</span></td><td>WD2 ne requiert pas AVI/VKS — plan cohérent avec l'intention de déploiement</td></tr>
+        <tr><td>Fleet Management distinct des réseaux ESXi/VM Management</td><td><span class="st st-ok">✅ OK</span></td><td>10.10.80.0/24 dédié aux composants VCFA/Ops — ségrégation correcte</td></tr>
+        <tr><td>Chaque WLD a ses propres VLANs infrastructure (ESXi, vMotion, vSAN, TEP, UL)</td><td><span class="st st-ok">✅ OK</span></td><td>MD / WD1 / WD2 = plages IP séparées et non-chevauchantes</td></tr>
+        <tr><td>Pas de réutilisation VLAN entre domaines pour des trafics différents</td><td><span class="st st-ok">✅ OK</span></td><td>Chaque domaine dispose de ses propres segments réseau isolés</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════ SCORE FINAL ═══════════════ -->
+<section>
+  <h2 class="section-title">8 · Score de Conformité VCF 9 — Plan v2</h2>
+  <div style="background:white; border-radius:8px; padding:24px; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+    <div style="display:flex; gap:40px; align-items:center;">
+      <div style="text-align:center; min-width:120px;">
+        <div style="font-size:48px; font-weight:700; color:var(--yellow);">72%</div>
+        <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Score Global</div>
+        <div style="font-size:11px; color:var(--yellow); margin-top:4px;">⚠️ Conformité Partielle — Corrections à apporter</div>
+      </div>
+      <div style="flex:1;">
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="font-size:12px; font-weight:600;">Structure réseau &amp; ségrégation</span><span style="font-size:12px; color:var(--green); font-weight:700;">97%</span></div>
+          <div style="background:#eee; border-radius:4px; height:8px;"><div style="background:var(--green); width:97%; height:100%; border-radius:4px;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">✅ Pas de chevauchement · vSAN isolé · WDs distincts · Tous vCenter dans MD VM Mgmt</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="font-size:12px; font-weight:600;">Complétude des réseaux obligatoires</span><span style="font-size:12px; color:var(--green); font-weight:700;">90%</span></div>
+          <div style="background:#eee; border-radius:4px; height:8px;"><div style="background:var(--green); width:90%; height:100%; border-radius:4px;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">✅ Tous les réseaux obligatoires présents · NSX Manager nœuds 2&amp;3 à ajouter</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="font-size:12px; font-weight:600;">Dimensionnement IP &amp; comptage TEP</span><span style="font-size:12px; color:var(--orange); font-weight:700;">55%</span></div>
+          <div style="background:#eee; border-radius:4px; height:8px;"><div style="background:var(--orange); width:55%; height:100%; border-radius:4px;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">❌ Comptage TEP erroné (6 vs 12) · /24 oversized pour la majorité des réseaux</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="font-size:12px; font-weight:600;">Documentation (gateways, FQDNs, DNS/NTP)</span><span style="font-size:12px; color:var(--red); font-weight:700;">20%</span></div>
+          <div style="background:#eee; border-radius:4px; height:8px;"><div style="background:var(--red); width:20%; height:100%; border-radius:4px;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">❌ Gateways absentes · DNS/NTP non renseignés · FQDNs à documenter</div>
+        </div>
+        <div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="font-size:12px; font-weight:600;">VLAN IDs (Phase 2 planifiée)</span><span style="font-size:12px; color:var(--blue-accent); font-weight:700;">N/A</span></div>
+          <div style="background:#eee; border-radius:4px; height:8px;"><div style="background:var(--blue-accent); width:100%; height:100%; border-radius:4px;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">ℹ️ Démarche correcte — VLAN IDs à définir après validation des prérequis IP</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#fff8e8; border:1px solid #f5d5a5; border-radius:6px; padding:12px 16px; margin-top:20px; font-size:12px;">
+      <strong>📋 Score estimé post-corrections :</strong> En corrigeant les comptages TEP (12 IPs), en allouant les IPs NSX Manager nœuds 2 &amp; 3, en documentant les gateways/DNS/NTP/FQDNs, et en ajustant les subnets selon les recommandations, le score atteindrait <strong>~92%</strong> — rendant le plan prêt pour la saisie dans le VCF 9 Planning &amp; Preparation Workbook et la génération du JSON SDDC Manager.
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  VCF 9 Network Validation Report v2 · Généré le 16 avril 2026 · Corrections : mode vCenter Standard · Centralisation vCenter dans MD VM Mgmt · WD2 sans VKS/Tanzu · Dimensionnement +30% marge<br>
+  Référence : VMware Cloud Foundation 9.0 Planning &amp; Preparation Workbook · NSX 9 Installation Guide · Broadcom TechDocs
+</footer>
+
+</body>
+</html>

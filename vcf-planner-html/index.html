@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VCF 9 Network Planner</title>
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    /* ── CSS DESIGN SYSTEM (VCF-DD) ───────────────────────────── */
+    :root {
+      --blue-dark:   #0d1b2a;
+      --blue-mid:    #1b3a5c;
+      --blue-accent: #1e6abf;
+      --blue-light:  #3a9bd5;
+      --green:  #27ae60;
+      --orange: #e67e22;
+      --red:    #c0392b;
+      --yellow: #f39c12;
+      --gray-light:  #f4f6f9;
+      --gray-border: #dce1e9;
+      --text-dark:  #1a1a2e;
+      --text-muted: #5a6a7a;
+      --white: #ffffff;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [x-cloak] { display: none !important; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--gray-light);
+      color: var(--text-dark);
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── SCROLLBAR ─────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #e8edf4; }
+    ::-webkit-scrollbar-thumb { background: #b0c4d8; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--blue-light); }
+
+    /* ── LOGIN ─────────────────────────────────────────────────── */
+    .login-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-card {
+      background: white; border-radius: 12px; width: 100%; max-width: 380px;
+      padding: 40px; box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+    }
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo .brand { font-size: 34px; font-weight: 800; color: var(--blue-mid); letter-spacing: -1px; }
+    .login-logo .sub   { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .login-field { margin-bottom: 14px; }
+    .login-error { font-size: 12px; color: var(--red); min-height: 16px; margin-bottom: 10px; }
+    .login-btn {
+      width: 100%; padding: 11px; background: var(--blue-accent); color: white;
+      border: none; border-radius: 6px; font-size: 14px; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: background 0.15s;
+    }
+    .login-btn:hover:not(:disabled) { background: #155fa0; }
+    .login-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+    /* ── HEADER ────────────────────────────────────────────────── */
+    .app-header {
+      background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
+      color: white; padding: 13px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .app-header-left { display: flex; align-items: center; gap: 14px; }
+    .app-header-brand { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
+    .app-header-project { font-size: 12px; color: #a8c4de; }
+    .app-header-right { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a8c4de; }
+    .header-user { font-size: 12px; color: #a8c4de; padding: 0 8px; }
+    .header-btn {
+      font-size: 12px; color: #a8c4de; background: none; border: 1px solid rgba(168,196,222,0.3);
+      border-radius: 4px; padding: 4px 12px; cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .header-btn:hover { background: rgba(255,255,255,0.12); color: white; border-color: rgba(255,255,255,0.3); }
+
+    /* ── TAB BAR ───────────────────────────────────────────────── */
+    .tab-bar {
+      background: var(--blue-mid);
+      display: flex; gap: 0; overflow-x: auto;
+      border-bottom: 3px solid var(--blue-accent);
+      padding: 0 16px;
+      scrollbar-width: none;
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      padding: 10px 16px; font-size: 11px; font-weight: 700;
+      color: #90aec8; border: none; background: none; cursor: pointer;
+      border-bottom: 3px solid transparent; margin-bottom: -3px;
+      white-space: nowrap; transition: all 0.15s;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      font-family: inherit;
+    }
+    .tab-btn:hover { color: white; background: rgba(255,255,255,0.07); }
+    .tab-btn.active { color: white; border-bottom-color: #5bc8ff; background: rgba(255,255,255,0.1); }
+
+    /* ── MAIN CONTAINER ────────────────────────────────────────── */
+    .main { padding: 22px 28px; max-width: 1440px; margin: 0 auto; }
+
+    /* ── TOAST ─────────────────────────────────────────────────── */
+    .toast {
+      position: fixed; top: 16px; right: 20px; z-index: 200;
+      background: var(--blue-dark); color: white; font-size: 12px;
+      padding: 10px 18px; border-radius: 6px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+      border-left: 3px solid var(--blue-accent);
+    }
+
+    /* ── SECTION TITLE ─────────────────────────────────────────── */
+    .sec-title {
+      font-size: 13px; font-weight: 700; color: var(--blue-mid);
+      border-left: 4px solid var(--blue-accent); padding-left: 11px;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
+    }
+
+    /* ── CARD ──────────────────────────────────────────────────── */
+    .card {
+      background: white; border-radius: 8px;
+      border: 1px solid var(--gray-border);
+      box-shadow: 0 1px 5px rgba(0,0,0,0.07);
+      padding: 20px; margin-bottom: 16px;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    /* ── GRID ──────────────────────────────────────────────────── */
+    .g2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+    .g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+    .g5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; }
+    @media (max-width: 960px) { .g4,.g5 { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 700px)  { .g2,.g3,.g4,.g5 { grid-template-columns: 1fr; } }
+
+    /* ── FIELD ─────────────────────────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field > label {
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .field-note { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 3px; }
+
+    /* ── FORM CONTROLS ─────────────────────────────────────────── */
+    .input, .select {
+      width: 100%; border: 1px solid var(--gray-border); border-radius: 5px;
+      padding: 6px 10px; font-size: 12px; color: var(--text-dark);
+      background: white; outline: none; font-family: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .input:focus, .select:focus {
+      border-color: var(--blue-accent);
+      box-shadow: 0 0 0 2px rgba(30,106,191,0.13);
+    }
+    .input:disabled { background: #f0f3f8; color: #aaa; }
+    .input.mono { font-family: 'Courier New', monospace; font-size: 11px; }
+    .check-row { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; margin-top: 2px; }
+    .check-row input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--blue-accent); cursor: pointer; }
+
+    /* ── BUTTONS ───────────────────────────────────────────────── */
+    .btn {
+      padding: 7px 15px; border-radius: 5px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid; transition: all 0.15s; font-family: inherit;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .btn-primary  { background: var(--blue-accent); color: white; border-color: var(--blue-accent); }
+    .btn-primary:hover  { background: #155fa0; border-color: #155fa0; }
+    .btn-secondary { background: white; color: var(--blue-mid); border-color: var(--gray-border); }
+    .btn-secondary:hover { background: #f0f5fb; border-color: var(--blue-light); }
+    .btn-danger  { background: #fde8e8; color: var(--red); border-color: #f5b5b5; }
+    .btn-danger:hover { background: #fbd0d0; }
+    .btn-sm { padding: 3px 9px; font-size: 11px; }
+    .btn-link {
+      background: none; border: none; color: var(--blue-accent); cursor: pointer;
+      font-size: 11px; font-weight: 600; font-family: inherit; text-decoration: underline; padding: 0;
+    }
+
+    /* ── TABLES ────────────────────────────────────────────────── */
+    .tbl-wrap { overflow-x: auto; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.09); }
+    .tbl { width: 100%; border-collapse: collapse; background: white; font-size: 12px; }
+    .tbl thead tr { background: var(--blue-mid); }
+    .tbl thead th {
+      padding: 10px 12px; text-align: left; font-weight: 600; color: white;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+    }
+    .tbl thead th.resizable { resize: horizontal; overflow: hidden; }
+    .tbl tbody tr { border-bottom: 1px solid var(--gray-border); }
+    .tbl tbody tr:nth-child(even) td { background: #fafbfd; }
+    .tbl tbody tr:hover td { background: #eef4fc !important; }
+    .tbl tbody td { padding: 7px 12px; vertical-align: middle; }
+    .tbl .input {
+      border-color: #dde6f0; padding: 3px 8px; font-size: 11px;
+      box-shadow: none; background: white;
+    }
+    .tbl .input:focus { border-color: var(--blue-accent); }
+    .tbl-domain { font-weight: 600; color: var(--blue-accent); }
+    .tbl-mono { font-family: 'Courier New', monospace; font-size: 11px; }
+    .tbl-muted { color: var(--text-muted); font-size: 11px; }
+
+    /* ── BADGES ────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; padding: 2px 9px;
+      border-radius: 10px; font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .badge-mgmt     { background: #ddeaff; color: #1a3a8b; }
+    .badge-workload { background: #d9f5e5; color: #145c2e; }
+    .badge-mandatory { background: #d9f5e5; color: #145c2e; }
+    .badge-scenario  { background: #fff3d9; color: #7a4e00; }
+    .badge-optional  { background: #f0e8ff; color: #5a1a9b; }
+    .badge-shared    { background: #e8f4ff; color: #1a4a8b; }
+    .badge-dedicated { background: #e8fff4; color: #1a5c2e; }
+
+    /* ── VALIDATION BLOCKS ─────────────────────────────────────── */
+    .val-summary {
+      background: var(--blue-mid); border-radius: 8px;
+      padding: 14px 20px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .val-summary-label { font-size: 12px; color: #a8c4de; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+    .val-count { padding: 5px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+    .val-count.blocker { background: var(--red); color: white; }
+    .val-count.warning { background: var(--orange); color: white; }
+    .val-count.info    { background: var(--blue-light); color: white; }
+    .val-count.ok      { background: var(--green); color: white; }
+
+    .anomaly-block {
+      margin-bottom: 10px; border-radius: 8px; overflow: hidden;
+      border-left: 5px solid; background: white;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .anomaly-block.blocker { border-color: var(--red); }
+    .anomaly-block.warning { border-color: var(--orange); }
+    .anomaly-block.info    { border-color: var(--blue-accent); }
+    .anomaly-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; background: rgba(0,0,0,0.025);
+    }
+    .anomaly-sev {
+      font-size: 10px; font-weight: 700; padding: 2px 9px;
+      border-radius: 10px; color: white; text-transform: uppercase; white-space: nowrap;
+    }
+    .anomaly-sev.blocker { background: var(--red); }
+    .anomaly-sev.warning { background: var(--orange); }
+    .anomaly-sev.info    { background: var(--blue-accent); }
+    .anomaly-title { font-weight: 700; font-size: 13px; flex: 1; }
+    .anomaly-meta  { font-size: 11px; color: var(--text-muted); }
+    .anomaly-body  { padding: 10px 16px; font-size: 12px; color: #444; }
+    .anomaly-rec   { background: #f0f5ff; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 12px; }
+    .anomaly-rec strong { color: var(--blue-accent); }
+    .val-ok { text-align: center; padding: 40px; color: var(--green); font-size: 16px; font-weight: 700; }
+
+    /* ── OVERVIEW DOMAIN CARDS ─────────────────────────────────── */
+    .dom-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 16px; }
+    @media (max-width: 1000px) { .dom-cards { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 640px)  { .dom-cards { grid-template-columns: 1fr; } }
+
+    .dom-card { background: white; border-radius: 8px; border: 1px solid var(--gray-border); box-shadow: 0 1px 5px rgba(0,0,0,0.08); overflow: hidden; }
+    .dom-card-head {
+      background: linear-gradient(135deg, var(--blue-mid) 0%, #1d4570 100%);
+      color: white; padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .dom-card-head .dom-name { font-size: 14px; font-weight: 700; }
+    .dom-card-body { padding: 14px 16px; }
+    .dom-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+    .dom-stat  { text-align: center; background: var(--gray-light); border-radius: 6px; padding: 10px; }
+    .dom-stat-val { font-size: 22px; font-weight: 800; color: var(--blue-mid); line-height: 1; }
+    .dom-stat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 3px; }
+    .dom-services { margin-top: 10px; font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+    /* ── WORKLOAD DOMAIN CARD ──────────────────────────────────── */
+    .wld-card { background: white; border-radius: 8px; border: 1px solid var(--gray-border); box-shadow: 0 1px 5px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 16px; }
+    .wld-card-head {
+      background: linear-gradient(90deg, var(--blue-mid) 0%, #1d4570 100%);
+      padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .wld-head-input {
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 5px; padding: 5px 10px; color: white; font-size: 14px; font-weight: 700;
+      font-family: inherit; outline: none; min-width: 200px;
+    }
+    .wld-head-input::placeholder { color: rgba(255,255,255,0.5); }
+    .wld-head-input:focus { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.6); }
+    .wld-card-body { padding: 18px; }
+
+    /* ── NESTED SECTION ────────────────────────────────────────── */
+    .nest { border: 1px solid var(--gray-border); border-radius: 6px; padding: 14px; margin-top: 14px; background: #fafbfd; }
+    .nest-title { font-size: 11px; font-weight: 700; color: var(--blue-mid); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
+
+    /* ── INFO BOX ──────────────────────────────────────────────── */
+    .infobox { border-radius: 6px; padding: 11px 15px; margin-bottom: 12px; font-size: 12px; display: flex; gap: 10px; }
+    .infobox.blue   { background: #e8f0fe; border: 1px solid #a5c0f5; color: #1a3a8b; }
+    .infobox.yellow { background: #fff8e1; border: 1px solid #f5cc7a; color: #7a4e00; }
+    .infobox.green  { background: #e8f8f0; border: 1px solid #a5d5b5; color: #1a5c2e; }
+
+    /* ── SERVICE ACCORDION BLOCK ───────────────────────────────── */
+    .svc-block { border: 1px solid var(--gray-border); border-radius: 6px; padding: 16px; margin-bottom: 10px; background: white; }
+    .svc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 0; }
+    .svc-head label { font-size: 14px; font-weight: 700; color: var(--blue-mid); display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .svc-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gray-border); }
+
+    /* ── ADDITIONAL SERVICE ROW ────────────────────────────────── */
+    .addsvc-row { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: #fafbfd; }
+
+    /* ── VPC / SUBNET ──────────────────────────────────────────── */
+    .vpc-block { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: white; }
+    .subnet-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+
+    /* ── EXPORT GRID ───────────────────────────────────────────── */
+    .export-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
+    @media (max-width: 700px) { .export-grid { grid-template-columns: 1fr; } }
+
+    /* ── FLEX HELPERS ──────────────────────────────────────────── */
+    .flex { display: flex; }
+    .flex-center { display: flex; align-items: center; }
+    .flex-between { display: flex; align-items: center; justify-content: space-between; }
+    .gap4 { gap: 4px; }
+    .gap8 { gap: 8px; }
+    .gap12 { gap: 12px; }
+    .gap16 { gap: 16px; }
+    .mt8  { margin-top: 8px; }
+    .mt12 { margin-top: 12px; }
+    .mt16 { margin-top: 16px; }
+    .mb4  { margin-bottom: 4px; }
+    .mb8  { margin-bottom: 8px; }
+    .mb12 { margin-bottom: 12px; }
+    .w-full { width: 100%; }
+    .flex-1 { flex: 1; }
+    .text-sm { font-size: 12px; }
+    .text-xs { font-size: 11px; }
+    .text-muted { color: var(--text-muted); }
+    .font-bold { font-weight: 700; }
+    .text-center { text-align: center; }
+    .divider { border: none; border-top: 1px solid var(--gray-border); margin: 16px 0; }
+  </style>
+</head>
+<body x-data="vcfApp()" x-init="init()" x-cloak>
+
+<!-- ══ LOGIN OVERLAY ═════════════════════════════════════════════ -->
+<div class="login-overlay" x-show="!authReady">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="brand">VCF 9</div>
+      <div class="sub">Network Planner — Architecture Edition</div>
+    </div>
+    <!-- Real <form> element required by Dashlane and all password managers -->
+    <form id="vcf-login-form" autocomplete="on" @submit.prevent="doLogin()">
+      <div class="login-field">
+        <div class="field"><label for="vcf-username">Username</label>
+          <input id="vcf-username" class="input" type="text"
+            name="username" autocomplete="username"
+            x-model="loginUsername" placeholder="username" />
+        </div>
+      </div>
+      <div class="login-field">
+        <div class="field"><label for="vcf-password">Password</label>
+          <input id="vcf-password" class="input" type="password"
+            name="password" autocomplete="current-password"
+            x-model="loginPassword" placeholder="••••••••" />
+        </div>
+      </div>
+      <p class="login-error" x-text="loginError"></p>
+      <button type="submit" class="login-btn" :disabled="loginLoading" x-text="loginLoading ? 'Signing in…' : 'Sign In'"></button>
+    </form>
+  </div>
+</div>
+
+<!-- ══ APP SHELL ═════════════════════════════════════════════════ -->
+<div x-show="authReady">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="app-header-left">
+      <span class="app-header-brand">VCF 9 Network Planner</span>
+      <span class="app-header-project" x-text="project.projectName ? '— ' + project.projectName : ''"></span>
+    </div>
+    <div class="app-header-right">
+      <span class="header-user" x-text="currentUser ? currentUser.username : ''"></span>
+      <button class="header-btn" @click="doLogout()">Sign out</button>
+    </div>
+  </header>
+
+  <!-- Toast -->
+  <div class="toast" x-show="toastVisible" x-transition x-text="toastMsg"></div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <template x-for="t in tabs" :key="t.id">
+      <button class="tab-btn" :class="{active: activeTab===t.id}" @click="activeTab=t.id" x-text="t.label"></button>
+    </template>
+  </div>
+
+  <!-- ══ TAB PANELS ══════════════════════════════════════════════ -->
+  <div class="main">
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- OVERVIEW                                                   -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='overview'">
+
+      <!-- Global Config -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="sec-title">Global Configuration</h2>
+        </div>
+        <div class="g4 mb12">
+          <div class="field"><label>Project Name</label>
+            <input class="input" x-model="project.projectName" placeholder="e.g. ACME-VCF9-DC1" />
+          </div>
+          <div class="field"><label>Customer</label>
+            <input class="input" x-model="project.customerName" placeholder="Customer name" />
+          </div>
+          <div class="field"><label>Scenario</label>
+            <select class="select" x-model="project.scenario">
+              <option value="vcf-standard">VCF Standard</option>
+              <option value="vcf-automation">VCF Automation</option>
+              <option value="vcf-automation-vks">VCF Automation + VKS</option>
+              <option value="private-ai">Private AI</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="field"><label>Deployment Type</label>
+            <select class="select" x-model="project.deploymentType">
+              <option value="greenfield">Greenfield</option>
+              <option value="brownfield">Brownfield</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex-center gap12">
+          <label class="check-row">
+            <input type="checkbox" x-model="project.subnetBufferEnabled" />
+            Subnet Buffer
+          </label>
+          <input class="input" type="number" min="0" max="100" style="width:70px"
+            x-model.number="project.subnetBufferPercent" :disabled="!project.subnetBufferEnabled" />
+          <span class="text-muted text-xs">% overhead on all recommended CIDRs</span>
+        </div>
+      </div>
+
+      <!-- Domain Summary Cards -->
+      <div class="dom-cards">
+        <template x-for="s in domainSummaries" :key="s.domain">
+          <div class="dom-card">
+            <div class="dom-card-head">
+              <span class="dom-name" x-text="s.domain"></span>
+              <span class="badge" :class="s.domainType==='management' ? 'badge-mgmt' : 'badge-workload'"
+                x-text="s.domainType==='management' ? 'Management' : 'Workload'"></span>
+            </div>
+            <div class="dom-card-body">
+              <div class="dom-stats">
+                <div class="dom-stat"><div class="dom-stat-val" x-text="s.hostCount"></div><div class="dom-stat-lbl">Hosts</div></div>
+                <div class="dom-stat"><div class="dom-stat-val" x-text="s.vlanCount"></div><div class="dom-stat-lbl">VLANs</div></div>
+                <div class="dom-stat"><div class="dom-stat-val" x-text="s.totalIPCount"></div><div class="dom-stat-lbl">IPs</div></div>
+              </div>
+              <div class="dom-services" x-text="s.enabledServices.length ? s.enabledServices.join(' · ') : 'No optional services'"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- MANAGEMENT DOMAIN                                          -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='management'">
+
+      <div class="card">
+        <h2 class="sec-title">Basic Configuration</h2>
+        <div class="g4 mt12">
+          <div class="field"><label>Host Count</label>
+            <input class="input" type="number" min="4" x-model.number="managementDomain.hostCount" />
+          </div>
+          <div class="field"><label>Topology Mode</label>
+            <select class="select" x-model="managementDomain.topologyMode">
+              <option value="single-site">Single Site</option>
+              <option value="stretched">Stretched</option>
+              <option value="partially-stretched">Partially Stretched</option>
+            </select>
+          </div>
+          <div class="field"><label>TEP Interfaces / Host</label>
+            <input class="input" type="number" min="1" max="4" x-model.number="managementDomain.tepInterfacesPerHost" />
+          </div>
+          <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+            <label class="check-row">
+              <input type="checkbox" x-model="managementDomain.layer2AdjacencyConfirmed" />
+              L2 Adjacency Confirmed
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="sec-title">NSX Configuration</h2>
+        <div class="g4 mt12">
+          <div class="field"><label>NSX Manager Mode</label>
+            <select class="select" x-model="managementDomain.nsxManagerMode">
+              <option value="standalone">Standalone (1 node)</option>
+              <option value="clustered">Clustered (3 nodes + VIP)</option>
+            </select>
+          </div>
+          <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+            <label class="check-row"><input type="checkbox" x-model="managementDomain.nsxEdgeDeployed" /> NSX Edge Deployed</label>
+          </div>
+          <div class="field" x-show="managementDomain.nsxEdgeDeployed"><label>Edge Node Count</label>
+            <input class="input" type="number" min="1" x-model.number="managementDomain.nsxEdgeNodeCount" />
+          </div>
+          <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+            <label class="check-row"><input type="checkbox" x-model="managementDomain.aviDeployed" /> AVI / NSX ALB Deployed</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="sec-title">Fleet Configuration</h2>
+        <div class="g2 mt12">
+          <div class="field"><label>Fleet Placement</label>
+            <select class="select" x-model="managementDomain.fleetPlacement">
+              <option value="shared-mgmt-vlan">Shared — Management VM VLAN</option>
+              <option value="dedicated-fleet-vlan">Dedicated Fleet VLAN</option>
+            </select>
+            <span class="field-note">VCF 9 uses Simple mode (1 appliance). Dedicated Fleet VLAN moves platform service nodes (Ops, Logs, Networks, Automation) to the Fleet Network. Collectors always remain in Management VM Network.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="sec-title">VKS / Kubernetes</h2>
+        <label class="check-row mb12" style="margin-top:10px">
+          <input type="checkbox" x-model="managementDomain.vksEnabled" />
+          VKS Enabled in Management Domain
+        </label>
+        <div x-show="managementDomain.vksEnabled">
+          <div class="infobox blue mb12">
+            <strong>VKS Infrastructure VLAN:</strong>&nbsp;5 CONSECUTIVE IPs required — 3 control plane VMs + 1 floating IP + 1 patching IP.
+          </div>
+          <div class="nest">
+            <div class="flex-between mb8">
+              <div class="nest-title">NSX VPCs</div>
+              <button class="btn btn-secondary btn-sm" @click="addVKSVPC('management')">+ Add VPC</button>
+            </div>
+            <template x-for="(vpc, vi) in managementDomain.vksVPCs" :key="vpc.id">
+              <div class="vpc-block">
+                <div class="flex-center gap8 mb8">
+                  <input class="input flex-1" placeholder="VPC Name" x-model="managementDomain.vksVPCs[vi].name" />
+                  <select class="select" style="width:160px" x-model="managementDomain.vksVPCs[vi].type">
+                    <option value="supervisor">Supervisor VPC</option>
+                    <option value="namespace">Namespace VPC</option>
+                  </select>
+                  <button class="btn btn-danger btn-sm" @click="managementDomain.vksVPCs.splice(vi,1)">✕</button>
+                </div>
+                <div style="padding-left:10px;border-left:2px solid var(--blue-accent)">
+                  <div class="flex-between mb4">
+                    <span class="text-xs text-muted font-bold">Subnets</span>
+                    <button class="btn-link" @click="addVKSSubnet('management', vi)">+ Subnet</button>
+                  </div>
+                  <template x-for="(sn, si) in vpc.subnets" :key="sn.id">
+                    <div class="subnet-row">
+                      <input class="input flex-1" placeholder="Subnet name" x-model="managementDomain.vksVPCs[vi].subnets[si].name" />
+                      <select class="select" style="width:110px" x-model="managementDomain.vksVPCs[vi].subnets[si].accessMode">
+                        <option value="private">Private</option>
+                        <option value="public">Public</option>
+                        <option value="isolated">Isolated</option>
+                      </select>
+                      <input class="input mono" style="width:150px" placeholder="CIDR" x-model="managementDomain.vksVPCs[vi].subnets[si].ipBlock" />
+                      <button class="btn-link" style="color:var(--red)" @click="managementDomain.vksVPCs[vi].subnets.splice(si,1)">✕</button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="sec-title">Additional Services</h2>
+          <button class="btn btn-secondary btn-sm" @click="addAdditionalService('management')">+ Add Service</button>
+        </div>
+        <template x-for="(svc, si) in managementDomain.additionalServices" :key="svc.id">
+          <div class="addsvc-row">
+            <div class="g5 mb8">
+              <input class="input" placeholder="Service name" x-model="managementDomain.additionalServices[si].name" style="grid-column:span 2" />
+              <input class="input" type="number" min="1" placeholder="Appliances" x-model.number="managementDomain.additionalServices[si].applianceCount" />
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.additionalServices[si].requiresDedicatedVLAN" /> Dedicated VLAN</label>
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.additionalServices[si].requiresVIP" /> Requires VIP</label>
+            </div>
+            <div class="flex-center gap8">
+              <input class="input flex-1" placeholder="Notes" x-model="managementDomain.additionalServices[si].notes" />
+              <input x-show="managementDomain.additionalServices[si].requiresVIP" class="input" style="width:70px" type="number" min="1" placeholder="VIP#" x-model.number="managementDomain.additionalServices[si].vipCount" />
+              <button class="btn btn-danger btn-sm" @click="managementDomain.additionalServices.splice(si,1)">Remove</button>
+            </div>
+          </div>
+        </template>
+        <div x-show="managementDomain.additionalServices.length===0" class="text-center text-muted text-xs" style="padding:16px">No additional services configured.</div>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- PLATFORM SERVICES                                          -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='platform'">
+
+      <!-- VCF Operations -->
+      <div class="svc-block">
+        <div class="svc-head">
+          <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
+            <input type="checkbox" x-model="managementDomain.vcfOperations.enabled" />
+            VCF Operations <span class="text-muted text-xs" style="font-weight:400;margin-left:6px">(formerly vROps)</span>
+          </label>
+        </div>
+        <div class="svc-body" x-show="managementDomain.vcfOperations.enabled">
+          <div class="g4">
+            <div class="field"><label>Mode</label>
+              <select class="select" x-model="managementDomain.vcfOperations.mode">
+                <option value="standalone">Standalone (1 node)</option>
+                <option value="enterprise">Enterprise (3 nodes + VIP)</option>
+              </select>
+            </div>
+            <div class="field"><label>Remote Collectors</label>
+              <input class="input" type="number" min="0" x-model.number="managementDomain.vcfOperations.remoteCollectorCount" />
+              <span class="field-note">Instance-level — always in Mgmt VM Network</span>
+            </div>
+            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperations.requiresDedicatedVLAN" /> Dedicated VLAN</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VCF Operations for Logs -->
+      <div class="svc-block">
+        <div class="svc-head">
+          <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
+            <input type="checkbox" x-model="managementDomain.vcfOperationsForLogs.enabled" />
+            VCF Operations for Logs <span class="text-muted text-xs" style="font-weight:400;margin-left:6px">(formerly vRLI)</span>
+          </label>
+        </div>
+        <div class="svc-body" x-show="managementDomain.vcfOperationsForLogs.enabled">
+          <div class="g4">
+            <div class="field"><label>Mode</label>
+              <select class="select" x-model="managementDomain.vcfOperationsForLogs.mode">
+                <option value="standalone">Standalone (1 master)</option>
+                <option value="clustered">Clustered (master + workers)</option>
+              </select>
+            </div>
+            <div class="field" x-show="managementDomain.vcfOperationsForLogs.mode==='clustered'"><label>Worker Count</label>
+              <input class="input" type="number" min="2" x-model.number="managementDomain.vcfOperationsForLogs.workerCount" />
+            </div>
+            <div class="field" x-show="managementDomain.vcfOperationsForLogs.mode==='clustered'" style="justify-content:flex-end;padding-bottom:2px">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperationsForLogs.integratedLBVIP" /> ILB Syslog VIP</label>
+            </div>
+            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperationsForLogs.requiresDedicatedVLAN" /> Dedicated VLAN</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VCF Operations for Networks -->
+      <div class="svc-block">
+        <div class="svc-head">
+          <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
+            <input type="checkbox" x-model="managementDomain.vcfOperationsForNetworks.enabled" />
+            VCF Operations for Networks <span class="text-muted text-xs" style="font-weight:400;margin-left:6px">(formerly vRNI)</span>
+          </label>
+        </div>
+        <div class="svc-body" x-show="managementDomain.vcfOperationsForNetworks.enabled">
+          <div class="g4">
+            <div class="field"><label>Platform Nodes</label>
+              <input class="input" type="number" min="1" x-model.number="managementDomain.vcfOperationsForNetworks.platformNodeCount" />
+            </div>
+            <div class="field"><label>Collectors / Proxy VMs</label>
+              <input class="input" type="number" min="0" x-model.number="managementDomain.vcfOperationsForNetworks.collectorCount" />
+              <span class="field-note">Instance-level — always in Mgmt VM Network</span>
+            </div>
+            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperationsForNetworks.requiresDedicatedVLAN" /> Dedicated VLAN</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VCF Automation -->
+      <div class="svc-block">
+        <div class="svc-head">
+          <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
+            <input type="checkbox" x-model="managementDomain.vcfAutomation.enabled" />
+            VCF Automation <span class="text-muted text-xs" style="font-weight:400;margin-left:6px">(formerly vRA)</span>
+          </label>
+        </div>
+        <div class="svc-body" x-show="managementDomain.vcfAutomation.enabled">
+          <div class="g4">
+            <div class="field"><label>Mode</label>
+              <select class="select" x-model="managementDomain.vcfAutomation.mode">
+                <option value="standalone">Standalone (1 VA)</option>
+                <option value="clustered">HA (4 node IPs + 1 VIP)</option>
+              </select>
+              <span class="field-note" x-show="managementDomain.vcfAutomation.mode==='clustered'">3 active + 1 upgrade/patching node</span>
+            </div>
+            <div class="field"><label>Orchestrator Mode</label>
+              <select class="select" x-model="managementDomain.vcfAutomation.orchestratorMode">
+                <option value="embedded">Embedded vRO</option>
+                <option value="standalone">Standalone vRO</option>
+              </select>
+            </div>
+            <div class="field" x-show="managementDomain.vcfAutomation.orchestratorMode==='standalone'"><label>Orchestrator Nodes</label>
+              <input class="input" type="number" min="1" x-model.number="managementDomain.vcfAutomation.orchestratorNodeCount" />
+              <span class="field-note">1 (standalone) or 3 (HA)</span>
+            </div>
+            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfAutomation.requiresDedicatedVLAN" /> Dedicated VLAN</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VCF Identity Broker -->
+      <div class="svc-block">
+        <div class="svc-head">
+          <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
+            <input type="checkbox" x-model="managementDomain.vcfIdentityBroker.enabled" />
+            VCF Identity Broker
+          </label>
+        </div>
+        <div class="svc-body" x-show="managementDomain.vcfIdentityBroker.enabled">
+          <div class="g4">
+            <div class="field"><label>Mode</label>
+              <select class="select" x-model="managementDomain.vcfIdentityBroker.mode">
+                <option value="embedded">Embedded</option>
+                <option value="appliance">Appliance</option>
+              </select>
+            </div>
+            <div class="field" x-show="managementDomain.vcfIdentityBroker.mode==='appliance'" style="justify-content:flex-end;padding-bottom:2px">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfIdentityBroker.haEnabled" /> HA (3 nodes + VIP)</label>
+            </div>
+            <div class="field" x-show="managementDomain.vcfIdentityBroker.mode==='appliance'" style="justify-content:flex-end;padding-bottom:2px">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfIdentityBroker.requiresDedicatedVLAN" /> Dedicated VLAN</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- WORKLOAD DOMAINS                                           -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='workloads'">
+      <div class="flex-between mb12">
+        <h2 class="sec-title" style="margin-bottom:0">Workload Domains</h2>
+        <button class="btn btn-primary" @click="addWorkloadDomain()">+ Add Workload Domain</button>
+      </div>
+
+      <template x-for="(wld, wi) in workloadDomains" :key="wld.id">
+        <div class="wld-card">
+          <div class="wld-card-head">
+            <input class="wld-head-input" placeholder="Domain Name" x-model="workloadDomains[wi].domainName" />
+            <button class="btn btn-danger btn-sm" @click="workloadDomains.splice(wi,1)">Remove Domain</button>
+          </div>
+          <div class="wld-card-body">
+            <div class="g4 mb12">
+              <div class="field"><label>Host Count</label>
+                <input class="input" type="number" min="3" x-model.number="workloadDomains[wi].hostCount" />
+              </div>
+              <div class="field"><label>Domain Role</label>
+                <select class="select" x-model="workloadDomains[wi].domainRole">
+                  <option value="standard-vi">Standard VI</option>
+                  <option value="platform-services">Platform Services</option>
+                  <option value="runtime-kubernetes">Runtime Kubernetes</option>
+                  <option value="ai-workloads">AI Workloads</option>
+                  <option value="mixed">Mixed</option>
+                </select>
+              </div>
+              <div class="field"><label>TEP Interfaces / Host</label>
+                <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].tepInterfacesPerHost" />
+              </div>
+              <div class="field" style="gap:8px">
+                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].dedicatedVLANs" /> Dedicated VLANs</label>
+                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].nsxEnabled" /> NSX Enabled</label>
+                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].aviEnabled" /> AVI / NSX ALB</label>
+                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].vksEnabled" /> VKS Enabled</label>
+              </div>
+            </div>
+
+            <!-- NSX sub-options -->
+            <div x-show="workloadDomains[wi].nsxEnabled" class="nest mt12">
+              <div class="nest-title">NSX Options</div>
+              <div class="g4">
+                <div class="field"><label>NSX Manager Mode</label>
+                  <select class="select" x-model="workloadDomains[wi].nsxManagerMode">
+                    <option value="shared">Shared (Mgmt Domain NSX)</option>
+                    <option value="standalone">Standalone (1 node)</option>
+                    <option value="clustered">Clustered (3 + VIP)</option>
+                  </select>
+                </div>
+                <div class="field" style="gap:8px">
+                  <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].edgeRequired" /> NSX Edge Required</label>
+                  <label class="check-row" x-show="workloadDomains[wi].edgeRequired"><input type="checkbox" x-model="workloadDomains[wi].sharedEdgeUplinks" /> Shared Edge Uplinks</label>
+                </div>
+                <div class="field" x-show="workloadDomains[wi].edgeRequired"><label>Edge Node Count</label>
+                  <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].edgeNodeCount" />
+                </div>
+              </div>
+            </div>
+
+            <!-- VKS VPCs -->
+            <div x-show="workloadDomains[wi].vksEnabled" class="nest mt12">
+              <div class="infobox yellow">
+                5 CONSECUTIVE IPs required for VKS Infrastructure VLAN (3 control plane + 1 floating + 1 patching).
+              </div>
+              <div class="flex-between mb8">
+                <div class="nest-title" style="margin-bottom:0">NSX VPCs</div>
+                <button class="btn-link" @click="addVKSVPC('workload', wi)">+ Add VPC</button>
+              </div>
+              <template x-for="(vpc, vi) in workloadDomains[wi].vksVPCs" :key="vpc.id">
+                <div class="vpc-block">
+                  <div class="flex-center gap8 mb8">
+                    <input class="input flex-1" placeholder="VPC Name" x-model="workloadDomains[wi].vksVPCs[vi].name" />
+                    <select class="select" style="width:150px" x-model="workloadDomains[wi].vksVPCs[vi].type">
+                      <option value="supervisor">Supervisor VPC</option>
+                      <option value="namespace">Namespace VPC</option>
+                    </select>
+                    <button class="btn btn-danger btn-sm" @click="workloadDomains[wi].vksVPCs.splice(vi,1)">✕</button>
+                  </div>
+                  <div style="padding-left:10px;border-left:2px solid var(--blue-accent)">
+                    <button class="btn-link mb4" @click="addVKSSubnet('workload', wi, vi)">+ Subnet</button>
+                    <template x-for="(sn, si) in vpc.subnets" :key="sn.id">
+                      <div class="subnet-row">
+                        <input class="input flex-1" placeholder="Name" x-model="workloadDomains[wi].vksVPCs[vi].subnets[si].name" />
+                        <select class="select" style="width:100px" x-model="workloadDomains[wi].vksVPCs[vi].subnets[si].accessMode">
+                          <option value="private">Private</option>
+                          <option value="public">Public</option>
+                          <option value="isolated">Isolated</option>
+                        </select>
+                        <input class="input mono" style="width:140px" placeholder="CIDR" x-model="workloadDomains[wi].vksVPCs[vi].subnets[si].ipBlock" />
+                        <button class="btn-link" style="color:var(--red)" @click="workloadDomains[wi].vksVPCs[vi].subnets.splice(si,1)">✕</button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Additional services per WLD -->
+            <div class="nest mt12">
+              <div class="flex-between mb8">
+                <div class="nest-title" style="margin-bottom:0">Additional Services</div>
+                <button class="btn-link" @click="addAdditionalService('workload', wi)">+ Add</button>
+              </div>
+              <template x-for="(svc, si) in workloadDomains[wi].additionalServices" :key="svc.id">
+                <div class="flex-center gap8 mb8">
+                  <input class="input flex-1" placeholder="Service name" x-model="workloadDomains[wi].additionalServices[si].name" />
+                  <input class="input" style="width:70px" type="number" min="1" placeholder="Count" x-model.number="workloadDomains[wi].additionalServices[si].applianceCount" />
+                  <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].additionalServices[si].requiresDedicatedVLAN" /> VLAN</label>
+                  <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].additionalServices[si].requiresVIP" /> VIP</label>
+                  <button class="btn btn-danger btn-sm" @click="workloadDomains[wi].additionalServices.splice(si,1)">✕</button>
+                </div>
+              </template>
+              <div x-show="workloadDomains[wi].additionalServices.length===0" class="text-muted text-xs">No additional services.</div>
+            </div>
+
+            <div class="mt12">
+              <div class="field"><label>Notes</label>
+                <input class="input" x-model="workloadDomains[wi].notes" placeholder="Domain notes…" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div x-show="workloadDomains.length===0" class="card text-center text-muted" style="padding:40px">
+        No workload domains configured. Click "+ Add Workload Domain" to start.
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- VLAN DESIGN                                                -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='vlans'">
+      <div class="flex-between mb12">
+        <h2 class="sec-title" style="margin-bottom:0">VLAN Design</h2>
+        <span class="text-muted text-xs">Auto-calculated from configuration — enter VLAN IDs and CIDRs below</span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th class="resizable" style="width:160px">Domain</th>
+              <th class="resizable" style="width:180px">VLAN Name</th>
+              <th class="resizable" style="width:100px">VLAN ID</th>
+              <th class="resizable" style="width:140px">CIDR</th>
+              <th class="resizable" style="width:80px">Req. IPs</th>
+              <th class="resizable" style="width:90px">Rec. CIDR</th>
+              <th class="resizable" style="width:90px">Mandatory</th>
+              <th class="resizable" style="width:80px">Scope</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(v, vi) in vlans" :key="v.id">
+              <tr>
+                <td class="tbl-domain" x-text="v.domain"></td>
+                <td class="font-bold" x-text="v.vlanName"></td>
+                <td><input class="input mono" style="width:80px" placeholder="e.g. 100" x-model="vlans[vi].vlanId" /></td>
+                <td><input class="input mono" style="width:130px" placeholder="10.0.0.0/24" x-model="vlans[vi].cidr" /></td>
+                <td class="text-center font-bold" x-text="v.requiredIPs"></td>
+                <td class="text-center tbl-mono" x-text="v.recommendedCIDR"></td>
+                <td>
+                  <span class="badge" :class="v.mandatory==='mandatory'?'badge-mandatory':(v.mandatory==='scenario-driven'?'badge-scenario':'badge-optional')" x-text="v.mandatory"></span>
+                </td>
+                <td>
+                  <span class="badge" :class="v.scope==='dedicated'?'badge-dedicated':'badge-shared'" x-text="v.scope"></span>
+                </td>
+                <td class="tbl-muted" x-text="v.notes"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- APPLIANCES                                                 -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='appliances'">
+      <div class="flex-between mb12">
+        <h2 class="sec-title" style="margin-bottom:0">Appliance Allocation</h2>
+        <span class="text-muted text-xs">Auto-generated — fill in IP addresses and FQDNs</span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th class="resizable" style="width:200px">Appliance Name</th>
+              <th class="resizable" style="width:160px">Type</th>
+              <th class="resizable" style="width:150px">Domain</th>
+              <th class="resizable" style="width:170px">VLAN</th>
+              <th class="resizable" style="width:140px">IP Address</th>
+              <th class="resizable" style="width:210px">FQDN</th>
+              <th class="resizable" style="width:70px">Static</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(a, ai) in appliances" :key="a.id">
+              <tr>
+                <td class="tbl-mono tbl-domain" x-text="a.applianceName"></td>
+                <td x-text="a.applianceType"></td>
+                <td class="tbl-muted" x-text="a.domain"></td>
+                <td class="tbl-muted" x-text="a.vlan"></td>
+                <td><input class="input mono" style="width:130px" placeholder="TBD" x-model="appliances[ai].ipAddress" /></td>
+                <td><input class="input mono" style="width:200px" placeholder="fqdn.domain.local" x-model="appliances[ai].fqdn" /></td>
+                <td class="text-center">
+                  <span class="badge" :class="a.staticIPRequired ? 'badge-mandatory' : 'badge-optional'" x-text="a.staticIPRequired ? 'Yes' : 'No'"></span>
+                </td>
+                <td class="tbl-muted" x-text="a.notes"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- VIPs                                                       -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='vips'">
+      <div class="flex-between mb12">
+        <h2 class="sec-title" style="margin-bottom:0">Virtual IP (VIP) Allocation</h2>
+        <span class="text-muted text-xs">Auto-generated — fill in IP addresses and FQDNs</span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th class="resizable" style="width:220px">VIP Name</th>
+              <th class="resizable" style="width:180px">Service</th>
+              <th class="resizable" style="width:150px">Domain</th>
+              <th class="resizable" style="width:170px">VLAN</th>
+              <th class="resizable" style="width:140px">IP Address</th>
+              <th class="resizable" style="width:210px">FQDN</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(v, vi) in vips" :key="v.id">
+              <tr>
+                <td class="font-bold tbl-domain" x-text="v.vipName"></td>
+                <td x-text="v.associatedService"></td>
+                <td class="tbl-muted" x-text="v.domain"></td>
+                <td class="tbl-muted" x-text="v.vlan"></td>
+                <td><input class="input mono" style="width:130px" placeholder="TBD" x-model="vips[vi].ipAddress" /></td>
+                <td><input class="input mono" style="width:200px" placeholder="vip.domain.local" x-model="vips[vi].fqdn" /></td>
+                <td class="tbl-muted" x-text="v.notes"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- VALIDATION                                                 -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='validation'">
+      <div class="val-summary">
+        <span class="val-summary-label">Validation Results</span>
+        <span class="val-count blocker" x-text="validationMessages.filter(m=>m.severity==='blocker').length + ' Blocker(s)'"></span>
+        <span class="val-count warning" x-text="validationMessages.filter(m=>m.severity==='warning').length + ' Warning(s)'"></span>
+        <span class="val-count info"    x-text="validationMessages.filter(m=>m.severity==='info').length + ' Info'"></span>
+        <span class="val-count ok" x-show="validationMessages.filter(m=>m.severity==='blocker').length===0">✓ No Blockers</span>
+      </div>
+
+      <template x-for="m in validationMessages" :key="m.id">
+        <div class="anomaly-block" :class="m.severity">
+          <div class="anomaly-head">
+            <span class="anomaly-sev" :class="m.severity" x-text="m.severity.toUpperCase()"></span>
+            <span class="anomaly-title" x-text="m.message"></span>
+            <span class="anomaly-meta" x-text="m.domain + ' — ' + m.category"></span>
+          </div>
+          <div class="anomaly-body" x-show="m.resolution">
+            <div class="anomaly-rec">
+              <strong>Resolution:</strong> <span x-text="m.resolution"></span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div class="val-ok" x-show="validationMessages.length===0">
+        ✓ No validation issues found — configuration looks good!
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- EXPORT / IMPORT                                            -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='export'">
+      <h2 class="sec-title mb12">Export &amp; Import</h2>
+      <div class="export-grid">
+
+        <div class="card">
+          <h3 class="sec-title" style="font-size:12px;margin-bottom:10px">Excel Export</h3>
+          <p class="text-muted text-sm mb12">Export a full planning workbook with 5 sheets:<br>
+            <strong>Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report</strong>
+          </p>
+          <button class="btn btn-primary" @click="exportExcel()">⬇ Export to Excel (.xlsx)</button>
+        </div>
+
+        <div class="card">
+          <h3 class="sec-title" style="font-size:12px;margin-bottom:10px">JSON Save / Load</h3>
+          <p class="text-muted text-sm mb12">Export or restore the full planner state as a JSON file.<br>
+            All configuration, IP assignments, and FQDNs are preserved.
+          </p>
+          <div class="flex-center gap8">
+            <button class="btn btn-secondary" @click="exportJSON()">⬇ Export JSON</button>
+            <label class="btn btn-secondary" style="cursor:pointer">
+              ⬆ Import JSON
+              <input type="file" accept=".json" class="hidden" style="display:none" @change="importJSON($event)" />
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="sec-title" style="font-size:12px;margin-bottom:10px">Project Statistics</h3>
+          <div class="dom-stats" style="grid-template-columns:repeat(4,1fr)">
+            <div class="dom-stat"><div class="dom-stat-val" x-text="vlans.length"></div><div class="dom-stat-lbl">VLANs</div></div>
+            <div class="dom-stat"><div class="dom-stat-val" x-text="appliances.length"></div><div class="dom-stat-lbl">Appliances</div></div>
+            <div class="dom-stat"><div class="dom-stat-val" x-text="vips.length"></div><div class="dom-stat-lbl">VIPs</div></div>
+            <div class="dom-stat"><div class="dom-stat-val" x-text="validationMessages.filter(m=>m.severity==='blocker').length"></div><div class="dom-stat-lbl">Blockers</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="sec-title" style="font-size:12px;margin-bottom:10px">Project Info</h3>
+          <table style="width:100%;font-size:12px;border-collapse:collapse">
+            <tr><td class="text-muted" style="padding:4px 0;width:40%">Project Name</td><td class="font-bold" x-text="project.projectName||'—'"></td></tr>
+            <tr><td class="text-muted" style="padding:4px 0">Customer</td><td x-text="project.customerName||'—'"></td></tr>
+            <tr><td class="text-muted" style="padding:4px 0">Scenario</td><td x-text="project.scenario"></td></tr>
+            <tr><td class="text-muted" style="padding:4px 0">Deployment</td><td x-text="project.deploymentType"></td></tr>
+            <tr><td class="text-muted" style="padding:4px 0">Workload Domains</td><td x-text="workloadDomains.length"></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- ABOUT                                                      -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='about'">
+
+      <!-- Hero card -->
+      <div class="card" style="background:linear-gradient(135deg,var(--blue-dark) 0%,var(--blue-mid) 100%);border:none;color:white;padding:32px 36px;margin-bottom:20px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px;">
+          <div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9 Network Planner</div>
+            <div style="font-size:14px;color:#a8c4de;margin-bottom:18px;">Architecture Edition — Pre-Deployment Network Planning Tool</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.0.0</span>
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;">April 2026</span>
+              <span style="background:rgba(39,174,96,0.3);border:1px solid rgba(39,174,96,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#7fffb8;font-weight:700;">VMware Cloud Foundation 9</span>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;color:#7a9abf;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Designed &amp; Developed by</div>
+            <div style="font-size:20px;font-weight:800;color:white;">Leonardo Coscia</div>
+            <div style="font-size:12px;color:#a8c4de;margin-top:3px;">Senior VMware Cloud Foundation Architect</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="g2">
+
+        <!-- What this tool does -->
+        <div class="card">
+          <h2 class="sec-title" style="margin-bottom:14px;">Purpose</h2>
+          <p class="text-sm text-muted" style="margin-bottom:10px;">
+            The VCF 9 Network Planner automates the pre-deployment network design process for VMware Cloud Foundation 9 deployments. It replaces manual spreadsheet workflows with a single, self-consistent planning document.
+          </p>
+          <p class="text-sm text-muted">
+            From a handful of configuration choices, the tool derives the complete set of VLANs, appliance IP allocations, VIPs, and runs architectural validation — ready for export to Excel or JSON.
+          </p>
+        </div>
+
+        <!-- Version history -->
+        <div class="card">
+          <h2 class="sec-title" style="margin-bottom:14px;">Version History</h2>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <thead><tr style="background:var(--gray-light);">
+              <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Version</th>
+              <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Date</th>
+              <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.0.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Apr 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Initial release — full HTML, Alpine.js, Supabase auth, VCF-DD design</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Capabilities -->
+        <div class="card">
+          <h2 class="sec-title" style="margin-bottom:14px;">Capabilities</h2>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <template x-for="cap in [
+              {icon:'🗂', text:'Auto-generates VLANs for Management &amp; Workload Domains'},
+              {icon:'🖥', text:'Appliance allocation with IP/FQDN fields (SDDC Mgr, vCenter, NSX, AVI, Fleet, VCF Suite)'},
+              {icon:'🔗', text:'VIP inventory for all clustered services'},
+              {icon:'✅', text:'Architectural validation engine with Blocker / Warning / Info severity'},
+              {icon:'📊', text:'Excel export — 5-sheet workbook (Domain Summary, VLANs, Appliances, VIPs, Validation)'},
+              {icon:'💾', text:'JSON save/restore — full planner state including user-entered IPs &amp; FQDNs'},
+              {icon:'🔐', text:'Supabase authentication — multi-user access with role control'},
+            ]">
+              <div style="display:flex;align-items:flex-start;gap:10px;font-size:12px;">
+                <span x-text="cap.icon" style="font-size:16px;flex-shrink:0;"></span>
+                <span x-html="cap.text" style="color:var(--text-dark);"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Tech stack -->
+        <div class="card">
+          <h2 class="sec-title" style="margin-bottom:14px;">Technology Stack</h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <template x-for="t in [
+              {label:'Frontend',value:'Vanilla HTML5 + Alpine.js v3'},
+              {label:'Styling',value:'Custom CSS — VCF-DD Design System'},
+              {label:'Authentication',value:'Supabase Auth (email + username)'},
+              {label:'Excel Export',value:'SheetJS (xlsx.full.min.js)'},
+              {label:'Runtime',value:'Browser-only, no build step'},
+              {label:'Compatibility',value:'Chrome, Edge, Firefox, Safari'},
+            ]">
+              <div style="background:var(--gray-light);border-radius:6px;padding:10px 12px;">
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px;" x-text="t.label"></div>
+                <div style="font-size:12px;color:var(--text-dark);" x-text="t.value"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer note -->
+      <div style="text-align:center;padding:16px;font-size:11px;color:var(--text-muted);">
+        VCF 9 Network Planner &nbsp;·&nbsp; Designed for VMware Cloud Foundation 9 pre-deployment architecture &nbsp;·&nbsp; © 2026 Leonardo Coscia
+      </div>
+    </div>
+
+  </div><!-- end .main -->
+</div><!-- end app shell -->
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ENGINES + APP LOGIC
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+// ── CIDR ENGINE ─────────────────────────────────────────────────
+const CIDR_TABLE = [
+  {prefix:29,usable:6},{prefix:28,usable:14},{prefix:27,usable:30},
+  {prefix:26,usable:62},{prefix:25,usable:126},{prefix:24,usable:254},
+  {prefix:23,usable:510},{prefix:22,usable:1022},{prefix:21,usable:2046},
+  {prefix:20,usable:4094},
+];
+const GATEWAY_SPARE = 2;
+
+function recommendCIDR(requiredIPs, bufferEnabled=true, bufferPercent=20) {
+  const withOverhead = requiredIPs + GATEWAY_SPARE;
+  const effective = bufferEnabled ? Math.ceil(withOverhead*(1+bufferPercent/100)) : withOverhead;
+  const match = CIDR_TABLE.find(c => c.usable >= effective);
+  if (!match) return {requiredIPs,recommendedCIDR:'/20',usableHosts:4094};
+  return {requiredIPs,recommendedCIDR:`/${match.prefix}`,usableHosts:match.usable};
+}
+
+// ── VLAN ENGINE ─────────────────────────────────────────────────
+let _vlanId=0;
+function resetVlanCounter(){_vlanId=0;}
+function makeVLAN(domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,notes,bufferEnabled,bufferPercent){
+  const rec=recommendCIDR(requiredIPs,bufferEnabled,bufferPercent);
+  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,vlanId:'',cidr:''};
+}
+
+function buildManagementVLANs(mgmt, project, workloadDomains=[]) {
+  resetVlanCounter();
+  const vlans=[];
+  const buf=project.subnetBufferEnabled, bufPct=project.subnetBufferPercent;
+  const domain='Management Domain';
+  const fleetDedicated=mgmt.fleetPlacement==='dedicated-fleet-vlan';
+
+  vlans.push(makeVLAN(domain,'ESXi Management','management','ESXi vmk0 only','VMkernel vmk0 for out-of-band ESXi management','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk0 IPs (1 per host)`,buf,bufPct));
+
+  const nsxManagerCount=mgmt.nsxManagerMode==='clustered'?3:1;
+  const nsxVIPCount=mgmt.nsxManagerMode==='clustered'?1:0;
+  const nsxEdgeMgmtIPs=mgmt.nsxEdgeDeployed?mgmt.nsxEdgeNodeCount:0;
+  const fleetCountInMgmtVM=fleetDedicated?0:1;
+  const additionalSvcIPs=mgmt.additionalServices.filter(s=>!s.requiresDedicatedVLAN).reduce((a,s)=>a+s.applianceCount,0);
+  const aviControllerIPs=mgmt.aviDeployed?3+1:0;
+  const wldNSXManagerIPs=workloadDomains.reduce((sum,wld)=>{
+    if(!wld.nsxEnabled||wld.nsxManagerMode==='shared')return sum;
+    return sum+(wld.nsxManagerMode==='clustered'?3:1)+1;
+  },0);
+  const opsCollectors=mgmt.vcfOperations.enabled?mgmt.vcfOperations.remoteCollectorCount:0;
+  const netsCollectors=mgmt.vcfOperationsForNetworks.enabled?mgmt.vcfOperationsForNetworks.collectorCount:0;
+  const opsNodesInMgmtVM=(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN&&!fleetDedicated)?(mgmt.vcfOperations.mode==='enterprise'?3+1:1):0;
+  const logsInMgmtVM=(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN&&!fleetDedicated)?(mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1):0;
+  const netsNodesInMgmtVM=(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN&&!fleetDedicated)?mgmt.vcfOperationsForNetworks.platformNodeCount:0;
+  const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&!fleetDedicated)?((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0)):0;
+  const ibInMgmtVM=(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&!mgmt.vcfIdentityBroker.requiresDedicatedVLAN)?(mgmt.vcfIdentityBroker.haEnabled?3+1:1):0;
+  const mgmtVMIPs=1+1+nsxManagerCount+nsxVIPCount+nsxEdgeMgmtIPs+wldNSXManagerIPs+fleetCountInMgmtVM+additionalSvcIPs+aviControllerIPs+opsNodesInMgmtVM+opsCollectors+logsInMgmtVM+netsNodesInMgmtVM+netsCollectors+autoInMgmtVM+ibInMgmtVM;
+  vlans.push(makeVLAN(domain,'Management VM Network','vm-network','SDDC Manager, vCenter, NSX Managers, platform service VMs','All management plane VMs','mandatory','dedicated',mgmtVMIPs,`SDDC Manager, vCenter, ${nsxManagerCount} NSX Mgr${nsxVIPCount?' + VIP':''}${nsxEdgeMgmtIPs?' + '+nsxEdgeMgmtIPs+' Edge Mgmt':''}${!fleetDedicated?' + Fleet':''}${aviControllerIPs?' + AVI Controllers':''}${opsCollectors?' + '+opsCollectors+' Ops Collectors':''}${netsCollectors?' + '+netsCollectors+' Nets Collectors':''}`,buf,bufPct));
+
+  vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion portgroup','Live migration','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs`,buf,bufPct));
+  vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN ESA storage — 1 vmk per host','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs (vSAN ESA)`,buf,bufPct));
+  const tepIPs=mgmt.hostCount*mgmt.tepInterfacesPerHost;
+  vlans.push(makeVLAN(domain,'NSX Host TEP','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts','mandatory','dedicated',tepIPs,`${mgmt.hostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepIPs} IPs`,buf,bufPct));
+
+  if(mgmt.nsxEdgeDeployed){
+    vlans.push(makeVLAN(domain,'NSX Edge TEP','nsx-tep','NSX Edge TEP — separate from Host TEP','Dedicated TEP for Edge nodes','mandatory','dedicated',mgmt.nsxEdgeNodeCount,`${mgmt.nsxEdgeNodeCount} Edge TEP IPs`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'NSX Edge Uplink 1','nsx-edge-uplink1','Edge uplink 1 (North-South)','Physical underlay uplink','mandatory','dedicated',mgmt.nsxEdgeNodeCount,`${mgmt.nsxEdgeNodeCount} IPs`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'NSX Edge Uplink 2','nsx-edge-uplink2','Edge uplink 2 (redundant)','Redundant underlay uplink','mandatory','dedicated',mgmt.nsxEdgeNodeCount,`${mgmt.nsxEdgeNodeCount} IPs`,buf,bufPct));
+  }
+
+  if(fleetDedicated){
+    let fleetIPs=1;const fleetNotes=['1 Fleet appliance (Simple mode)'];
+    if(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN){const n=mgmt.vcfOperations.mode==='enterprise'?4:1;fleetIPs+=n;fleetNotes.push(`VCF Ops: ${n} IPs`);}
+    if(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){const n=mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1;fleetIPs+=n;fleetNotes.push(`VCF Logs: ${n} IPs`);}
+    if(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN){fleetIPs+=mgmt.vcfOperationsForNetworks.platformNodeCount;fleetNotes.push(`VCF Nets: ${mgmt.vcfOperationsForNetworks.platformNodeCount} IPs`);}
+    if(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){const n=(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);fleetIPs+=n;fleetNotes.push(`VCF Auto: ${n} IPs`);}
+    fleetNotes.push('Collectors always in Mgmt VM Network');
+    vlans.push(makeVLAN(domain,'Fleet Network','fleet','Fleet appliance + platform service nodes','Fleet-level platform network','scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | '),buf,bufPct));
+  }
+
+  if(mgmt.aviDeployed)vlans.push(makeVLAN(domain,'AVI Management','avi','AVI SE management','AVI load balancer management','scenario-driven','dedicated',4,'AVI SE management IPs',buf,bufPct));
+  if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks')vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 consecutive IPs required','Kubernetes Supervisor control plane','scenario-driven','dedicated',5,'5 CONSECUTIVE IPs: 3 control plane VMs + 1 floating + 1 patching',buf,bufPct));
+
+  if(mgmt.vcfOperations.enabled&&mgmt.vcfOperations.requiresDedicatedVLAN){const n=mgmt.vcfOperations.mode==='enterprise'?3:1,v=mgmt.vcfOperations.mode==='enterprise'?1:0;vlans.push(makeVLAN(domain,'VCF Operations Network','operations','VCF Operations analytics nodes','Dedicated VCF Operations network','scenario-driven','dedicated',n+v,`${n} node(s)${v?' + 1 VIP':''}. Collectors in Mgmt VM Network.`,buf,bufPct));}
+  if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){const lm=1,lw=mgmt.vcfOperationsForLogs.mode==='clustered'?mgmt.vcfOperationsForLogs.workerCount:0,lv=mgmt.vcfOperationsForLogs.mode==='clustered'?(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):0;vlans.push(makeVLAN(domain,'VCF Operations for Logs Network','operations-logs','VCF Ops for Logs cluster','Dedicated log cluster network','scenario-driven','dedicated',lm+lw+lv,`1 master + ${lw} worker(s)${lv?' + '+lv+' VIP(s)':''}`,buf,bufPct));}
+  if(mgmt.vcfOperationsForNetworks.enabled&&mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN)vlans.push(makeVLAN(domain,'VCF Operations for Networks Network','operations-networks','VCF Ops for Networks platform VMs','Dedicated network analytics network','scenario-driven','dedicated',mgmt.vcfOperationsForNetworks.platformNodeCount,`${mgmt.vcfOperationsForNetworks.platformNodeCount} platform VM(s). Collectors in Mgmt VM Network.`,buf,bufPct));
+  if(mgmt.vcfAutomation.enabled&&mgmt.vcfAutomation.requiresDedicatedVLAN){const vc=mgmt.vcfAutomation.mode==='clustered'?4:1,vv=mgmt.vcfAutomation.mode==='clustered'?1:0,vro=mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount:0,vrov=mgmt.vcfAutomation.orchestratorMode==='standalone'&&mgmt.vcfAutomation.orchestratorNodeCount>1?1:0;vlans.push(makeVLAN(domain,'VCF Automation Network','automation','VCF Automation VAs','Dedicated automation network','scenario-driven','dedicated',vc+vv+vro+vrov,`${vc} VA IPs${vv?' + 1 VIP':''}${vro?' + '+vro+' vRO':''}${mgmt.vcfAutomation.mode==='clustered'?' (4 node IPs: 3 active + 1 upgrade)':''}`,buf,bufPct));}
+  if(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&mgmt.vcfIdentityBroker.requiresDedicatedVLAN){const ic=mgmt.vcfIdentityBroker.haEnabled?3:1,iv=mgmt.vcfIdentityBroker.haEnabled?1:0;vlans.push(makeVLAN(domain,'VCF Identity Broker Network','identity-broker','Identity Broker appliance(s)','Dedicated Identity Broker network','scenario-driven','dedicated',ic+iv,`${ic} appliance(s)${iv?' + 1 VIP':''}`,buf,bufPct));}
+
+  mgmt.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated network for ${svc.name}`,`Service VLAN: ${svc.name}`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||`${svc.applianceCount} appliances`,buf,bufPct)));
+  return vlans;
+}
+
+function buildWorkloadVLANs(wld, project) {
+  resetVlanCounter();
+  const vlans=[];
+  const buf=project.subnetBufferEnabled,bufPct=project.subnetBufferPercent;
+  const domain=wld.domainName;
+  const scope=wld.dedicatedVLANs?'dedicated':'shared';
+
+  vlans.push(makeVLAN(domain,'ESXi Management','management','vmk0 only','ESXi vmk0 for workload domain hosts','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk0 IPs`,buf,bufPct));
+  vlans.push(makeVLAN(domain,'VM / Application Network','vm-network','Workload VM network','Application VLAN','mandatory',scope,32,'Adjust to actual VM count',buf,bufPct));
+  vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion','Live migration','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs`,buf,bufPct));
+  vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN storage — 1 vmk per host','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs (vSAN ESA)`,buf,bufPct));
+
+  if(wld.nsxEnabled){
+    const tepIPs=wld.hostCount*wld.tepInterfacesPerHost;
+    vlans.push(makeVLAN(domain,'NSX Host TEP','nsx-tep','NSX Host TEP pool','Geneve overlay','mandatory',scope,tepIPs,`${wld.hostCount} × ${wld.tepInterfacesPerHost} = ${tepIPs} IPs`,buf,bufPct));
+    if(wld.edgeRequired){
+      const edgeScope=wld.sharedEdgeUplinks?'shared':'dedicated';
+      vlans.push(makeVLAN(domain,'NSX Edge TEP','nsx-tep','Edge TEP — separate from Host TEP','Dedicated TEP for Edge','mandatory',scope,wld.edgeNodeCount,`${wld.edgeNodeCount} Edge TEP IPs`,buf,bufPct));
+      vlans.push(makeVLAN(domain,'NSX Edge Uplink 1','nsx-edge-uplink1','Edge uplink 1','N-S uplink','mandatory',edgeScope,wld.edgeNodeCount,`${wld.edgeNodeCount} IPs`,buf,bufPct));
+      vlans.push(makeVLAN(domain,'NSX Edge Uplink 2','nsx-edge-uplink2','Edge uplink 2','Redundant uplink','mandatory',edgeScope,wld.edgeNodeCount,`${wld.edgeNodeCount} IPs`,buf,bufPct));
+    }
+  }
+  if(wld.aviEnabled)vlans.push(makeVLAN(domain,'AVI VIP Network','avi','AVI VIP pool','VIP pool for AVI load balancer services','scenario-driven','dedicated',32,'Adjust to service count',buf,bufPct));
+  if(wld.vksEnabled)vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 consecutive IPs','Kubernetes Supervisor','scenario-driven','dedicated',5,'5 CONSECUTIVE IPs: 3 control plane + 1 floating + 1 patching',buf,bufPct));
+  wld.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated VLAN for ${svc.name}`,`Service VLAN`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||'',buf,bufPct)));
+  return vlans;
+}
+
+// ── APPLIANCE ENGINE ────────────────────────────────────────────
+let _appId=0;
+function resetAppCounter(){_appId=0;}
+function mkApp(name,type,domain,hostingArea,vlan,staticIP,vipReq,fqdnReq,notes){
+  return {id:`appliance-${++_appId}`,applianceName:name,applianceType:type,domain,hostingArea,vlan,staticIPRequired:staticIP,vipRequired:vipReq,fqdnRequired:fqdnReq,notes,ipAddress:'',fqdn:''};
+}
+
+function buildManagementAppliances(mgmt,project){
+  resetAppCounter();
+  const apps=[];
+  const domain='Management Domain';
+  const fleetDedicated=mgmt.fleetPlacement==='dedicated-fleet-vlan';
+  const fleetVLAN=fleetDedicated?'Fleet Network':'Management VM Network';
+  function platVLAN(req,name){if(req)return name;return fleetDedicated?'Fleet Network':'Management VM Network';}
+
+  apps.push(mkApp('sddc-manager-01','SDDC Manager',domain,'Management VM Network','Management VM Network',true,false,true,'Primary SDDC Manager.'));
+  apps.push(mkApp('vcenter-mgmt-01','vCenter Server',domain,'Management VM Network','Management VM Network',true,false,true,'Management Domain vCenter.'));
+
+  const nsxCount=mgmt.nsxManagerMode==='clustered'?3:1;
+  for(let i=1;i<=nsxCount;i++) apps.push(mkApp(`nsx-manager-mgmt-0${i}`,'NSX Manager',domain,'Management VM Network','Management VM Network',true,i===1&&mgmt.nsxManagerMode==='clustered',true,`NSX Manager node ${i} of ${nsxCount}.`));
+  if(mgmt.nsxManagerMode==='clustered') apps.push(mkApp('nsx-vip-mgmt','NSX Manager VIP',domain,'Management VM Network','Management VM Network',true,false,true,'NSX Manager cluster VIP.'));
+
+  apps.push(mkApp('fleet-01','Fleet Appliance',domain,fleetVLAN,fleetVLAN,true,false,true,`Fleet appliance (VCF 9 Simple mode). Placement: ${mgmt.fleetPlacement}.`));
+
+  if(mgmt.nsxEdgeDeployed){
+    for(let i=1;i<=mgmt.nsxEdgeNodeCount;i++) apps.push(mkApp(`nsx-edge-mgmt-0${i}`,'NSX Edge Node',domain,'Management VM Network','Management VM Network',true,false,true,`Edge node ${i}: eth0→Mgmt VM Net, TEP→NSX Edge TEP, fp-eth0/1→Uplink 1/2.`));
+  }
+  if(mgmt.aviDeployed){
+    for(let i=1;i<=3;i++) apps.push(mkApp(`avi-controller-0${i}`,'AVI Controller',domain,'Management VM Network','Management VM Network',true,i===1,true,`AVI Controller node ${i} of 3.`));
+    apps.push(mkApp('avi-cluster-vip','AVI Cluster VIP',domain,'Management VM Network','Management VM Network',true,false,true,'AVI Controller cluster VIP.'));
+  }
+
+  if(mgmt.vcfOperations.enabled){
+    const opsVLAN=platVLAN(mgmt.vcfOperations.requiresDedicatedVLAN,'VCF Operations Network');
+    const nc=mgmt.vcfOperations.mode==='enterprise'?3:1;
+    for(let i=1;i<=nc;i++) apps.push(mkApp(`vcf-ops-${String(i).padStart(2,'0')}`,nc===1?'VCF Operations Node':i===1?'VCF Operations Master Node':'VCF Operations Replica Node',domain,opsVLAN,opsVLAN,true,false,true,`VCF Operations node ${i}${nc>1?' of '+nc:''}.`));
+    if(mgmt.vcfOperations.mode==='enterprise') apps.push(mkApp('vcf-ops-vip','VCF Operations Cluster VIP',domain,opsVLAN,opsVLAN,true,false,true,'Cluster VIP for VCF Operations enterprise mode.'));
+    for(let r=1;r<=mgmt.vcfOperations.remoteCollectorCount;r++) apps.push(mkApp(`vcf-ops-rc-${String(r).padStart(2,'0')}`,'VCF Operations Remote Collector',domain,'Management VM Network','Management VM Network',true,false,true,`Remote Collector ${r} — instance-level, always in Mgmt VM Network.`));
+  }
+
+  if(mgmt.vcfOperationsForLogs.enabled){
+    const lVLAN=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'VCF Operations for Logs Network');
+    apps.push(mkApp('vcf-logs-master-01','VCF Ops for Logs Master',domain,lVLAN,lVLAN,true,false,true,'Master node.'));
+    if(mgmt.vcfOperationsForLogs.mode==='clustered'){
+      for(let w=1;w<=mgmt.vcfOperationsForLogs.workerCount;w++) apps.push(mkApp(`vcf-logs-worker-${String(w).padStart(2,'0')}`,'VCF Ops for Logs Worker',domain,lVLAN,lVLAN,true,false,true,`Worker node ${w}.`));
+      apps.push(mkApp('vcf-logs-ui-vip','VCF Ops for Logs UI VIP',domain,lVLAN,lVLAN,true,false,true,'UI/API access VIP.'));
+      if(mgmt.vcfOperationsForLogs.integratedLBVIP) apps.push(mkApp('vcf-logs-ilb-vip','VCF Ops for Logs ILB VIP',domain,lVLAN,lVLAN,true,false,true,'ILB VIP for syslog/CFAPI. All log sources must use this VIP.'));
+    }
+  }
+
+  if(mgmt.vcfOperationsForNetworks.enabled){
+    const nVLAN=platVLAN(mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN,'VCF Operations for Networks Network');
+    for(let p=1;p<=mgmt.vcfOperationsForNetworks.platformNodeCount;p++) apps.push(mkApp(`vcf-nets-platform-${String(p).padStart(2,'0')}`,'VCF Ops for Networks Platform VM',domain,nVLAN,nVLAN,true,false,true,`Platform VM ${p}.`));
+    for(let c=1;c<=mgmt.vcfOperationsForNetworks.collectorCount;c++) apps.push(mkApp(`vcf-nets-collector-${String(c).padStart(2,'0')}`,'VCF Ops for Networks Collector',domain,'Management VM Network','Management VM Network',true,false,true,`Collector ${c} — instance-level, always in Mgmt VM Network.`));
+  }
+
+  if(mgmt.vcfAutomation.enabled){
+    const aVLAN=platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
+    const vc=mgmt.vcfAutomation.mode==='clustered'?4:1;
+    for(let v=1;v<=vc;v++){
+      const isUpgrade=mgmt.vcfAutomation.mode==='clustered'&&v===4;
+      apps.push(mkApp(`vcf-auto-va-${String(v).padStart(2,'0')}`,isUpgrade?'VCF Automation VA (upgrade/patching)':mgmt.vcfAutomation.mode==='clustered'?`VCF Automation VA (node ${v} of 3 active)`:'VCF Automation VA',domain,aVLAN,aVLAN,true,false,true,isUpgrade?'Node 4: reserved for upgrade/patching.':`VA node ${v}.`));
+    }
+    if(mgmt.vcfAutomation.mode==='clustered') apps.push(mkApp('vcf-auto-vip','VCF Automation Cluster VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for HA deployment (3 active + 1 upgrade node).'));
+    if(mgmt.vcfAutomation.orchestratorMode==='standalone'){
+      const vrc=mgmt.vcfAutomation.orchestratorNodeCount;
+      for(let r=1;r<=vrc;r++) apps.push(mkApp(`vcf-vro-${String(r).padStart(2,'0')}`,'VCF Automation Orchestrator (vRO)',domain,aVLAN,aVLAN,true,false,true,`Standalone vRO node ${r} of ${vrc}.`));
+      if(vrc>1) apps.push(mkApp('vcf-vro-vip','VCF Automation Orchestrator VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for standalone vRO HA.'));
+    }
+  }
+
+  if(mgmt.vcfIdentityBroker.enabled){
+    if(mgmt.vcfIdentityBroker.mode==='embedded'){
+      apps.push(mkApp('vcf-identity-broker-embedded','VCF Identity Broker (Embedded)',domain,'Embedded (vCenter/NSX)','Management VM Network',false,false,false,'Embedded — no dedicated appliance IP.'));
+    } else {
+      const ibVLAN=mgmt.vcfIdentityBroker.requiresDedicatedVLAN?'VCF Identity Broker Network':'Management VM Network';
+      const ibc=mgmt.vcfIdentityBroker.haEnabled?3:1;
+      for(let b=1;b<=ibc;b++) apps.push(mkApp(`vcf-identity-broker-${String(b).padStart(2,'0')}`,mgmt.vcfIdentityBroker.haEnabled?`VCF Identity Broker (node ${b} of ${ibc})`:'VCF Identity Broker',domain,ibVLAN,ibVLAN,true,false,true,`Identity Broker appliance ${b}.`));
+      if(mgmt.vcfIdentityBroker.haEnabled) apps.push(mkApp('vcf-identity-broker-vip','VCF Identity Broker HA VIP',domain,ibVLAN,ibVLAN,true,false,true,'HA VIP for Identity Broker cluster.'));
+    }
+  }
+
+  if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks') apps.push(mkApp('vks-supervisor','VKS Supervisor Cluster',domain,'VKS Infrastructure','VKS Infrastructure',true,false,true,'5 CONSECUTIVE IPs: 3 control plane VMs + 1 floating + 1 patching.'));
+
+  mgmt.additionalServices.forEach(svc=>{
+    const sVLAN=svc.requiresDedicatedVLAN?`${svc.name} Network`:'Management VM Network';
+    for(let i=1;i<=svc.applianceCount;i++) apps.push(mkApp(`${svc.name.toLowerCase().replace(/\s/g,'-')}-0${i}`,svc.name,domain,sVLAN,sVLAN,true,false,true,svc.notes||`Appliance ${i}.`));
+    if(svc.requiresVIP&&svc.vipCount>0) for(let v=1;v<=svc.vipCount;v++) apps.push(mkApp(`${svc.name.toLowerCase().replace(/\s/g,'-')}-vip-0${v}`,`${svc.name} VIP`,domain,sVLAN,sVLAN,true,false,true,`VIP for ${svc.name}.`));
+  });
+
+  return apps;
+}
+
+function buildWorkloadAppliances(wld){
+  const apps=[];
+  const domain=wld.domainName;
+  apps.push(mkApp(`vcenter-${domain.toLowerCase()}-01`,'vCenter Server',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,`vCenter for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
+  if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
+    const nc=wld.nsxManagerMode==='clustered'?3:1;
+    for(let i=1;i<=nc;i++) apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-0${i}`,'NSX Manager',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,`NSX Mgr ${i}/${nc} for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
+    apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-vip`,'NSX Manager VIP',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,wld.nsxManagerMode==='clustered'?`NSX Manager cluster VIP for ${domain}.`:`NSX Manager VIP for ${domain} (reserved for future scale-out).`));
+  }
+  if(wld.nsxEnabled&&wld.edgeRequired){
+    for(let i=1;i<=wld.edgeNodeCount;i++) apps.push(mkApp(`nsx-edge-${domain.toLowerCase()}-0${i}`,'NSX Edge Node',domain,'VM / Application Network','VM / Application Network',true,false,true,`Edge node ${i}: eth0→VM/App Net, TEP→Edge TEP, fp-eth0/1→Uplink 1/2.`));
+  }
+  if(wld.aviEnabled){
+    apps.push(mkApp(`avi-se-${domain.toLowerCase()}-01`,'AVI Service Engine',domain,'AVI VIP Network','AVI VIP Network',true,false,false,`AVI SE for ${domain}.`));
+    apps.push(mkApp(`avi-se-${domain.toLowerCase()}-02`,'AVI Service Engine',domain,'AVI VIP Network','AVI VIP Network',true,false,false,'AVI SE pair for HA.'));
+  }
+  if(wld.vksEnabled) apps.push(mkApp(`vks-supervisor-${domain.toLowerCase()}`,'VKS Supervisor',domain,'VKS Infrastructure','VKS Infrastructure',true,false,true,`VKS Supervisor for ${domain}.`));
+  wld.additionalServices.forEach(svc=>{
+    const sVLAN=svc.requiresDedicatedVLAN?`${svc.name} Network`:'VM / Application Network';
+    for(let i=1;i<=svc.applianceCount;i++) apps.push(mkApp(`${svc.name.toLowerCase().replace(/\s/g,'-')}-${domain.toLowerCase()}-0${i}`,svc.name,domain,sVLAN,sVLAN,true,false,true,svc.notes||''));
+  });
+  return apps;
+}
+
+// ── VIP ENGINE ──────────────────────────────────────────────────
+let _vipId=0;
+function resetVipCounter(){_vipId=0;}
+function mkVIP(vipName,service,domain,vlan,notes){
+  return {id:`vip-${++_vipId}`,vipName,associatedService:service,domain,vlan,ipPlaceholder:'TBD',fqdnPlaceholder:'TBD',notes,ipAddress:'',fqdn:''};
+}
+
+function buildManagementVIPs(mgmt,project){
+  resetVipCounter();
+  const vips=[];
+  const domain='Management Domain';
+  const fleetDedicated=mgmt.fleetPlacement==='dedicated-fleet-vlan';
+  const fleetVLAN=fleetDedicated?'Fleet Network':'Management VM Network';
+  function platVLAN(req,name){if(req)return name;return fleetDedicated?'Fleet Network':'Management VM Network';}
+
+  vips.push(mkVIP('NSX Manager VIP','NSX Manager',domain,'Management VM Network',mgmt.nsxManagerMode==='clustered'?'Cluster VIP for NSX Manager 3-node cluster.':'Standalone NSX Manager — VIP reserved for future scale-out.'));
+  vips.push(mkVIP('Fleet VIP','Fleet',domain,fleetVLAN,mgmt.fleetMode==='clustered'?'Fleet HA cluster VIP.':'Fleet standalone VIP. Reserved for DNS stability.'));
+  if(mgmt.aviDeployed) vips.push(mkVIP('AVI Controller Cluster VIP','AVI Vantage',domain,'Management VM Network','AVI Controller cluster VIP.'));
+  if(mgmt.vcfOperations.enabled){const v=platVLAN(mgmt.vcfOperations.requiresDedicatedVLAN,'VCF Operations Network');vips.push(mkVIP('VCF Operations VIP','VCF Operations',domain,v,mgmt.vcfOperations.mode==='enterprise'?'Enterprise analytics cluster VIP.':'Standalone VCF Operations VIP — reserved for DNS.'));}
+  if(mgmt.vcfOperationsForLogs.enabled){
+    const v=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'VCF Operations for Logs Network');
+    vips.push(mkVIP('VCF Operations for Logs UI VIP','VCF Operations for Logs',domain,v,mgmt.vcfOperationsForLogs.mode==='clustered'?'UI/API VIP for Logs cluster.':'Standalone Logs VIP — reserved for DNS.'));
+    if(mgmt.vcfOperationsForLogs.mode==='clustered'&&mgmt.vcfOperationsForLogs.integratedLBVIP) vips.push(mkVIP('VCF Operations for Logs ILB Syslog VIP','VCF Operations for Logs — ILB',domain,v,'ILB VIP for syslog (UDP 514) and CFAPI. All log sources must point here.'));
+  }
+  if(mgmt.vcfOperationsForNetworks.enabled){const v=platVLAN(mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN,'VCF Operations for Networks Network');vips.push(mkVIP('VCF Operations for Networks VIP','VCF Operations for Networks',domain,v,'VIP for VCF Ops for Networks UI/API.'));}
+  if(mgmt.vcfAutomation.enabled){
+    const v=platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
+    vips.push(mkVIP('VCF Automation VIP','VCF Automation',domain,v,mgmt.vcfAutomation.mode==='clustered'?'Cluster VIP for VCF Automation HA (3 active + 1 upgrade node).':'Standalone VCF Automation VIP.'));
+    if(mgmt.vcfAutomation.orchestratorMode==='standalone') vips.push(mkVIP('VCF Automation Orchestrator (vRO) VIP','VCF Automation Orchestrator (vRO)',domain,v,mgmt.vcfAutomation.orchestratorNodeCount>1?'Cluster VIP for standalone vRO HA cluster.':'Standalone vRO VIP — reserved for DNS.'));
+  }
+  if(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'){const v=mgmt.vcfIdentityBroker.requiresDedicatedVLAN?'VCF Identity Broker Network':'Management VM Network';vips.push(mkVIP('VCF Identity Broker VIP','VCF Identity Broker',domain,v,mgmt.vcfIdentityBroker.haEnabled?'HA VIP for Identity Broker cluster.':'Standalone Identity Broker VIP.'));}
+  if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks'){vips.push(mkVIP('VKS Supervisor API VIP','VKS Supervisor',domain,'VKS Infrastructure','Kubernetes API server VIP.'));vips.push(mkVIP('VKS Ingress VIP Pool','VKS Load Balancer',domain,'VKS Infrastructure','NSX ALB VIP pool for VKS workload ingress.'));}
+  mgmt.additionalServices.forEach(svc=>{if(svc.requiresVIP&&svc.vipCount>0){const v=svc.requiresDedicatedVLAN?`${svc.name} Network`:'Management VM Network';for(let i=1;i<=svc.vipCount;i++) vips.push(mkVIP(`${svc.name} VIP ${i}`,svc.name,domain,v,`Service VIP ${i} for ${svc.name}.`));}});
+  return vips;
+}
+
+function buildWorkloadVIPs(wld){
+  const vips=[];
+  const domain=wld.domainName;
+  if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared') vips.push(mkVIP(`${domain} NSX Manager VIP`,'NSX Manager',domain,'Management VM Network',wld.nsxManagerMode==='clustered'?`NSX Manager cluster VIP for ${domain}.`:`NSX Manager VIP for ${domain} (reserved for DNS).`));
+  if(wld.aviEnabled) vips.push(mkVIP(`${domain} AVI VIP Pool`,'AVI Load Balancer',domain,'AVI VIP Network',`LB VIP pool for ${domain} workloads.`));
+  if(wld.vksEnabled){vips.push(mkVIP(`${domain} VKS Supervisor VIP`,'VKS Supervisor',domain,'VKS Infrastructure',`Kubernetes API VIP for ${domain}.`));vips.push(mkVIP(`${domain} VKS Ingress VIP Pool`,'VKS Ingress',domain,'VKS Infrastructure',`NSX ALB VIP pool for ${domain} VKS ingress.`));}
+  wld.additionalServices.forEach(svc=>{if(svc.requiresVIP&&svc.vipCount>0){const v=svc.requiresDedicatedVLAN?`${svc.name} Network`:'VM / Application Network';for(let i=1;i<=svc.vipCount;i++) vips.push(mkVIP(`${domain} ${svc.name} VIP ${i}`,svc.name,domain,v,`VIP for ${svc.name} in ${domain}.`));}});
+  return vips;
+}
+
+// ── VALIDATION ENGINE ────────────────────────────────────────────
+let _valId=0;
+function mkMsg(severity,category,domain,message,resolution){return {id:`val-${++_valId}`,severity,category,domain,message,resolution};}
+
+function runValidation(project,mgmt,workloads,vlans){
+  _valId=0;
+  const msgs=[];
+  const domain='Management Domain';
+  if(mgmt.hostCount<4) msgs.push(mkMsg('blocker','bring-up',domain,`Management Domain has ${mgmt.hostCount} hosts. Minimum 4 required.`,'Add more hosts.'));
+  if(mgmt.nsxEdgeDeployed&&mgmt.nsxEdgeNodeCount<2) msgs.push(mkMsg('warning','nsx',domain,'Single NSX Edge node — no HA. Recommend 2+ Edge nodes.','Increase Edge node count to 2.'));
+  if(!mgmt.fleetPlacement) msgs.push(mkMsg('blocker','vlan',domain,'Fleet placement is undefined.','Select Fleet placement.'));
+  if(!mgmt.layer2AdjacencyConfirmed) msgs.push(mkMsg('warning','bring-up',domain,'L2 adjacency for bring-up not confirmed.','Confirm L2 adjacency.'));
+  if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,'Stretched topology: ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
+  if((mgmt.vksEnabled||project.scenario==='vcf-automation-vks')&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario',domain,'VKS enabled but NSX Edge not deployed.','Deploy NSX Edge or confirm overlay from WLD NSX.'));
+  if(mgmt.aviDeployed&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('info','scenario',domain,'AVI enabled but NSX Edge not deployed. Verify data plane connectivity.','Verify AVI SE network design.'));
+  if(mgmt.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',domain,'TEP interfaces per host < 2. Recommend 2 for TEP HA.','Set TEP to 2+.'));
+  if(mgmt.vcfOperations.enabled&&mgmt.vcfOperations.mode==='enterprise'&&mgmt.vcfOperations.remoteCollectorCount===0) msgs.push(mkMsg('info','scenario',domain,'VCF Operations enterprise mode with no Remote Collectors.','Add collectors for workload domains.'));
+  if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&!mgmt.vcfOperationsForLogs.integratedLBVIP) msgs.push(mkMsg('warning','vip',domain,'VCF Ops for Logs clustered but ILB VIP disabled. Log sources cannot use a single syslog endpoint.','Enable ILB VIP.'));
+  if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&mgmt.vcfOperationsForLogs.workerCount<2) msgs.push(mkMsg('warning','scenario',domain,`VCF Ops for Logs: only ${mgmt.vcfOperationsForLogs.workerCount} worker(s). Min 2 recommended.`,'Set worker count ≥ 2.'));
+  if(mgmt.vcfAutomation.enabled&&!mgmt.vcfIdentityBroker.enabled) msgs.push(mkMsg('warning','scenario',domain,'VCF Automation enabled but VCF Identity Broker not configured.','Enable VCF Identity Broker.'));
+  const bringUpReady=mgmt.hostCount>=4&&mgmt.layer2AdjacencyConfirmed&&mgmt.tepInterfacesPerHost>=2;
+  msgs.push(bringUpReady?mkMsg('info','bring-up',domain,'Bring-up readiness check PASSED.'):mkMsg('blocker','bring-up',domain,'Bring-up readiness check FAILED.','Address all blockers before VCF Cloud Builder.'));
+
+  workloads.forEach((wld,idx)=>{
+    const d=wld.domainName||`Workload ${idx+1}`;
+    if(!wld.domainName||!wld.domainName.trim()) msgs.push(mkMsg('blocker','vlan',d,`Workload Domain ${idx+1} has no name.`,'Set a domain name.'));
+    if(wld.hostCount<3) msgs.push(mkMsg('warning','bring-up',d,`"${d}" has only ${wld.hostCount} hosts. Min 3 recommended.`,'Add another host.'));
+    if(wld.edgeRequired&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','nsx',d,`"${d}": Edge required but NSX not enabled.`,'Enable NSX.'));
+    if(wld.vksEnabled&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','scenario',d,`"${d}": VKS enabled but NSX not enabled.`,'Enable NSX.'));
+    if(wld.edgeRequired&&wld.edgeNodeCount<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": only 1 Edge node. Min 2 recommended.`,'Increase Edge count.'));
+    if(wld.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
+  });
+
+  const domains=[...new Set(vlans.map(v=>v.domain))];
+  domains.forEach(dom=>{
+    const dv=vlans.filter(v=>v.domain===dom);
+    const e1=dv.some(v=>v.vlanType==='nsx-edge-uplink1'),e2=dv.some(v=>v.vlanType==='nsx-edge-uplink2');
+    if(e1&&!e2) msgs.push(mkMsg('blocker','vlan',dom,`"${dom}": Edge Uplink 1 present but Uplink 2 missing.`,'Both uplinks are mandatory.'));
+    if(e2&&!e1) msgs.push(mkMsg('blocker','vlan',dom,`"${dom}": Edge Uplink 2 present but Uplink 1 missing.`,'Both uplinks are mandatory.'));
+  });
+
+  if(project.scenario==='private-ai'){
+    if(!workloads.some(w=>w.domainRole==='ai-workloads')) msgs.push(mkMsg('warning','scenario','Global','Scenario is "Private AI" but no WLD has role "AI Workloads".','Set at least one WLD to AI Workloads.'));
+    if(!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario','Management Domain','Private AI scenario typically requires NSX Edge.','Consider enabling NSX Edge.'));
+  }
+  if(project.scenario==='vcf-automation-vks'&&!workloads.some(w=>w.vksEnabled)&&!mgmt.vksEnabled) msgs.push(mkMsg('warning','scenario','Global','Scenario is "VCF Automation + VKS" but VKS not enabled in any domain.','Enable VKS in at least one domain.'));
+  if(!project.projectName.trim()) msgs.push(mkMsg('info','scenario','Global','Project name is not set.','Enter project name.'));
+
+  return msgs;
+}
+
+// ── DOMAIN SUMMARIES ─────────────────────────────────────────────
+function buildDomainSummaries(project,mgmt,workloads,vlans,vips){
+  const summaries=[];
+  const mgmtVlans=vlans.filter(v=>v.domain==='Management Domain');
+  const services=[];
+  if(mgmt.vcfOperations.enabled)services.push('VCF Operations');
+  if(mgmt.vcfOperationsForLogs.enabled)services.push('VCF Ops for Logs');
+  if(mgmt.vcfOperationsForNetworks.enabled)services.push('VCF Ops for Networks');
+  if(mgmt.vcfAutomation.enabled)services.push('VCF Automation');
+  if(mgmt.vcfIdentityBroker.enabled)services.push('VCF Identity Broker');
+  if(mgmt.aviDeployed)services.push('AVI');
+  if(mgmt.vksEnabled)services.push('VKS');
+  summaries.push({domain:'Management Domain',domainType:'management',hostCount:mgmt.hostCount,enabledServices:services,vlanCount:mgmtVlans.length,totalIPCount:mgmtVlans.reduce((a,v)=>a+v.requiredIPs,0),vipCount:vips.filter(v=>v.domain==='Management Domain').length,notes:`${project.scenario} | ${mgmt.fleetPlacement}`});
+  workloads.forEach(wld=>{
+    const wVlans=vlans.filter(v=>v.domain===wld.domainName);
+    const ws=[];
+    if(wld.nsxEnabled)ws.push('NSX');if(wld.aviEnabled)ws.push('AVI');if(wld.vksEnabled)ws.push('VKS');if(wld.edgeRequired)ws.push('Edge');
+    summaries.push({domain:wld.domainName,domainType:'workload',hostCount:wld.hostCount,enabledServices:ws,vlanCount:wVlans.length,totalIPCount:wVlans.reduce((a,v)=>a+v.requiredIPs,0),vipCount:vips.filter(v=>v.domain===wld.domainName).length,notes:wld.notes||wld.domainRole});
+  });
+  return summaries;
+}
+
+// ── EXCEL EXPORT ─────────────────────────────────────────────────
+const FORMULA_RE=/^[=+\-@\t]/;
+function xs(v){if(v==null)return '';const s=String(v);return FORMULA_RE.test(s)?`'${s}`:s;}
+function colW(n){return{wch:n};}
+function applyHdr(ws,range){
+  try{
+    const ref=XLSX.utils.decode_range(range);
+    for(let C=ref.s.c;C<=ref.e.c;C++){
+      const cr=XLSX.utils.encode_cell({r:0,c:C});
+      if(ws[cr])ws[cr].s={fill:{fgColor:{rgb:'1B3A5C'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:10},alignment:{horizontal:'center',wrapText:true}};
+    }
+  }catch{}
+}
+
+function doExcelExport(state){
+  const wb=XLSX.utils.book_new();
+  wb.Props={Title:`VCF 9 Network Plan — ${state.project.projectName||'Export'}`,Author:'VCF 9 Network Planner',CreatedDate:new Date()};
+
+  const ds=[['Domain','Type','Hosts','Services','VLANs','Total IPs','VIPs','Notes'],...state.domainSummaries.map(s=>[xs(s.domain),s.domainType==='management'?'Management':'Workload',s.hostCount,xs(s.enabledServices.join(', ')),s.vlanCount,s.totalIPCount,s.vipCount,xs(s.notes)])];
+  const ws1=XLSX.utils.aoa_to_sheet(ds);ws1['!cols']=[32,18,10,40,10,12,8,40].map(colW);applyHdr(ws1,'A1:H1');
+  XLSX.utils.book_append_sheet(wb,ws1,'Domain Summary');
+
+  const vd=[['Domain','VLAN Name','Type','VLAN ID','CIDR','Req. IPs','Rec. CIDR','Mandatory','Scope','Notes'],...state.vlans.map(v=>[xs(v.domain),xs(v.vlanName),xs(v.vlanType),xs(v.vlanId),xs(v.cidr),v.requiredIPs,xs(v.recommendedCIDR),xs(v.mandatory),xs(v.scope),xs(v.notes)])];
+  const ws2=XLSX.utils.aoa_to_sheet(vd);ws2['!cols']=[28,24,18,10,16,10,12,14,12,40].map(colW);applyHdr(ws2,'A1:J1');
+  XLSX.utils.book_append_sheet(wb,ws2,'VLAN Summary');
+
+  const ad=[['Appliance Name','Type','Domain','VLAN','IP Address','FQDN','Static IP','Notes'],...state.appliances.map(a=>[xs(a.applianceName),xs(a.applianceType),xs(a.domain),xs(a.vlan),xs(a.ipAddress),xs(a.fqdn),a.staticIPRequired?'Yes':'No',xs(a.notes)])];
+  const ws3=XLSX.utils.aoa_to_sheet(ad);ws3['!cols']=[28,22,28,28,18,36,10,40].map(colW);applyHdr(ws3,'A1:H1');
+  XLSX.utils.book_append_sheet(wb,ws3,'Appliance Allocation');
+
+  const vipd=[['VIP Name','Service','Domain','VLAN','IP Address','FQDN','Notes'],...state.vips.map(v=>[xs(v.vipName),xs(v.associatedService),xs(v.domain),xs(v.vlan),xs(v.ipAddress||v.ipPlaceholder),xs(v.fqdn||v.fqdnPlaceholder),xs(v.notes)])];
+  const ws4=XLSX.utils.aoa_to_sheet(vipd);ws4['!cols']=[32,24,28,28,18,36,40].map(colW);applyHdr(ws4,'A1:G1');
+  XLSX.utils.book_append_sheet(wb,ws4,'VIPs');
+
+  const vald=[['Severity','Category','Domain','Message','Resolution'],...state.validationMessages.map(m=>[xs(m.severity.toUpperCase()),xs(m.category),xs(m.domain),xs(m.message),xs(m.resolution)])];
+  const ws5=XLSX.utils.aoa_to_sheet(vald);ws5['!cols']=[12,14,28,60,50].map(colW);applyHdr(ws5,'A1:E1');
+  XLSX.utils.book_append_sheet(wb,ws5,'Validation Report');
+
+  const fname=`VCF9_Plan_${(state.project.projectName||'Export').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,fname);
+}
+
+// ── DEFAULT STATE ────────────────────────────────────────────────
+function newId(){return 'id-'+Math.random().toString(36).slice(2);}
+
+function defaultWorkloadDomain(index){
+  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],notes:''};
+}
+
+const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-standard',deploymentType:'greenfield',workloadDomainCount:1,subnetBufferEnabled:true,subnetBufferPercent:20};
+const DEFAULT_MGMT={hostCount:4,nsxManagerMode:'clustered',fleetMode:'standalone',fleetPlacement:'shared-mgmt-vlan',nsxEdgeDeployed:false,nsxEdgeNodeCount:2,aviDeployed:false,vksEnabled:false,tepInterfacesPerHost:2,edgeUplinksDedicated:true,additionalServices:[],topologyMode:'single-site',layer2AdjacencyConfirmed:false,vcfOperations:{enabled:true,mode:'enterprise',remoteCollectorCount:0,requiresDedicatedVLAN:false},vcfOperationsForLogs:{enabled:true,mode:'clustered',workerCount:2,integratedLBVIP:true,requiresDedicatedVLAN:false},vcfOperationsForNetworks:{enabled:true,platformNodeCount:1,collectorCount:1,requiresDedicatedVLAN:false},vcfAutomation:{enabled:true,mode:'clustered',orchestratorMode:'embedded',orchestratorNodeCount:1,requiresDedicatedVLAN:false},vcfIdentityBroker:{enabled:true,mode:'appliance',haEnabled:false,requiresDedicatedVLAN:false},vksVPCs:[]};
+
+// ── ALPINE APP ───────────────────────────────────────────────────
+function vcfApp(){
+  return {
+    // Auth
+    authReady:false,
+    currentUser:null,
+    loginUsername:'',loginPassword:'',loginError:'',loginLoading:false,
+    sb:null,
+
+    // App state
+    activeTab:'overview',
+    tabs:[
+      {id:'overview',label:'Overview'},{id:'management',label:'Management Domain'},
+      {id:'platform',label:'Platform Services'},{id:'workloads',label:'Workload Domains'},
+      {id:'vlans',label:'VLAN Design'},{id:'appliances',label:'Appliances'},
+      {id:'vips',label:'VIPs'},{id:'validation',label:'Validation'},
+      {id:'export',label:'Export / Import'},
+      {id:'about',label:'About'},
+    ],
+
+    project:JSON.parse(JSON.stringify(DEFAULT_PROJECT)),
+    managementDomain:JSON.parse(JSON.stringify(DEFAULT_MGMT)),
+    workloadDomains:[defaultWorkloadDomain(1)],
+
+    vlans:[],appliances:[],vips:[],validationMessages:[],domainSummaries:[],
+    toastMsg:'',toastVisible:false,
+
+    init(){
+      this.$watch('project',()=>this.compute());
+      this.$watch('managementDomain',()=>this.compute());
+      this.$watch('workloadDomains',()=>this.compute());
+      this.compute();
+      this.initAuth();
+    },
+
+    compute(){
+      const vlanEdits={};
+      this.vlans.forEach(v=>{if(v.vlanId||v.cidr)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr};});
+      const appEdits={};
+      this.appliances.forEach(a=>{if(a.ipAddress||a.fqdn)appEdits[a.applianceName]={ipAddress:a.ipAddress,fqdn:a.fqdn};});
+      const vipEdits={};
+      this.vips.forEach(v=>{if(v.ipAddress||v.fqdn)vipEdits[v.vipName]={ipAddress:v.ipAddress,fqdn:v.fqdn};});
+
+      const mVlans=buildManagementVLANs(this.managementDomain,this.project,this.workloadDomains);
+      const wVlans=this.workloadDomains.flatMap(w=>buildWorkloadVLANs(w,this.project));
+      this.vlans=[...mVlans,...wVlans].map(v=>({...v,...(vlanEdits[`${v.domain}|${v.vlanName}`]||{})}));
+
+      const mApps=buildManagementAppliances(this.managementDomain,this.project);
+      const wApps=this.workloadDomains.flatMap(w=>buildWorkloadAppliances(w));
+      this.appliances=[...mApps,...wApps].map(a=>({...a,...(appEdits[a.applianceName]||{})}));
+
+      const mVips=buildManagementVIPs(this.managementDomain,this.project);
+      const wVips=this.workloadDomains.flatMap(w=>buildWorkloadVIPs(w));
+      this.vips=[...mVips,...wVips].map(v=>({...v,...(vipEdits[v.vipName]||{})}));
+
+      this.validationMessages=runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans);
+      this.domainSummaries=buildDomainSummaries(this.project,this.managementDomain,this.workloadDomains,this.vlans,this.vips);
+    },
+
+    async initAuth(){
+      const cfg=window.APP_CONFIG||{};
+      if(!cfg.supabaseUrl||!cfg.supabaseKey){this.loginError='config.js not found. Copy config.example.js to config.js and fill in your credentials.';return;}
+      this.sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true},global:{headers:{'apikey':cfg.supabaseKey}}});
+      const {data:{session}}=await this.sb.auth.getSession();
+      if(session){
+        await this.loadUser(session.user.id);
+        if(this.currentUser?.active){this.authReady=true;this.showToast(`Welcome back, ${this.currentUser.username}`);}
+      }
+      this.sb.auth.onAuthStateChange(async(event)=>{if(event==='SIGNED_OUT'){this.currentUser=null;this.authReady=false;}});
+    },
+
+    async loadUser(userId){
+      const {data}=await this.sb.from('profiles').select('*').eq('id',userId).single();
+      if(data)this.currentUser={...data};
+    },
+
+    async doLogin(){
+      this.loginError='';
+      if(!this.loginUsername||!this.loginPassword){this.loginError='Please fill in all fields.';return;}
+      this.loginLoading=true;
+      try{
+        const {data:email}=await this.sb.rpc('get_email_by_username',{p_username:this.loginUsername});
+        if(!email){this.loginError='Invalid username or password.';return;}
+        const {data,error}=await this.sb.auth.signInWithPassword({email,password:this.loginPassword});
+        if(error){this.loginError='Invalid username or password.';return;}
+        await this.loadUser(data.user.id);
+        if(!this.currentUser?.active){await this.sb.auth.signOut();this.loginError='Account inactive. Contact administrator.';return;}
+        this.authReady=true;
+        this.showToast(`Welcome, ${this.currentUser.username}`);
+      }finally{this.loginLoading=false;}
+    },
+
+    async doLogout(){
+      await this.sb.auth.signOut();
+      this.currentUser=null;
+      this.authReady=false;
+      this.loginUsername='';this.loginPassword='';this.loginError='';
+    },
+
+    showToast(msg,ms=3000){this.toastMsg=msg;this.toastVisible=true;setTimeout(()=>this.toastVisible=false,ms);},
+
+    addWorkloadDomain(){
+      const idx=this.workloadDomains.length+1;
+      this.workloadDomains.push(defaultWorkloadDomain(idx));
+    },
+
+    addAdditionalService(domain,wldIdx){
+      const svc={id:newId(),name:'',type:'custom',applianceCount:1,requiresDedicatedVLAN:false,requiresVIP:false,vipCount:0,notes:''};
+      if(domain==='management')this.managementDomain.additionalServices.push(svc);
+      else this.workloadDomains[wldIdx].additionalServices.push(svc);
+    },
+
+    addVKSVPC(domain,wldIdx){
+      const vpc={id:newId(),name:'Namespace VPC',type:'namespace',subnets:[]};
+      if(domain==='management')this.managementDomain.vksVPCs.push(vpc);
+      else this.workloadDomains[wldIdx].vksVPCs.push(vpc);
+    },
+
+    addVKSSubnet(domain,wldIdx,vpcIdx){
+      const sn={id:newId(),name:'',accessMode:'private',ipBlock:'',notes:''};
+      if(domain==='management')this.managementDomain.vksVPCs[vpcIdx].subnets.push(sn);
+      else this.workloadDomains[wldIdx].vksVPCs[vpcIdx].subnets.push(sn);
+    },
+
+    exportExcel(){
+      doExcelExport({project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips,validationMessages:this.validationMessages,domainSummaries:this.domainSummaries});
+      this.showToast('Excel exported successfully');
+    },
+
+    exportJSON(){
+      const state={project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips};
+      const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=`vcf9_plan_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();URL.revokeObjectURL(url);
+      this.showToast('JSON exported successfully');
+    },
+
+    importJSON(event){
+      const file=event.target.files[0];if(!file)return;
+      const reader=new FileReader();
+      reader.onload=(e)=>{
+        try{
+          const s=JSON.parse(e.target.result);
+          if(s.project)this.project={...DEFAULT_PROJECT,...s.project};
+          if(s.managementDomain)this.managementDomain={...JSON.parse(JSON.stringify(DEFAULT_MGMT)),...s.managementDomain};
+          if(s.workloadDomains)this.workloadDomains=s.workloadDomains;
+          this.compute();
+          if(s.vlans)s.vlans.forEach(sv=>{const v=this.vlans.find(x=>x.domain===sv.domain&&x.vlanName===sv.vlanName);if(v){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';}});
+          if(s.appliances)s.appliances.forEach(sa=>{const a=this.appliances.find(x=>x.applianceName===sa.applianceName);if(a){a.ipAddress=sa.ipAddress||'';a.fqdn=sa.fqdn||'';}});
+          if(s.vips)s.vips.forEach(sv=>{const v=this.vips.find(x=>x.vipName===sv.vipName);if(v){v.ipAddress=sv.ipAddress||'';v.fqdn=sv.fqdn||'';}});
+          this.showToast('JSON imported successfully');
+        }catch{this.showToast('Import failed — invalid JSON file');}
+        event.target.value='';
+      };
+      reader.readAsText(file);
+    },
+  };
+}
+</script>
+</body>
+</html>

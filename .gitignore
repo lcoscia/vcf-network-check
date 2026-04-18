@@ -1,0 +1,6 @@
+.DS_Store
+.claude/
+node_modules/
+vcf-planner/.next/
+vcf-planner/node_modules/
+*.log
