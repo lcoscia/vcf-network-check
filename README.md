@@ -9,7 +9,7 @@
 
 ## Overview
 
-The VCF 9 Network Planner replaces manual spreadsheet-based network design with a self-consistent, browser-based planning tool. From a handful of configuration choices, it automatically derives the complete VLAN inventory, appliance IP allocation, VIP list, and runs architectural validation — all exportable to Excel or JSON.
+Browser-based network planning tool for VMware Cloud Foundation 9 deployments. From a handful of configuration choices, it automatically derives the complete VLAN inventory, appliance IP allocation, VIP list, and runs architectural validation — exportable to Excel or JSON.
 
 ---
 
@@ -23,26 +23,13 @@ The VCF 9 Network Planner replaces manual spreadsheet-based network design with 
 | **Validation Engine** | Architectural checks with Blocker / Warning / Info severity and remediation guidance |
 | **Excel Export** | 5-sheet workbook: Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report |
 | **JSON Save/Load** | Full planner state persistence including user-entered IPs and FQDNs |
-| **Authentication** | Supabase-backed multi-user login with username + password |
-
----
-
-## Project Structure
-
-```
-vcf-network-check/
-└── vcf-planner-html/        # ★ Main deliverable — standalone HTML app
-    ├── index.html           # Single-file application (Alpine.js + custom CSS)
-    └── config.js            # Supabase credentials — not committed, create locally
-```
+| **Authentication** | Supabase-backed multi-user login |
 
 ---
 
 ## Quick Start
 
-### 1. Create `config.js`
-
-Create the file `vcf-planner-html/config.js` with your Supabase project credentials:
+Create `config.js` at the root (not committed):
 
 ```js
 window.APP_CONFIG = {
@@ -51,25 +38,11 @@ window.APP_CONFIG = {
 };
 ```
 
-> `config.js` is excluded from git via `.gitignore` — never commit credentials.
-
-### 2. Open in browser
-
-No build step required — open directly or serve with any static file server:
-
-```bash
-open vcf-planner-html/index.html
-
-# or with a local server
-cd vcf-planner-html && npx serve .
-# → http://localhost:3000
-```
+Then open `index.html` directly in a browser — no build step required.
 
 ---
 
 ## Supabase Setup
-
-The app expects the following in your Supabase project:
 
 **Table: `profiles`**
 
@@ -90,18 +63,6 @@ returns text language sql security definer as $$
   limit 1;
 $$;
 ```
-
----
-
-## Technology Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | Vanilla HTML5 + [Alpine.js v3](https://alpinejs.dev) |
-| Styling | Custom CSS — VCF-DD Design System |
-| Authentication | [Supabase](https://supabase.com) Auth |
-| Excel Export | [SheetJS](https://sheetjs.com) (xlsx.full.min.js) |
-| Runtime | Browser-only, zero build step |
 
 ---
 
