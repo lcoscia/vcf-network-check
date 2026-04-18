@@ -1,9 +1,0 @@
-.DS_Store
-.claude/
-node_modules/
-vcf-planner/.next/
-vcf-planner/node_modules/
-*.log
-vcf-planner-html/config.js
-vcf-planner-html/config.example.js
-VCF 9 VLAN Verification/
