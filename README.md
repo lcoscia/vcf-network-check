@@ -31,39 +31,18 @@ The VCF 9 Network Planner replaces manual spreadsheet-based network design with 
 
 ```
 vcf-network-check/
-├── vcf-planner-html/        # ★ Main deliverable — standalone HTML app
-│   ├── index.html           # Single-file application (Alpine.js + custom CSS)
-│   ├── config.js            # Supabase credentials (not committed)
-│   └── config.example.js    # Template for config.js
-│
-├── vcf-planner/             # Next.js prototype (reference implementation)
-│
-└── VCF 9 VLAN Verification/ # Original VCF-DD validation report tool
+└── vcf-planner-html/        # ★ Main deliverable — standalone HTML app
+    ├── index.html           # Single-file application (Alpine.js + custom CSS)
+    └── config.js            # Supabase credentials — not committed, create locally
 ```
 
 ---
 
 ## Quick Start
 
-### HTML App (recommended)
+### 1. Create `config.js`
 
-```bash
-# 1. Copy and fill in your Supabase credentials
-cp vcf-planner-html/config.example.js vcf-planner-html/config.js
-
-# 2. Open in browser — no build step required
-open vcf-planner-html/index.html
-```
-
-Or serve with any static file server:
-
-```bash
-cd vcf-planner-html
-npx serve .
-# → http://localhost:3000
-```
-
-### Configuration (`config.js`)
+Create the file `vcf-planner-html/config.js` with your Supabase project credentials:
 
 ```js
 window.APP_CONFIG = {
@@ -74,11 +53,23 @@ window.APP_CONFIG = {
 
 > `config.js` is excluded from git via `.gitignore` — never commit credentials.
 
+### 2. Open in browser
+
+No build step required — open directly or serve with any static file server:
+
+```bash
+open vcf-planner-html/index.html
+
+# or with a local server
+cd vcf-planner-html && npx serve .
+# → http://localhost:3000
+```
+
 ---
 
 ## Supabase Setup
 
-The app expects two objects in your Supabase project:
+The app expects the following in your Supabase project:
 
 **Table: `profiles`**
 
