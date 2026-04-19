@@ -27,37 +27,6 @@ Browser-based network planning tool for VMware Cloud Foundation 9 deployments. F
 
 ---
 
-## Quick Start
-
-Open `index.html` directly in a browser — no build step, no external config file required.
-
-Supabase credentials are embedded directly in `index.html` inside a `<script>` block at the top of `<head>`. To point to a different Supabase project, edit `window.APP_CONFIG` there.
-
----
-
-## Supabase Setup
-
-**Table: `profiles`**
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid (PK) | References `auth.users.id` |
-| `username` | text | Display name used for login |
-| `active` | boolean | Inactive accounts are blocked at login |
-
-**RPC function: `get_email_by_username`**
-
-```sql
-create or replace function get_email_by_username(p_username text)
-returns text language sql security definer as $$
-  select email from auth.users u
-  join public.profiles p on p.id = u.id
-  where p.username = p_username
-  limit 1;
-$$;
-```
-
----
 
 ## Supported Scenarios
 
