@@ -23,22 +23,15 @@ Browser-based network planning tool for VMware Cloud Foundation 9 deployments. F
 | **Validation Engine** | Architectural checks with Blocker / Warning / Info severity and remediation guidance |
 | **Excel Export** | 5-sheet workbook: Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report |
 | **JSON Save/Load** | Full planner state persistence including user-entered IPs and FQDNs |
-| **Authentication** | Supabase-backed multi-user login |
+| **Authentication** | Supabase-backed multi-user login — credentials embedded in `index.html` |
 
 ---
 
 ## Quick Start
 
-Create `config.js` at the root (not committed):
+Open `index.html` directly in a browser — no build step, no external config file required.
 
-```js
-window.APP_CONFIG = {
-  supabaseUrl: 'https://<your-project>.supabase.co',
-  supabaseKey: '<your-anon-key>'
-};
-```
-
-Then open `index.html` directly in a browser — no build step required.
+Supabase credentials are embedded directly in `index.html` inside a `<script>` block at the top of `<head>`. To point to a different Supabase project, edit `window.APP_CONFIG` there.
 
 ---
 
