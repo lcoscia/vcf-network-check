@@ -3,7 +3,7 @@
 > **Architecture Edition** — Pre-Deployment Network Planning Tool for VMware Cloud Foundation 9
 
 **Author:** Leonardo Coscia — Senior VMware Cloud Foundation Architect  
-**Version:** v1.0.0 — April 2026
+**Version:** v1.0.2 — April 2026
 
 ---
 
@@ -66,6 +66,18 @@ $$;
 - **VCF Automation + VKS** — adds Kubernetes Supervisor VLANs
 - **Private AI** — AI Workload Domain role
 - **Custom** — free-form configuration
+
+---
+
+## Security
+
+| Control | Status |
+|---|---|
+| CDN Subresource Integrity (SRI) | All 3 scripts pinned with `integrity` + `crossorigin` |
+| Dependency versions | Fully pinned (Supabase 2.103.3, xlsx 0.18.5, Alpine 3.14.9) |
+| XSS — Alpine `x-html` | Eliminated — all dynamic content uses `x-text` |
+| Supabase profile fetch | Minimal columns only (`id, username, active`) |
+| Supabase anon key | Publishable by design — safe to embed in client HTML |
 
 ---
 
