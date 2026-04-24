@@ -41,30 +41,6 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 - Supabase username/password login
 - Integrated access request modal (Supabase `access_requests` table + EmailJS notification)
 
-## Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/rusherleo/vcf-network-check.git
-   cd vcf-network-check/vcf-planner-html
-   ```
-
-2. Create your config file from the example:
-   ```bash
-   cp config.example.js config.js
-   ```
-
-3. Edit `config.js` and fill in your Supabase project URL and anon key.
-
-4. Open `index.html` in a browser (or serve with any static HTTP server):
-   ```bash
-   npx serve .
-   # or
-   python3 -m http.server 8080
-   ```
-
-5. Log in with your Supabase-managed username and password.
-
 ## Authentication
 
 Uses the same Supabase project and `profiles` table as VCF-DD. Users must have `active = true` in their profile to access the tool. Login is by username via the `get_email_by_username` RPC function.
