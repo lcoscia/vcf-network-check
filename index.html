@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VCF 9 Network Planner</title>
-  <script src="config.js"></script>
+  <script>
+    window.APP_CONFIG = {
+      supabaseUrl: 'https://zpuwusopejoyrbpgamuw.supabase.co',
+      supabaseKey: 'sb_publishable_HWs9Ov0QoG5rybmORZrB9g_kPsB3Mi-',
+    };
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -2050,7 +2055,7 @@ function vcfApp(){
 
     async initAuth(){
       const cfg=window.APP_CONFIG||{};
-      if(!cfg.supabaseUrl||!cfg.supabaseKey){this.loginError='config.js not found. Copy config.example.js to config.js and fill in your credentials.';return;}
+      if(!cfg.supabaseUrl||!cfg.supabaseKey){this.loginError='Supabase credentials missing. Contact the administrator.';return;}
       this.sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true},global:{headers:{'apikey':cfg.supabaseKey}}});
       const {data:{session}}=await this.sb.auth.getSession();
       if(session){
