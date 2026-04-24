@@ -1,55 +1,95 @@
-# VCF 9 Network Planner
+# VCF 9 Network Planner — v1.1.0
 
-> **Architecture Edition** — Pre-Deployment Network Planning Tool for VMware Cloud Foundation 9
-
-**Author:** Leonardo Coscia — Senior VMware Cloud Foundation Architect  
-**Version:** v1.0.2 — April 2026
-
----
-
-## Overview
-
-Browser-based network planning tool for VMware Cloud Foundation 9 deployments. From a handful of configuration choices, it automatically derives the complete VLAN inventory, appliance IP allocation, VIP list, and runs architectural validation — exportable to Excel or JSON.
-
----
+Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning.
 
 ## Features
 
-| Feature | Description |
+### Planning tabs
+- **Overview** — global config, FQDN suffix/prefix, domain summary cards
+- **Management Domain** — hosts, NSX, storage type, topology mode, Fleet/Platform network model
+- **Platform Services** — VCF Operations, Logs, Networks, Automation, Identity Broker
+- **Workload Domains** — per-domain config with storage type, NSX, VKS, domain roles
+- **VLAN Design** — auto-generated VLAN table with VLAN ID and CIDR input (IP prefix pre-fill)
+- **Appliances** — full appliance list with IP/FQDN fields and FQDN suffix auto-placeholder
+- **VIPs** — virtual IP allocation with IP prefix pre-fill from VLAN CIDRs
+- **Validation** — architectural rules with Blocker / Warning / Info severity
+- **Export / Import** — Excel workbook (5 sheets) + JSON save/restore
+
+### Network models
+- **4 Fleet/Platform network models**: Shared Management VM Network, Dedicated Fleet VLAN, NSX VLAN Segment, NSX Overlay Segment (Edge required)
+- **Storage types**: vSAN ESA (VCF 9 default), vSAN OSA, NFS, VMFS
+- **Topology modes**: Single-Site, vSAN Stretched Cluster (Broadcom prerequisites), Stretched vMSC, Partially Stretched
+
+### VCF 9 design rules
+- vSAN Stretched Cluster prerequisites from Broadcom TechDocs (latency ≤ 5 ms RTT, 10 Gbps, Witness Host)
+- Fleet Network routing — collectors always in Management VM Network
+- VKS 5-consecutive-IP requirements
+- VCF Automation 4-node HA (3 active + 1 upgrade)
+- NSX TEP calculation per host
+- Remote Collectors (≠ Cloud Proxy) — 2 by default for enterprise mode
+- Identity Broker Embedded → N/A IP (disabled field)
+- Workload Domain min 2 hosts when using NFS storage
+
+### UX
+- Topology explanations with L2/L3 rules per network (vSAN Stretched, Partially Stretched, vMSC)
+- Domain Role descriptions (Runtime Kubernetes = VKS Supervisor cluster)
+- Fleet model indicator in Platform Services tab
+- FQDN Suffix/Prefix → auto-placeholder in Appliances and VIPs
+- IP prefix pre-fill from VLAN CIDR (e.g. `10.0.1.0/24` → placeholder `10.0.1.`)
+
+### Authentication
+- Supabase username/password login
+- Integrated access request modal (Supabase `access_requests` table + EmailJS notification)
+
+## Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/rusherleo/vcf-network-check.git
+   cd vcf-network-check/vcf-planner-html
+   ```
+
+2. Create your config file from the example:
+   ```bash
+   cp config.example.js config.js
+   ```
+
+3. Edit `config.js` and fill in your Supabase project URL and anon key.
+
+4. Open `index.html` in a browser (or serve with any static HTTP server):
+   ```bash
+   npx serve .
+   # or
+   python3 -m http.server 8080
+   ```
+
+5. Log in with your Supabase-managed username and password.
+
+## Authentication
+
+Uses the same Supabase project and `profiles` table as VCF-DD. Users must have `active = true` in their profile to access the tool. Login is by username via the `get_email_by_username` RPC function.
+
+Access requests are stored in the `access_requests` table and trigger an EmailJS notification to the administrator.
+
+## Tech Stack
+
+| Layer | Technology |
 |---|---|
-| **VLAN Engine** | Auto-generates all VLANs for Management & Workload Domains (ESXi, vMotion, vSAN, TEP, Edge Uplinks, Fleet, Platform Services) |
-| **Appliance Allocation** | Full inventory with IP / FQDN fields for SDDC Manager, vCenter, NSX Managers, AVI, Fleet, VCF Suite |
-| **VIP Inventory** | Auto-lists all cluster VIPs (NSX, AVI, VCF Operations, Automation, Identity Broker, VKS) |
-| **Validation Engine** | Architectural checks with Blocker / Warning / Info severity and remediation guidance |
-| **Excel Export** | 5-sheet workbook: Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report |
-| **JSON Save/Load** | Full planner state persistence including user-entered IPs and FQDNs |
-| **Authentication** | Supabase-backed multi-user login — credentials embedded in `index.html` |
+| Frontend | Vanilla HTML5 + Alpine.js v3 |
+| Styling | Custom CSS — VCF-DD Design System |
+| Authentication | Supabase Auth (email + username) |
+| Access Requests | Supabase `access_requests` + EmailJS |
+| Excel Export | SheetJS (xlsx.full.min.js) |
+| Runtime | Browser-only, no build step |
+| Compatibility | Chrome, Edge, Firefox, Safari |
 
----
+## Version History
 
-
-## Supported Scenarios
-
-- **VCF Standard** — Management Domain + Workload Domains
-- **VCF Automation** — includes VCF Automation (vRA) + vRO
-- **VCF Automation + VKS** — adds Kubernetes Supervisor VLANs
-- **Private AI** — AI Workload Domain role
-- **Custom** — free-form configuration
-
----
-
-## Security
-
-| Control | Status |
-|---|---|
-| CDN Subresource Integrity (SRI) | All 3 scripts pinned with `integrity` + `crossorigin` |
-| Dependency versions | Fully pinned (Supabase 2.103.3, xlsx 0.18.5, Alpine 3.14.9) |
-| XSS — Alpine `x-html` | Eliminated — all dynamic content uses `x-text` |
-| Supabase profile fetch | Minimal columns only (`id, username, active`) |
-| Supabase anon key | Publishable by design — safe to embed in client HTML |
-
----
+| Version | Date | Notes |
+|---|---|---|
+| v1.1.0 | Apr 2026 | UX & features: topology explanations (vSAN Stretched, Partially Stretched), Storage Type (NFS/VMFS/vSAN), 4 Fleet network models (NSX Overlay/VLAN Segment), Broadcom TechDocs prerequisites, Platform Services fleet indicator, FQDN Suffix/Prefix, IP prefix from VLAN CIDR, access request modal, 2 Remote Collectors default |
+| v1.0.0 | Apr 2026 | Initial release — full HTML, Alpine.js, Supabase auth, VCF-DD design |
 
 ## License
 
-Private — © 2026 Leonardo Coscia. All rights reserved.
+Internal use only.

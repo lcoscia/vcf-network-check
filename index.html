@@ -4,21 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VCF 9 Network Planner</title>
-  <script>
-    window.APP_CONFIG = {
-      supabaseUrl: 'https://zpuwusopejoyrbpgamuw.supabase.co',
-      supabaseKey: 'sb_publishable_HWs9Ov0QoG5rybmORZrB9g_kPsB3Mi-',
-    };
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.103.3/dist/umd/supabase.js"
-          integrity="sha512-SpJhsvnjL6xistVtVzwWeYVzf4jrtaSgp8Ox/rbS2scZlMj8sFZENzqAODvo/Qi2w03AWCJeX7WwhW7uLhvocg=="
-          crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
-          integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA=="
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"
-          integrity="sha512-KSdieUYxSxr/laB3Bh5TP8GAng49b2qRfdcnFvh8OuPpPgksA189OQ9v1A3gIz5P9s3A4aXMe5uiHLMfla60Uw=="
-          crossorigin="anonymous"></script>
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
     /* ── CSS DESIGN SYSTEM (VCF-DD) ───────────────────────────── */
     :root {
@@ -52,6 +42,52 @@
     ::-webkit-scrollbar-track { background: #e8edf4; }
     ::-webkit-scrollbar-thumb { background: #b0c4d8; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--blue-light); }
+
+    /* ── REQUEST ACCESS LINK ───────────────────────────────────── */
+    .login-request-link {
+      text-align: center; margin-top: 14px; padding-top: 14px;
+      border-top: 1px solid var(--gray-border);
+      font-size: 11px; color: var(--text-muted);
+    }
+    .login-request-link button {
+      background: none; border: none; color: var(--blue-accent);
+      font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .login-request-link button:hover { text-decoration: underline; }
+
+    /* ── ACCESS REQUEST MODAL ──────────────────────────────────── */
+    .access-req-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .access-req-overlay.open { display: flex; }
+    .access-req-box {
+      background: white; border-radius: 10px; width: 100%; max-width: 440px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.4); overflow: hidden;
+    }
+    .access-req-header {
+      background: linear-gradient(135deg, var(--blue-dark), var(--blue-accent));
+      color: white; padding: 20px 24px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .access-req-header h2 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .access-req-header p  { font-size: 11px; opacity: 0.75; }
+    .access-req-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+    .access-req-field label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .access-req-field input,
+    .access-req-field textarea {
+      width: 100%; padding: 7px 10px; border: 1px solid var(--gray-border);
+      border-radius: 4px; font-size: 13px; font-family: inherit;
+      color: var(--text-dark); resize: vertical;
+    }
+    .access-req-field input:focus,
+    .access-req-field textarea:focus { outline: none; border-color: var(--blue-accent); }
+    .access-req-footer {
+      padding: 12px 24px; border-top: 1px solid var(--gray-border);
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .access-req-status { font-size: 12px; color: var(--text-muted); min-height: 16px; }
 
     /* ── LOGIN ─────────────────────────────────────────────────── */
     .login-overlay {
@@ -354,6 +390,22 @@
     .font-bold { font-weight: 700; }
     .text-center { text-align: center; }
     .divider { border: none; border-top: 1px solid var(--gray-border); margin: 16px 0; }
+
+    /* ── HELP DESCRIPTIONS ─────────────────────────────────────── */
+    .help-desc {
+      font-size: 11px; color: #345; margin-top: 6px; padding: 8px 11px;
+      background: #eef4fb; border-left: 3px solid var(--blue-accent);
+      border-radius: 0 4px 4px 0; line-height: 1.55;
+    }
+    .help-desc strong { color: var(--blue-mid); }
+    .help-desc ul { margin: 4px 0 0 14px; padding: 0; }
+    .help-desc li { margin-bottom: 2px; }
+    .role-desc {
+      font-size: 11px; color: var(--text-muted); margin-top: 4px;
+      padding: 7px 10px; background: #f4f6f9; border-radius: 4px;
+      font-style: italic; line-height: 1.5;
+    }
+    .role-desc strong { color: var(--blue-mid); font-style: normal; }
   </style>
 </head>
 <body x-data="vcfApp()" x-init="init()" x-cloak>
@@ -384,6 +436,41 @@
       <p class="login-error" x-text="loginError"></p>
       <button type="submit" class="login-btn" :disabled="loginLoading" x-text="loginLoading ? 'Signing in…' : 'Sign In'"></button>
     </form>
+    <div class="login-request-link">
+      <span>Don't have access? </span>
+      <button type="button" @click="openAccessRequestModal()">Request Access</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ACCESS REQUEST MODAL ═════════════════════════════════════ -->
+<div id="access-req-overlay" class="access-req-overlay" onclick="if(event.target===this)document.getElementById('access-req-overlay').classList.remove('open')">
+  <div class="access-req-box">
+    <div class="access-req-header">
+      <span style="font-size:22px;">📧</span>
+      <div>
+        <h2>Request VCF 9 Network Planner Access</h2>
+        <p>Your request will be sent to the administrator for approval.</p>
+      </div>
+      <button onclick="document.getElementById('access-req-overlay').classList.remove('open')"
+              style="margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:white;font-size:18px;cursor:pointer;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;">&times;</button>
+    </div>
+    <div class="access-req-body">
+      <div style="display:flex;gap:12px;">
+        <div class="access-req-field" style="flex:1;"><label>Full Name</label><input type="text" id="req-name" placeholder="John Doe"></div>
+        <div class="access-req-field" style="flex:1;"><label>Email</label><input type="email" id="req-email" placeholder="john@company.com"></div>
+      </div>
+      <div class="access-req-field"><label>Company / Organization</label><input type="text" id="req-company" placeholder="ACME Corp"></div>
+      <div class="access-req-field">
+        <label>Reason for Access</label>
+        <textarea id="req-reason" rows="3" placeholder="Describe why you need access to the VCF 9 Network Planner…"></textarea>
+      </div>
+      <p id="req-status" class="access-req-status"></p>
+    </div>
+    <div class="access-req-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('access-req-overlay').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="sendAccessRequest()">📧 Send Request</button>
+    </div>
   </div>
 </div>
 
@@ -448,7 +535,7 @@
             </select>
           </div>
         </div>
-        <div class="flex-center gap12">
+        <div class="flex-center gap12 mt8">
           <label class="check-row">
             <input type="checkbox" x-model="project.subnetBufferEnabled" />
             Subnet Buffer
@@ -456,6 +543,18 @@
           <input class="input" type="number" min="0" max="100" style="width:70px"
             x-model.number="project.subnetBufferPercent" :disabled="!project.subnetBufferEnabled" />
           <span class="text-muted text-xs">% overhead on all recommended CIDRs</span>
+        </div>
+        <div class="g2 mt12">
+          <div class="field">
+            <label>FQDN Suffix (DNS domain)</label>
+            <input class="input mono" x-model="project.fqdnSuffix" placeholder="e.g. vcf.domain.local" />
+            <span class="field-note">Optional — used as placeholder in Appliances &amp; VIPs tabs to pre-fill FQDNs (hostname.suffix)</span>
+          </div>
+          <div class="field">
+            <label>FQDN Prefix</label>
+            <input class="input mono" x-model="project.fqdnPrefix" placeholder="e.g. vcf-prod" />
+            <span class="field-note">Optional prefix added before appliance name in FQDNs</span>
+          </div>
         </div>
       </div>
 
@@ -491,22 +590,132 @@
         <div class="g4 mt12">
           <div class="field"><label>Host Count</label>
             <input class="input" type="number" min="4" x-model.number="managementDomain.hostCount" />
+            <span class="field-note">Min 4 for VCF bring-up (vSAN FTT=1 + HA)</span>
           </div>
-          <div class="field"><label>Topology Mode</label>
+          <div class="field">
+            <label>Topology Mode</label>
             <select class="select" x-model="managementDomain.topologyMode">
               <option value="single-site">Single Site</option>
-              <option value="stretched">Stretched</option>
+              <option value="vsan-stretched">vSAN Stretched Cluster (avec Witness)</option>
+              <option value="stretched">Stretched (vMSC — stockage non-vSAN)</option>
               <option value="partially-stretched">Partially Stretched</option>
             </select>
+            <div x-show="managementDomain.topologyMode==='single-site'" class="role-desc">
+              Déploiement standard sur un seul site. Tous les hôtes et VLANs sont locaux.
+            </div>
+            <div x-show="managementDomain.topologyMode==='vsan-stretched'" class="help-desc">
+              <strong>vSAN Stretched Cluster :</strong> Topologie VCF 9 standard pour les déploiements bi-site avec vSAN comme stockage primaire. Les données sont répliquées synchrone entre les 2 sites. Un hôte Witness tiers assure le quorum.
+              <br><br>
+              <strong style="color:#b05000">⚡ Prérequis réseau (Broadcom TechDocs VCF 9)</strong>
+              <ul>
+                <li><strong>Latence inter-sites (data ↔ data) :</strong> ≤ 5 ms RTT</li>
+                <li><strong>Latence data ↔ Witness :</strong> ≤ 200 ms RTT (100 ms one-way recommandé) ; si &gt; 10 hôtes/site : &lt; 100 ms RTT</li>
+                <li><strong>Bande passante inter-sites :</strong> 10 Gbps minimum (ESA et OSA)</li>
+                <li><strong>Witness :</strong> 2 Mbps par tranche de 1 000 composants vSAN</li>
+              </ul>
+              <strong style="color:#1a4a8b">🖧 VLANs et L2/L3</strong>
+              <ul>
+                <li><strong>vSAN VMkernel :</strong> L2 obligatoire entre les 2 sites (même VLAN ID)</li>
+                <li><strong>VM Management Network :</strong> L2 étendu sur les 2 sites — même VLAN ID requis</li>
+                <li><strong>ESXi Management (vmk0) :</strong> L2 recommandé pour l'automatisation VCF Ops (ajout de serveur)</li>
+                <li><strong>vMotion :</strong> L2 recommandé pour conserver les automatismes VCF Ops</li>
+                <li><strong>NSX Host TEP :</strong> L3 accepté (BGP/OSPF), L2 recommandé pour simplifier</li>
+                <li><strong>NFS (si stockage NFS) :</strong> L2 obligatoire sur les 2 sites</li>
+              </ul>
+              <strong style="color:#145c2e">✅ Prérequis architecture</strong>
+              <ul>
+                <li>Nombre d'hôtes <strong>identique</strong> sur chaque site (symétrie obligatoire)</li>
+                <li><strong>vSAN Witness Host</strong> requis sur un 3ème site indépendant — ne fait pas tourner de VMs, même version ESXi que les data hosts</li>
+                <li>Dans VCF : le cluster Management Domain <strong>doit être étendu en premier</strong> avant tout Workload Domain</li>
+                <li>Hôtes DPU (SmartNIC) et hôtes sur subnets mixtes : <strong>non supportés</strong> en stretched</li>
+                <li>Mapping vmnic → vDS <strong>identique</strong> entre les 2 zones</li>
+                <li>SMP-FT non supporté avec Site Disaster Tolerance ≥ 1</li>
+                <li>vSAN ESA et OSA sont tous deux supportés en stretched</li>
+              </ul>
+              <div style="font-size:10px;color:#7a8fa8;margin-top:6px;">
+                Sources : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom — Bandwidth &amp; Latency</a> ·
+                <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a>
+              </div>
+            </div>
+            <div x-show="managementDomain.topologyMode==='stretched'" class="help-desc">
+              <strong>Stretched (vMSC) :</strong> Le cluster est étendu sur 2 sites actifs-actifs avec vSAN Stretched Cluster.
+              <br><br>
+
+              <strong style="color:#b05000">⚡ Prérequis réseau (source : Broadcom TechDocs VCF 9)</strong>
+              <ul>
+                <li><strong>Latence inter-sites (data ↔ data) :</strong> ≤ 5 ms RTT</li>
+                <li><strong>Latence data ↔ Witness :</strong> ≤ 200 ms RTT (100 ms one-way recommandé) ; si &gt; 10 hôtes/site : &lt; 100 ms RTT</li>
+                <li><strong>Bande passante inter-sites :</strong> 10 Gbps minimum (ESA et OSA)</li>
+                <li><strong>Witness :</strong> 2 Mbps par tranche de 1 000 composants vSAN</li>
+              </ul>
+
+              <strong style="color:#1a4a8b">🖧 Prérequis réseau VLANs</strong>
+              <ul>
+                <li><strong>VM Network (Management VMs) :</strong> L2 étendu sur les 2 sites — même VLAN ID requis</li>
+                <li><strong>ESXi Management (vmk0) :</strong> peut être L3 (zone-specific), mais L2 recommandé pour l'automatisation VCF Ops (ajout de serveur)</li>
+                <li><strong>vMotion :</strong> L2 recommandé pour conserver les automatismes VCF Ops ; L3 possible mais perte d'automatisation</li>
+                <li><strong>vSAN :</strong> L2 obligatoire entre les 2 sites (même VLAN ID)</li>
+                <li><strong>NFS (si stockage NFS) :</strong> L2 obligatoire entre ESXi et serveur NFS sur les 2 sites</li>
+                <li><strong>NSX Host TEP :</strong> L3 accepté (BGP/OSPF), L2 recommandé pour simplifier la configuration</li>
+              </ul>
+
+              <strong style="color:#145c2e">✅ Prérequis architecture vSAN Stretched</strong>
+              <ul>
+                <li>Nombre d'hôtes <strong>identique</strong> sur chaque site (symétrie obligatoire)</li>
+                <li><strong>vSAN Witness Host</strong> requis sur un 3ème site (ou vSAN Witness Appliance) — ne fait pas tourner de VMs, même version ESXi que les data hosts</li>
+                <li>Dans VCF : le cluster Management Domain <strong>doit être étendu en premier</strong> avant tout Workload Domain</li>
+                <li>Hôtes DPU (SmartNIC) et hôtes sur subnets mixtes : <strong>non supportés</strong> en stretched</li>
+                <li>Mapping vmnic → vDS <strong>identique</strong> entre les 2 zones</li>
+                <li>SMP-FT non supporté avec Site Disaster Tolerance ≥ 1</li>
+              </ul>
+
+              <div style="font-size:10px;color:#7a8fa8;margin-top:6px;">
+                Sources : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — Bandwidth &amp; Latency</a> ·
+                <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a>
+              </div>
+            </div>
+            <div x-show="managementDomain.topologyMode==='partially-stretched'" class="help-desc">
+              <strong>Partially Stretched :</strong> Les composants de management restent sur le site principal. Seuls des hôtes compute sont étendus vers un site secondaire.
+              <ul>
+                <li>Les VLANs de management <strong>ne nécessitent pas d'extension L2 complète</strong> — seules les VLANs de la couche compute (ESXi Mgmt secondaire, vMotion compute) doivent être étendues.</li>
+                <li>Le site secondaire héberge uniquement des VMs de workload, pas les composants VCF.</li>
+                <li>Différent du mode Stretched complet : SDDC Manager, vCenter, NSX Managers restent au site principal.</li>
+              </ul>
+            </div>
           </div>
           <div class="field"><label>TEP Interfaces / Host</label>
             <input class="input" type="number" min="1" max="4" x-model.number="managementDomain.tepInterfacesPerHost" />
+            <span class="field-note">Min 2 recommandé (TEP HA actif-actif)</span>
           </div>
-          <div class="field" style="justify-content:flex-end;padding-bottom:2px">
-            <label class="check-row">
-              <input type="checkbox" x-model="managementDomain.layer2AdjacencyConfirmed" />
-              L2 Adjacency Confirmed
-            </label>
+          <div class="field">
+            <label>Storage Type</label>
+            <select class="select" x-model="managementDomain.storageType">
+              <option value="vsan-esa">vSAN ESA (VCF 9 default)</option>
+              <option value="vsan-osa">vSAN OSA</option>
+              <option value="nfs">NFS (stockage primaire NFS)</option>
+              <option value="vmfs">VMFS (iSCSI / FC)</option>
+            </select>
+            <span class="field-note" x-show="managementDomain.storageType==='nfs'">
+              NFS : VLAN NFS généré à la place de vSAN. <strong>L2 obligatoire</strong> entre hôtes ESXi et serveur NFS.
+            </span>
+            <span class="field-note" x-show="managementDomain.storageType==='vmfs'">
+              VMFS : datastores sur baie SAN (iSCSI ou FC). Aucun VLAN de stockage VMkernel généré (iSCSI : à configurer manuellement via Additional Services si VLAN dédié requis).
+            </span>
+          </div>
+        </div>
+        <div class="mt12">
+          <label class="check-row">
+            <input type="checkbox" x-model="managementDomain.layer2AdjacencyConfirmed" />
+            <span>L2 Adjacency Confirmed (bring-up)</span>
+          </label>
+          <div class="help-desc mt8">
+            <strong>L2 Adjacency Confirmed :</strong> Confirme que les VLANs requis pour le bring-up VCF sont accessibles en L2 depuis le SDDC Manager / Cloud Builder :
+            <ul>
+              <li><strong>ESXi Management</strong> (vmk0 des hôtes)</li>
+              <li><strong>Management VM Network</strong> (SDDC Manager, vCenter, NSX Managers)</li>
+              <li><strong>vMotion</strong> (requis par le bring-up pour la validation HA)</li>
+            </ul>
+            Ce n'est <em>pas</em> une exigence permanente (le NSX TEP et les uplinks Edge peuvent être L3 en production), mais le bring-up Cloud Builder valide la connectivité L2 initiale.
           </div>
         </div>
       </div>
@@ -533,14 +742,63 @@
       </div>
 
       <div class="card">
-        <h2 class="sec-title">Fleet Configuration</h2>
-        <div class="g2 mt12">
-          <div class="field"><label>Fleet Placement</label>
+        <h2 class="sec-title">Fleet &amp; Platform Services Network Model</h2>
+        <div class="mt12">
+          <div class="field">
+            <label>Modèle réseau des composants Fleet</label>
             <select class="select" x-model="managementDomain.fleetPlacement">
-              <option value="shared-mgmt-vlan">Shared — Management VM VLAN</option>
-              <option value="dedicated-fleet-vlan">Dedicated Fleet VLAN</option>
+              <option value="shared-mgmt-vlan">1 — Shared Management VM Network (Day 0, défaut)</option>
+              <option value="dedicated-fleet-vlan">2 — Dedicated Fleet VLAN (Day 2, séparé)</option>
+              <option value="nsx-vlan-segment">3 — NSX VLAN Segment (segment NSX backé VLAN)</option>
+              <option value="nsx-overlay-segment">4 — NSX Overlay Segment (segment NSX overlay, Edge requis)</option>
             </select>
-            <span class="field-note">VCF 9 uses Simple mode (1 appliance). Dedicated Fleet VLAN moves platform service nodes (Ops, Logs, Networks, Automation) to the Fleet Network. Collectors always remain in Management VM Network.</span>
+          </div>
+
+          <!-- Model 1: Shared -->
+          <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan'" class="role-desc mt8">
+            <strong>Modèle 1 — Shared Management VM Network :</strong> Fleet et tous les services platform partagent le Management VM Network (port group existant). Déploiement Day 0. Aucun VLAN supplémentaire requis. Simple, recommandé pour les petits déploiements.
+          </div>
+
+          <!-- Model 2: Dedicated Fleet VLAN -->
+          <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan'" class="help-desc mt8">
+            <strong>Modèle 2 — Dedicated Fleet VLAN :</strong> Un VLAN dédié est créé pour le Fleet Appliance et les nœuds des services platform (Ops, Logs, Networks, Automation). Les Collectors restent toujours dans le Management VM Network.
+            <ul>
+              <li>Configuration Day 2 (post bring-up via API)</li>
+              <li>Un VLAN physique supplémentaire est requis et généré dans VLAN Design</li>
+              <li>Les collecteurs (Remote Collectors, Proxy VMs) restent dans Management VM Network</li>
+            </ul>
+          </div>
+
+          <!-- Model 3: NSX VLAN Segment -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" class="help-desc mt8">
+            <strong>Modèle 3 — NSX VLAN Segment :</strong> Segment NSX backé par un VLAN physique (VLAN transport zone). Le routage est assuré par le fabric physique.
+            <ul>
+              <li>Créer une VLAN transport zone dans le NSX Manager du Management Domain</li>
+              <li>Créer un segment NSX sur cette nouvelle transport zone</li>
+              <li>Attacher la VLAN transport zone au transport node profile du cluster primary</li>
+              <li><strong>NSX Edge non requis</strong> — routage physique</li>
+              <li>Pas de NSX Federation ni de stretching overlay possible</li>
+            </ul>
+            <div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-vlan-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX VLAN Segment</a></div>
+          </div>
+
+          <!-- Model 4: NSX Overlay Segment -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment'" class="help-desc mt8">
+            <strong>Modèle 4 — NSX Overlay Segment :</strong> Segment NSX overlay (Geneve). Isolation réseau complète, policies de sécurité dédiées.
+            <ul>
+              <li><strong style="color:var(--red)">NSX Edge Cluster obligatoire</strong> — avec Tier-0 et Tier-1 gateways configurés</li>
+              <li>BGP requis avec peer ASN et passwords pour la connectivité externe</li>
+              <li>NSX Load Balancer disponible pour les composants Fleet</li>
+              <li>Supporte <strong>NSX Federation</strong> pour le stretching multi-sites (DR)</li>
+              <li>Les VCF Operations Collectors sont toujours déployés dans le Management VM Network</li>
+              <li><strong>Pas de VLAN ID physique</strong> — segment overlay (encapsulation Geneve)</li>
+            </ul>
+            <div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-overlay-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX Overlay Segment</a></div>
+          </div>
+
+          <!-- Warning: NSX Overlay requires Edge -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && !managementDomain.nsxEdgeDeployed" class="infobox yellow mt8">
+            ⚠️ <strong>NSX Edge non déployé</strong> — Le modèle NSX Overlay Segment nécessite un NSX Edge Cluster. Activez "NSX Edge Deployed" dans la section NSX Configuration ci-dessus.
           </div>
         </div>
       </div>
@@ -623,6 +881,23 @@
     <!-- ────────────────────────────────────────────────────────── -->
     <div x-show="activeTab==='platform'">
 
+      <!-- Indicateur dynamique du modèle réseau Fleet -->
+      <div class="help-desc mb12">
+        <strong>Réseau des services platform :</strong> Les composants ci-dessous (Ops, Logs, Networks, Automation, Identity Broker) sont déployés sur le réseau configuré dans l'onglet <em>Management Domain → Fleet &amp; Platform Services Network Model</em> :
+        <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan'" style="margin-top:6px;padding:6px 10px;background:#eef4fb;border-radius:4px;">
+          📌 Modèle actuel : <strong>Shared Management VM Network</strong> — tous les services platform partagent le Management VM Network.
+        </div>
+        <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan'" style="margin-top:6px;padding:6px 10px;background:#fff8e1;border-radius:4px;">
+          📌 Modèle actuel : <strong>Dedicated Fleet VLAN</strong> — les nœuds des services platform sont déployés dans le VLAN Fleet Network dédié. Les Collectors restent dans le Management VM Network.
+        </div>
+        <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" style="margin-top:6px;padding:6px 10px;background:#e8f8f0;border-radius:4px;">
+          📌 Modèle actuel : <strong>NSX VLAN Segment</strong> — les services platform sont déployés sur le segment NSX backé VLAN. Les Collectors restent dans le Management VM Network.
+        </div>
+        <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment'" style="margin-top:6px;padding:6px 10px;background:#e8f0fe;border-radius:4px;">
+          📌 Modèle actuel : <strong>NSX Overlay Segment</strong> — les services platform sont déployés sur le segment NSX overlay (Geneve). NSX Edge Cluster requis. Les Collectors restent dans le Management VM Network.
+        </div>
+      </div>
+
       <!-- VCF Operations -->
       <div class="svc-block">
         <div class="svc-head">
@@ -641,10 +916,9 @@
             </div>
             <div class="field"><label>Remote Collectors</label>
               <input class="input" type="number" min="0" x-model.number="managementDomain.vcfOperations.remoteCollectorCount" />
-              <span class="field-note">Instance-level — always in Mgmt VM Network</span>
-            </div>
-            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
-              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperations.requiresDedicatedVLAN" /> Dedicated VLAN</label>
+              <span class="field-note">
+                Agents de collecte déployés près des sources de données (WLDs, NSX, vCenter) pour réduire la charge réseau sur le cluster analytics. <strong>≠ Cloud Proxy / Cloud Gateway</strong> (qui est utilisé pour l'intégration VCF Cloud/VCFA). Ces collecteurs restent toujours dans le Management VM Network, indépendamment du Fleet/VLAN dédié.
+              </span>
             </div>
           </div>
         </div>
@@ -672,9 +946,6 @@
             <div class="field" x-show="managementDomain.vcfOperationsForLogs.mode==='clustered'" style="justify-content:flex-end;padding-bottom:2px">
               <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperationsForLogs.integratedLBVIP" /> ILB Syslog VIP</label>
             </div>
-            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
-              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperationsForLogs.requiresDedicatedVLAN" /> Dedicated VLAN</label>
-            </div>
           </div>
         </div>
       </div>
@@ -695,9 +966,6 @@
             <div class="field"><label>Collectors / Proxy VMs</label>
               <input class="input" type="number" min="0" x-model.number="managementDomain.vcfOperationsForNetworks.collectorCount" />
               <span class="field-note">Instance-level — always in Mgmt VM Network</span>
-            </div>
-            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
-              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfOperationsForNetworks.requiresDedicatedVLAN" /> Dedicated VLAN</label>
             </div>
           </div>
         </div>
@@ -730,9 +998,6 @@
               <input class="input" type="number" min="1" x-model.number="managementDomain.vcfAutomation.orchestratorNodeCount" />
               <span class="field-note">1 (standalone) or 3 (HA)</span>
             </div>
-            <div class="field" style="justify-content:flex-end;padding-bottom:2px">
-              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfAutomation.requiresDedicatedVLAN" /> Dedicated VLAN</label>
-            </div>
           </div>
         </div>
       </div>
@@ -755,9 +1020,6 @@
             </div>
             <div class="field" x-show="managementDomain.vcfIdentityBroker.mode==='appliance'" style="justify-content:flex-end;padding-bottom:2px">
               <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfIdentityBroker.haEnabled" /> HA (3 nodes + VIP)</label>
-            </div>
-            <div class="field" x-show="managementDomain.vcfIdentityBroker.mode==='appliance'" style="justify-content:flex-end;padding-bottom:2px">
-              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfIdentityBroker.requiresDedicatedVLAN" /> Dedicated VLAN</label>
             </div>
           </div>
         </div>
@@ -782,26 +1044,52 @@
           <div class="wld-card-body">
             <div class="g4 mb12">
               <div class="field"><label>Host Count</label>
-                <input class="input" type="number" min="3" x-model.number="workloadDomains[wi].hostCount" />
+                <input class="input" type="number" min="2" x-model.number="workloadDomains[wi].hostCount" />
+                <span class="field-note">Min 3 pour vSAN FTT=1. Min 2 accepté si stockage NFS primaire.</span>
               </div>
-              <div class="field"><label>Domain Role</label>
+              <div class="field">
+                <label>Domain Role</label>
                 <select class="select" x-model="workloadDomains[wi].domainRole">
-                  <option value="standard-vi">Standard VI</option>
+                  <option value="standard-vi">Standard VI (VMs)</option>
                   <option value="platform-services">Platform Services</option>
-                  <option value="runtime-kubernetes">Runtime Kubernetes</option>
-                  <option value="ai-workloads">AI Workloads</option>
+                  <option value="runtime-kubernetes">Runtime Kubernetes (VKS Supervisor)</option>
+                  <option value="ai-workloads">AI Workloads (GPU)</option>
                   <option value="mixed">Mixed</option>
                 </select>
+                <div x-show="workloadDomains[wi].domainRole==='standard-vi'" class="role-desc">Workloads VMs standard (applicatifs, base de données, etc.). Rôle par défaut.</div>
+                <div x-show="workloadDomains[wi].domainRole==='platform-services'" class="role-desc">Héberge des services de plateforme VCF (VCF Operations, Automation, etc.) ou des services partagés.</div>
+                <div x-show="workloadDomains[wi].domainRole==='runtime-kubernetes'" class="help-desc">
+                  <strong>Runtime Kubernetes (VKS Supervisor) :</strong> Ce domaine est dédié à l'hébergement du <strong>VKS Supervisor</strong> — le plan de gestion Kubernetes de VMware. Vous installerez le Supervisor sur ce cluster, puis créerez des namespaces et des clusters de workloads VKS dessus.
+                  <ul>
+                    <li>Activez <strong>VKS Enabled</strong> pour ce domaine.</li>
+                    <li>NSX + NSX Edge requis pour les réseaux overlay VKS.</li>
+                    <li>AVI (NSX ALB) recommandé pour le load balancing des VIPs Kubernetes.</li>
+                    <li>Ce n'est <em>pas</em> un cluster de workloads VMs standard.</li>
+                  </ul>
+                </div>
+                <div x-show="workloadDomains[wi].domainRole==='ai-workloads'" class="role-desc">Cluster dédié aux workloads IA/ML nécessitant des GPUs (Private AI Foundation). Requiert des hôtes avec GPUs compatibles vGPU.</div>
+                <div x-show="workloadDomains[wi].domainRole==='mixed'" class="role-desc">Domaine mixte — héberge plusieurs types de workloads (VMs + conteneurs + services).</div>
               </div>
               <div class="field"><label>TEP Interfaces / Host</label>
                 <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].tepInterfacesPerHost" />
               </div>
-              <div class="field" style="gap:8px">
-                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].dedicatedVLANs" /> Dedicated VLANs</label>
-                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].nsxEnabled" /> NSX Enabled</label>
-                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].aviEnabled" /> AVI / NSX ALB</label>
-                <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].vksEnabled" /> VKS Enabled</label>
+              <div class="field">
+                <label>Storage Type</label>
+                <select class="select" x-model="workloadDomains[wi].storageType">
+                  <option value="vsan-esa">vSAN ESA (VCF 9 default)</option>
+                  <option value="vsan-osa">vSAN OSA</option>
+                  <option value="nfs">NFS (stockage primaire NFS)</option>
+                  <option value="vmfs">VMFS (iSCSI / FC)</option>
+                </select>
+                <span class="field-note" x-show="workloadDomains[wi].storageType==='nfs'">VLAN NFS généré. L2 obligatoire. Min 2 hôtes possible.</span>
+                <span class="field-note" x-show="workloadDomains[wi].storageType==='vmfs'">VMFS sur SAN. Aucun VLAN de stockage VMkernel généré automatiquement.</span>
               </div>
+            </div>
+            <div class="flex-center gap12 mb12">
+              <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].dedicatedVLANs" /> Dedicated VLANs</label>
+              <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].nsxEnabled" /> NSX Enabled</label>
+              <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].aviEnabled" /> AVI / NSX ALB</label>
+              <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].vksEnabled" /> VKS Enabled</label>
             </div>
 
             <!-- NSX sub-options -->
@@ -945,9 +1233,24 @@
     <!-- APPLIANCES                                                 -->
     <!-- ────────────────────────────────────────────────────────── -->
     <div x-show="activeTab==='appliances'">
-      <div class="flex-between mb12">
+      <div class="flex-between mb8">
         <h2 class="sec-title" style="margin-bottom:0">Appliance Allocation</h2>
         <span class="text-muted text-xs">Auto-generated — fill in IP addresses and FQDNs</span>
+      </div>
+      <!-- FQDN prefix banner -->
+      <div class="card" style="padding:12px 16px;margin-bottom:12px" x-show="project.fqdnSuffix">
+        <div class="flex-center gap8">
+          <span class="text-xs text-muted">Suffixe FQDN actif :</span>
+          <span class="tbl-mono font-bold" style="color:var(--blue-accent)" x-text="'*.' + project.fqdnSuffix"></span>
+          <span class="text-xs text-muted">— modifiable dans l'onglet Overview</span>
+        </div>
+      </div>
+      <!-- Subnet pre-fill hint -->
+      <div class="infobox blue mb8">
+        <div class="text-xs">
+          <strong>Pré-remplissage :</strong> Si vous avez renseigné un CIDR dans l'onglet <strong>VLAN Design</strong> (ex: 10.0.1.0/24), le préfixe réseau (10.0.1.) apparaît en placeholder dans le champ IP. Saisissez uniquement le numéro d'hôte.
+          Le suffixe FQDN est défini dans <strong>Overview → FQDN Suffix</strong>.
+        </div>
       </div>
       <div class="tbl-wrap">
         <table class="tbl">
@@ -970,8 +1273,22 @@
                 <td x-text="a.applianceType"></td>
                 <td class="tbl-muted" x-text="a.domain"></td>
                 <td class="tbl-muted" x-text="a.vlan"></td>
-                <td><input class="input mono" style="width:130px" placeholder="TBD" x-model="appliances[ai].ipAddress" /></td>
-                <td><input class="input mono" style="width:200px" placeholder="fqdn.domain.local" x-model="appliances[ai].fqdn" /></td>
+                <td>
+                  <!-- Embedded IDB: IP = N/A, champ désactivé -->
+                  <template x-if="a.applianceType==='VCF Identity Broker (Embedded)'">
+                    <input class="input mono" style="width:130px;color:#aaa" value="N/A" disabled />
+                  </template>
+                  <template x-if="a.applianceType!=='VCF Identity Broker (Embedded)'">
+                    <input class="input mono" style="width:130px"
+                      :placeholder="getVLANPrefix(a.domain, a.vlan) || 'TBD'"
+                      x-model="appliances[ai].ipAddress" />
+                  </template>
+                </td>
+                <td>
+                  <input class="input mono" style="width:200px"
+                    :placeholder="buildFQDNPlaceholder(a.applianceName)"
+                    x-model="appliances[ai].fqdn" />
+                </td>
                 <td class="text-center">
                   <span class="badge" :class="a.staticIPRequired ? 'badge-mandatory' : 'badge-optional'" x-text="a.staticIPRequired ? 'Yes' : 'No'"></span>
                 </td>
@@ -987,9 +1304,15 @@
     <!-- VIPs                                                       -->
     <!-- ────────────────────────────────────────────────────────── -->
     <div x-show="activeTab==='vips'">
-      <div class="flex-between mb12">
+      <div class="flex-between mb8">
         <h2 class="sec-title" style="margin-bottom:0">Virtual IP (VIP) Allocation</h2>
         <span class="text-muted text-xs">Auto-generated — fill in IP addresses and FQDNs</span>
+      </div>
+      <div class="infobox blue mb8" x-show="project.fqdnSuffix || vlans.some(v=>v.cidr)">
+        <div class="text-xs">
+          <span x-show="project.fqdnSuffix"><strong>FQDN suffix :</strong> <span class="tbl-mono" x-text="project.fqdnSuffix"></span> — placeholders pré-remplis. </span>
+          <span x-show="vlans.some(v=>v.cidr)"><strong>CIDR renseignés :</strong> préfixes IP disponibles en placeholder selon le VLAN du VIP.</span>
+        </div>
       </div>
       <div class="tbl-wrap">
         <table class="tbl">
@@ -1011,8 +1334,16 @@
                 <td x-text="v.associatedService"></td>
                 <td class="tbl-muted" x-text="v.domain"></td>
                 <td class="tbl-muted" x-text="v.vlan"></td>
-                <td><input class="input mono" style="width:130px" placeholder="TBD" x-model="vips[vi].ipAddress" /></td>
-                <td><input class="input mono" style="width:200px" placeholder="vip.domain.local" x-model="vips[vi].fqdn" /></td>
+                <td>
+                  <input class="input mono" style="width:130px"
+                    :placeholder="getVLANPrefix(v.domain, v.vlan) || 'TBD'"
+                    x-model="vips[vi].ipAddress" />
+                </td>
+                <td>
+                  <input class="input mono" style="width:200px"
+                    :placeholder="buildFQDNPlaceholder(v.vipName.toLowerCase().replace(/\\s+/g,'-'))"
+                    x-model="vips[vi].fqdn" />
+                </td>
                 <td class="tbl-muted" x-text="v.notes"></td>
               </tr>
             </template>
@@ -1058,6 +1389,11 @@
     <!-- ────────────────────────────────────────────────────────── -->
     <div x-show="activeTab==='export'">
       <h2 class="sec-title mb12">Export &amp; Import</h2>
+      <div class="infobox blue mb12">
+        <div class="text-xs">
+          <strong>Domain Summary — VLAN Count :</strong> Le compteur VLAN par domaine inclut uniquement les VLANs physiques générés. Dans le Management Domain, les services platform (Ops, Logs, Networks, Automation, Identity Broker) n'ajoutent un VLAN dédié que si "Dedicated VLAN" est activé pour chacun dans l'onglet Platform Services. Sans VLAN dédié, ces services partagent le Management VM Network ou le Fleet Network.
+        </div>
+      </div>
       <div class="export-grid">
 
         <div class="card">
@@ -1117,7 +1453,7 @@
             <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9 Network Planner</div>
             <div style="font-size:14px;color:#a8c4de;margin-bottom:18px;">Architecture Edition — Pre-Deployment Network Planning Tool</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.0.2</span>
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.1.0</span>
               <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;">April 2026</span>
               <span style="background:rgba(39,174,96,0.3);border:1px solid rgba(39,174,96,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#7fffb8;font-weight:700;">VMware Cloud Foundation 9</span>
             </div>
@@ -1154,17 +1490,14 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
-                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.0.2</span></td>
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.1.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Apr 2026</td>
-                <td style="padding:8px 10px;color:var(--text-muted);">Security hardening — SRI hashes on all CDN scripts, pinned dependency versions, x-html → x-text, minimal Supabase profile fetch</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">
+                  UX &amp; features: explications Topology Mode (vSAN Stretched, Partially Stretched, vMSC), L2 Adjacency, Remote Collectors (≠ Cloud Proxy), Domain Roles (Runtime Kubernetes), Storage Type (NFS / VMFS / vSAN), NSX Overlay/VLAN Segment Fleet model, prérequis vSAN Stretched (Broadcom TechDocs), suppression Dedicated VLAN par service, indicateur Fleet dans Platform Services, FQDN Suffix/Prefix, IP prefix depuis CIDR VLAN, Identity Broker Embedded → N/A, Host Count min 2 (NFS), demande d'accès via modale Supabase+EmailJS, 2 Remote Collectors par défaut.
+                </td>
               </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
-                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--text-muted);">v1.0.1</span></td>
-                <td style="padding:8px 10px;color:var(--text-muted);">Apr 2026</td>
-                <td style="padding:8px 10px;color:var(--text-muted);">Supabase credentials embedded directly in index.html — no external config.js required</td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--gray-border);">
-                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--text-muted);">v1.0.0</span></td>
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.0.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Apr 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Initial release — full HTML, Alpine.js, Supabase auth, VCF-DD design</td>
               </tr>
@@ -1177,17 +1510,19 @@
           <h2 class="sec-title" style="margin-bottom:14px;">Capabilities</h2>
           <div style="display:flex;flex-direction:column;gap:8px;">
             <template x-for="cap in [
-              {icon:'🗂', text:'Auto-generates VLANs for Management & Workload Domains'},
-              {icon:'🖥', text:'Appliance allocation with IP/FQDN fields (SDDC Mgr, vCenter, NSX, AVI, Fleet, VCF Suite)'},
-              {icon:'🔗', text:'VIP inventory for all clustered services'},
-              {icon:'✅', text:'Architectural validation engine with Blocker / Warning / Info severity'},
-              {icon:'📊', text:'Excel export — 5-sheet workbook (Domain Summary, VLANs, Appliances, VIPs, Validation)'},
-              {icon:'💾', text:'JSON save/restore — full planner state including user-entered IPs & FQDNs'},
-              {icon:'🔐', text:'Supabase authentication — multi-user access with role control'},
+              {icon:'🗂', text:'Auto-génère VLANs pour Management &amp; Workload Domains (vSAN ESA/OSA, NFS, VMFS)'},
+              {icon:'🖥', text:'Allocation des appliances avec champs IP/FQDN (SDDC Mgr, vCenter, NSX, AVI, Fleet, VCF Suite)'},
+              {icon:'🔗', text:'Inventaire VIPs pour tous les services clusterisés'},
+              {icon:'✅', text:'Moteur de validation architecturale avec sévérité Blocker / Warning / Info'},
+              {icon:'🌐', text:'4 modèles réseau Fleet : Shared, Dedicated VLAN, NSX VLAN Segment, NSX Overlay Segment'},
+              {icon:'📐', text:'Topologies : Single-Site, vSAN Stretched Cluster (prérequis Broadcom), Stretched vMSC, Partially Stretched'},
+              {icon:'📊', text:'Export Excel — 5 feuilles (Domain Summary, VLANs, Appliances, VIPs, Validation)'},
+              {icon:'💾', text:'JSON save/restore — état complet incluant IPs, FQDNs et VLAN IDs saisis'},
+              {icon:'🔐', text:'Authentification Supabase — accès multi-utilisateurs, demande de compte intégrée'},
             ]">
               <div style="display:flex;align-items:flex-start;gap:10px;font-size:12px;">
                 <span x-text="cap.icon" style="font-size:16px;flex-shrink:0;"></span>
-                <span x-text="cap.text" style="color:var(--text-dark);"></span>
+                <span x-html="cap.text" style="color:var(--text-dark);"></span>
               </div>
             </template>
           </div>
@@ -1200,7 +1535,7 @@
             <template x-for="t in [
               {label:'Frontend',value:'Vanilla HTML5 + Alpine.js v3'},
               {label:'Styling',value:'Custom CSS — VCF-DD Design System'},
-              {label:'Authentication',value:'Supabase Auth — credentials embedded in index.html'},
+              {label:'Authentication',value:'Supabase Auth (email + username)'},
               {label:'Excel Export',value:'SheetJS (xlsx.full.min.js)'},
               {label:'Runtime',value:'Browser-only, no build step'},
               {label:'Compatibility',value:'Chrome, Edge, Firefox, Safari'},
@@ -1258,7 +1593,9 @@ function buildManagementVLANs(mgmt, project, workloadDomains=[]) {
   const vlans=[];
   const buf=project.subnetBufferEnabled, bufPct=project.subnetBufferPercent;
   const domain='Management Domain';
-  const fleetDedicated=mgmt.fleetPlacement==='dedicated-fleet-vlan';
+  const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
+  const fleetVLANName=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':'Fleet Network';
+  const fleetVLANType=mgmt.fleetPlacement==='nsx-overlay-segment'?'overlay':mgmt.fleetPlacement==='nsx-vlan-segment'?'service':'fleet';
 
   vlans.push(makeVLAN(domain,'ESXi Management','management','ESXi vmk0 only','VMkernel vmk0 for out-of-band ESXi management','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk0 IPs (1 per host)`,buf,bufPct));
 
@@ -1283,7 +1620,15 @@ function buildManagementVLANs(mgmt, project, workloadDomains=[]) {
   vlans.push(makeVLAN(domain,'Management VM Network','vm-network','SDDC Manager, vCenter, NSX Managers, platform service VMs','All management plane VMs','mandatory','dedicated',mgmtVMIPs,`SDDC Manager, vCenter, ${nsxManagerCount} NSX Mgr${nsxVIPCount?' + VIP':''}${nsxEdgeMgmtIPs?' + '+nsxEdgeMgmtIPs+' Edge Mgmt':''}${!fleetDedicated?' + Fleet':''}${aviControllerIPs?' + AVI Controllers':''}${opsCollectors?' + '+opsCollectors+' Ops Collectors':''}${netsCollectors?' + '+netsCollectors+' Nets Collectors':''}`,buf,bufPct));
 
   vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion portgroup','Live migration','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs`,buf,bufPct));
-  vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN ESA storage — 1 vmk per host','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs (vSAN ESA)`,buf,bufPct));
+  if(mgmt.storageType==='nfs'){
+    vlans.push(makeVLAN(domain,'NFS Storage','nfs','VMkernel portgroup pour le trafic NFS — L2 obligatoire','NFS stockage primaire — 1 vmk par hôte. L2 obligatoire entre ESXi et serveur NFS.','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs (NFS, 1 par hôte). L2 obligatoire. VLAN dédié fortement recommandé. En mode Stretched, ce VLAN doit être étendu L2 sur les 2 sites.`,buf,bufPct));
+  } else if(mgmt.storageType==='vmfs'){
+    // VMFS sur SAN (iSCSI/FC) : pas de VLAN VMkernel de stockage généré automatiquement
+    // L'iSCSI doit être configuré manuellement via "Additional Services" si un VLAN dédié est requis
+  } else {
+    // vSAN ESA (default) ou vSAN OSA
+    vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN ESA storage — 1 vmk per host','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs (vSAN ESA)`,buf,bufPct));
+  }
   const tepIPs=mgmt.hostCount*mgmt.tepInterfacesPerHost;
   vlans.push(makeVLAN(domain,'NSX Host TEP','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts','mandatory','dedicated',tepIPs,`${mgmt.hostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepIPs} IPs`,buf,bufPct));
 
@@ -1300,17 +1645,13 @@ function buildManagementVLANs(mgmt, project, workloadDomains=[]) {
     if(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN){fleetIPs+=mgmt.vcfOperationsForNetworks.platformNodeCount;fleetNotes.push(`VCF Nets: ${mgmt.vcfOperationsForNetworks.platformNodeCount} IPs`);}
     if(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){const n=(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);fleetIPs+=n;fleetNotes.push(`VCF Auto: ${n} IPs`);}
     fleetNotes.push('Collectors always in Mgmt VM Network');
-    vlans.push(makeVLAN(domain,'Fleet Network','fleet','Fleet appliance + platform service nodes','Fleet-level platform network','scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | '),buf,bufPct));
+    // NSX Overlay Segment: no physical VLAN ID — overlay segment (Geneve encapsulation)
+    const fleetNote2=mgmt.fleetPlacement==='nsx-overlay-segment'?' — Segment NSX Overlay (pas de VLAN ID physique, encapsulation Geneve)':mgmt.fleetPlacement==='nsx-vlan-segment'?' — Segment NSX VLAN (VLAN transport zone NSX)':'';
+    vlans.push(makeVLAN(domain,fleetVLANName,fleetVLANType,`${fleetVLANName} — Fleet appliance + platform service nodes`,`Fleet-level platform network (modèle: ${mgmt.fleetPlacement})`,'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | ')+fleetNote2,buf,bufPct));
   }
 
   if(mgmt.aviDeployed)vlans.push(makeVLAN(domain,'AVI Management','avi','AVI SE management','AVI load balancer management','scenario-driven','dedicated',4,'AVI SE management IPs',buf,bufPct));
   if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks')vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 consecutive IPs required','Kubernetes Supervisor control plane','scenario-driven','dedicated',5,'5 CONSECUTIVE IPs: 3 control plane VMs + 1 floating + 1 patching',buf,bufPct));
-
-  if(mgmt.vcfOperations.enabled&&mgmt.vcfOperations.requiresDedicatedVLAN){const n=mgmt.vcfOperations.mode==='enterprise'?3:1,v=mgmt.vcfOperations.mode==='enterprise'?1:0;vlans.push(makeVLAN(domain,'VCF Operations Network','operations','VCF Operations analytics nodes','Dedicated VCF Operations network','scenario-driven','dedicated',n+v,`${n} node(s)${v?' + 1 VIP':''}. Collectors in Mgmt VM Network.`,buf,bufPct));}
-  if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){const lm=1,lw=mgmt.vcfOperationsForLogs.mode==='clustered'?mgmt.vcfOperationsForLogs.workerCount:0,lv=mgmt.vcfOperationsForLogs.mode==='clustered'?(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):0;vlans.push(makeVLAN(domain,'VCF Operations for Logs Network','operations-logs','VCF Ops for Logs cluster','Dedicated log cluster network','scenario-driven','dedicated',lm+lw+lv,`1 master + ${lw} worker(s)${lv?' + '+lv+' VIP(s)':''}`,buf,bufPct));}
-  if(mgmt.vcfOperationsForNetworks.enabled&&mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN)vlans.push(makeVLAN(domain,'VCF Operations for Networks Network','operations-networks','VCF Ops for Networks platform VMs','Dedicated network analytics network','scenario-driven','dedicated',mgmt.vcfOperationsForNetworks.platformNodeCount,`${mgmt.vcfOperationsForNetworks.platformNodeCount} platform VM(s). Collectors in Mgmt VM Network.`,buf,bufPct));
-  if(mgmt.vcfAutomation.enabled&&mgmt.vcfAutomation.requiresDedicatedVLAN){const vc=mgmt.vcfAutomation.mode==='clustered'?4:1,vv=mgmt.vcfAutomation.mode==='clustered'?1:0,vro=mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount:0,vrov=mgmt.vcfAutomation.orchestratorMode==='standalone'&&mgmt.vcfAutomation.orchestratorNodeCount>1?1:0;vlans.push(makeVLAN(domain,'VCF Automation Network','automation','VCF Automation VAs','Dedicated automation network','scenario-driven','dedicated',vc+vv+vro+vrov,`${vc} VA IPs${vv?' + 1 VIP':''}${vro?' + '+vro+' vRO':''}${mgmt.vcfAutomation.mode==='clustered'?' (4 node IPs: 3 active + 1 upgrade)':''}`,buf,bufPct));}
-  if(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&mgmt.vcfIdentityBroker.requiresDedicatedVLAN){const ic=mgmt.vcfIdentityBroker.haEnabled?3:1,iv=mgmt.vcfIdentityBroker.haEnabled?1:0;vlans.push(makeVLAN(domain,'VCF Identity Broker Network','identity-broker','Identity Broker appliance(s)','Dedicated Identity Broker network','scenario-driven','dedicated',ic+iv,`${ic} appliance(s)${iv?' + 1 VIP':''}`,buf,bufPct));}
 
   mgmt.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated network for ${svc.name}`,`Service VLAN: ${svc.name}`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||`${svc.applianceCount} appliances`,buf,bufPct)));
   return vlans;
@@ -1326,7 +1667,13 @@ function buildWorkloadVLANs(wld, project) {
   vlans.push(makeVLAN(domain,'ESXi Management','management','vmk0 only','ESXi vmk0 for workload domain hosts','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk0 IPs`,buf,bufPct));
   vlans.push(makeVLAN(domain,'VM / Application Network','vm-network','Workload VM network','Application VLAN','mandatory',scope,32,'Adjust to actual VM count',buf,bufPct));
   vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion','Live migration','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs`,buf,bufPct));
-  vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN storage — 1 vmk per host','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs (vSAN ESA)`,buf,bufPct));
+  if(wld.storageType==='nfs'){
+    vlans.push(makeVLAN(domain,'NFS Storage','nfs','VMkernel NFS — L2 obligatoire','NFS stockage primaire — 1 vmk par hôte. L2 entre ESXi et serveur NFS.','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs (NFS). L2 obligatoire. Avec stockage NFS, min 2 hôtes accepté (pas de contrainte vSAN FTT).`,buf,bufPct));
+  } else if(wld.storageType==='vmfs'){
+    // VMFS sur SAN : pas de VLAN VMkernel de stockage généré
+  } else {
+    vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN storage — 1 vmk per host','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs (vSAN ESA)`,buf,bufPct));
+  }
 
   if(wld.nsxEnabled){
     const tepIPs=wld.hostCount*wld.tepInterfacesPerHost;
@@ -1355,9 +1702,10 @@ function buildManagementAppliances(mgmt,project){
   resetAppCounter();
   const apps=[];
   const domain='Management Domain';
-  const fleetDedicated=mgmt.fleetPlacement==='dedicated-fleet-vlan';
-  const fleetVLAN=fleetDedicated?'Fleet Network':'Management VM Network';
-  function platVLAN(req,name){if(req)return name;return fleetDedicated?'Fleet Network':'Management VM Network';}
+  const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
+  const _fvn=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':'Fleet Network';
+  const fleetVLAN=fleetDedicated?_fvn:'Management VM Network';
+  function platVLAN(req,name){if(req)return name;return fleetDedicated?_fvn:'Management VM Network';}
 
   apps.push(mkApp('sddc-manager-01','SDDC Manager',domain,'Management VM Network','Management VM Network',true,false,true,'Primary SDDC Manager.'));
   apps.push(mkApp('vcenter-mgmt-01','vCenter Server',domain,'Management VM Network','Management VM Network',true,false,true,'Management Domain vCenter.'));
@@ -1472,9 +1820,10 @@ function buildManagementVIPs(mgmt,project){
   resetVipCounter();
   const vips=[];
   const domain='Management Domain';
-  const fleetDedicated=mgmt.fleetPlacement==='dedicated-fleet-vlan';
-  const fleetVLAN=fleetDedicated?'Fleet Network':'Management VM Network';
-  function platVLAN(req,name){if(req)return name;return fleetDedicated?'Fleet Network':'Management VM Network';}
+  const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
+  const _fvn=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':'Fleet Network';
+  const fleetVLAN=fleetDedicated?_fvn:'Management VM Network';
+  function platVLAN(req,name){if(req)return name;return fleetDedicated?_fvn:'Management VM Network';}
 
   vips.push(mkVIP('NSX Manager VIP','NSX Manager',domain,'Management VM Network',mgmt.nsxManagerMode==='clustered'?'Cluster VIP for NSX Manager 3-node cluster.':'Standalone NSX Manager — VIP reserved for future scale-out.'));
   vips.push(mkVIP('Fleet VIP','Fleet',domain,fleetVLAN,mgmt.fleetMode==='clustered'?'Fleet HA cluster VIP.':'Fleet standalone VIP. Reserved for DNS stability.'));
@@ -1519,7 +1868,12 @@ function runValidation(project,mgmt,workloads,vlans){
   if(mgmt.nsxEdgeDeployed&&mgmt.nsxEdgeNodeCount<2) msgs.push(mkMsg('warning','nsx',domain,'Single NSX Edge node — no HA. Recommend 2+ Edge nodes.','Increase Edge node count to 2.'));
   if(!mgmt.fleetPlacement) msgs.push(mkMsg('blocker','vlan',domain,'Fleet placement is undefined.','Select Fleet placement.'));
   if(!mgmt.layer2AdjacencyConfirmed) msgs.push(mkMsg('warning','bring-up',domain,'L2 adjacency for bring-up not confirmed.','Confirm L2 adjacency.'));
-  if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,'Stretched topology: ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
+  if(mgmt.topologyMode==='vsan-stretched'){
+    msgs.push(mkMsg('warning','bring-up',domain,'vSAN Stretched Cluster : vSAN VMkernel et VM Management Network doivent être L2 sur les 2 sites. Latence inter-sites ≤ 5ms RTT. Witness Host requis.','Vérifier L2, latence et Witness.'));
+    if(!mgmt.layer2AdjacencyConfirmed)msgs.push(mkMsg('blocker','bring-up',domain,'vSAN Stretched : L2 Adjacency non confirmée. La connectivité L2 est obligatoire pour vSAN et le Management Network.','Confirmer L2 adjacency.'));
+  }
+  if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,'Stretched topology (vMSC): ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
+  if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,'NSX Overlay Segment sélectionné mais NSX Edge non déployé. Le modèle Overlay Segment requiert un NSX Edge Cluster avec T0/T1.','Activer NSX Edge dans la configuration NSX.'));
   if((mgmt.vksEnabled||project.scenario==='vcf-automation-vks')&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario',domain,'VKS enabled but NSX Edge not deployed.','Deploy NSX Edge or confirm overlay from WLD NSX.'));
   if(mgmt.aviDeployed&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('info','scenario',domain,'AVI enabled but NSX Edge not deployed. Verify data plane connectivity.','Verify AVI SE network design.'));
   if(mgmt.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',domain,'TEP interfaces per host < 2. Recommend 2 for TEP HA.','Set TEP to 2+.'));
@@ -1626,11 +1980,11 @@ function doExcelExport(state){
 function newId(){return 'id-'+Math.random().toString(36).slice(2);}
 
 function defaultWorkloadDomain(index){
-  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],notes:''};
+  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],storageType:'vsan-esa',notes:''};
 }
 
-const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-standard',deploymentType:'greenfield',workloadDomainCount:1,subnetBufferEnabled:true,subnetBufferPercent:20};
-const DEFAULT_MGMT={hostCount:4,nsxManagerMode:'clustered',fleetMode:'standalone',fleetPlacement:'shared-mgmt-vlan',nsxEdgeDeployed:false,nsxEdgeNodeCount:2,aviDeployed:false,vksEnabled:false,tepInterfacesPerHost:2,edgeUplinksDedicated:true,additionalServices:[],topologyMode:'single-site',layer2AdjacencyConfirmed:false,vcfOperations:{enabled:true,mode:'enterprise',remoteCollectorCount:0,requiresDedicatedVLAN:false},vcfOperationsForLogs:{enabled:true,mode:'clustered',workerCount:2,integratedLBVIP:true,requiresDedicatedVLAN:false},vcfOperationsForNetworks:{enabled:true,platformNodeCount:1,collectorCount:1,requiresDedicatedVLAN:false},vcfAutomation:{enabled:true,mode:'clustered',orchestratorMode:'embedded',orchestratorNodeCount:1,requiresDedicatedVLAN:false},vcfIdentityBroker:{enabled:true,mode:'appliance',haEnabled:false,requiresDedicatedVLAN:false},vksVPCs:[]};
+const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-standard',deploymentType:'greenfield',workloadDomainCount:1,subnetBufferEnabled:true,subnetBufferPercent:20,fqdnSuffix:'',fqdnPrefix:''};
+const DEFAULT_MGMT={hostCount:4,nsxManagerMode:'clustered',fleetMode:'standalone',fleetPlacement:'shared-mgmt-vlan',nsxEdgeDeployed:false,nsxEdgeNodeCount:2,aviDeployed:false,vksEnabled:false,tepInterfacesPerHost:2,edgeUplinksDedicated:true,additionalServices:[],topologyMode:'single-site',layer2AdjacencyConfirmed:false,storageType:'vsan-esa',vcfOperations:{enabled:true,mode:'enterprise',remoteCollectorCount:2,requiresDedicatedVLAN:false},vcfOperationsForLogs:{enabled:true,mode:'clustered',workerCount:2,integratedLBVIP:true,requiresDedicatedVLAN:false},vcfOperationsForNetworks:{enabled:true,platformNodeCount:1,collectorCount:1,requiresDedicatedVLAN:false},vcfAutomation:{enabled:true,mode:'clustered',orchestratorMode:'embedded',orchestratorNodeCount:1,requiresDedicatedVLAN:false},vcfIdentityBroker:{enabled:true,mode:'appliance',haEnabled:false,requiresDedicatedVLAN:false},vksVPCs:[]};
 
 // ── ALPINE APP ───────────────────────────────────────────────────
 function vcfApp(){
@@ -1668,6 +2022,9 @@ function vcfApp(){
     },
 
     compute(){
+      // Keep workloadDomainCount in sync with actual array length
+      this.project.workloadDomainCount=this.workloadDomains.length;
+
       const vlanEdits={};
       this.vlans.forEach(v=>{if(v.vlanId||v.cidr)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr};});
       const appEdits={};
@@ -1693,7 +2050,7 @@ function vcfApp(){
 
     async initAuth(){
       const cfg=window.APP_CONFIG||{};
-      if(!cfg.supabaseUrl||!cfg.supabaseKey){this.loginError='Supabase credentials missing. Check APP_CONFIG in index.html.';return;}
+      if(!cfg.supabaseUrl||!cfg.supabaseKey){this.loginError='config.js not found. Copy config.example.js to config.js and fill in your credentials.';return;}
       this.sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true},global:{headers:{'apikey':cfg.supabaseKey}}});
       const {data:{session}}=await this.sb.auth.getSession();
       if(session){
@@ -1704,7 +2061,7 @@ function vcfApp(){
     },
 
     async loadUser(userId){
-      const {data}=await this.sb.from('profiles').select('id,username,active').eq('id',userId).single();
+      const {data}=await this.sb.from('profiles').select('*').eq('id',userId).single();
       if(data)this.currentUser={...data};
     },
 
@@ -1733,9 +2090,17 @@ function vcfApp(){
 
     showToast(msg,ms=3000){this.toastMsg=msg;this.toastVisible=true;setTimeout(()=>this.toastVisible=false,ms);},
 
+    openAccessRequestModal(){
+      ['req-name','req-email','req-company','req-reason'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('req-status').textContent='';
+      document.getElementById('req-status').style.color='';
+      document.getElementById('access-req-overlay').classList.add('open');
+    },
+
     addWorkloadDomain(){
       const idx=this.workloadDomains.length+1;
       this.workloadDomains.push(defaultWorkloadDomain(idx));
+      this.project.workloadDomainCount=this.workloadDomains.length;
     },
 
     addAdditionalService(domain,wldIdx){
@@ -1756,13 +2121,35 @@ function vcfApp(){
       else this.workloadDomains[wldIdx].vksVPCs[vpcIdx].subnets.push(sn);
     },
 
+    // Returns network prefix (e.g. "10.0.1.") from the VLAN CIDR if filled in
+    getVLANPrefix(appDomain, vlanName){
+      let vlan=this.vlans.find(v=>v.domain===appDomain&&v.vlanName===vlanName);
+      if(!vlan)vlan=this.vlans.find(v=>v.vlanName===vlanName);
+      if(!vlan||!vlan.cidr)return '';
+      const m=vlan.cidr.match(/^(\d+\.\d+\.\d+)\.\d+\/\d+$/);
+      return m?m[1]+'.':'';
+    },
+
+    // Builds FQDN placeholder from appliance/VIP name + project suffix
+    buildFQDNPlaceholder(name){
+      const prefix=this.project.fqdnPrefix?this.project.fqdnPrefix+'-':'';
+      const suffix=this.project.fqdnSuffix;
+      if(suffix)return prefix+name+'.'+suffix;
+      return 'host.domain.local';
+    },
+
     exportExcel(){
       doExcelExport({project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips,validationMessages:this.validationMessages,domainSummaries:this.domainSummaries});
       this.showToast('Excel exported successfully');
     },
 
     exportJSON(){
-      const state={project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips};
+      const state={
+        project:{...this.project,workloadDomainCount:this.workloadDomains.length},
+        managementDomain:this.managementDomain,
+        workloadDomains:this.workloadDomains,
+        vlans:this.vlans,appliances:this.appliances,vips:this.vips
+      };
       const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
@@ -1792,6 +2179,39 @@ function vcfApp(){
     },
   };
 }
+
+// ── ACCESS REQUEST ────────────────────────────────────────────────
+async function sendAccessRequest() {
+  const name     = document.getElementById('req-name').value.trim();
+  const email    = document.getElementById('req-email').value.trim();
+  const company  = document.getElementById('req-company').value.trim();
+  const reason   = document.getElementById('req-reason').value.trim();
+  const statusEl = document.getElementById('req-status');
+  if (!name || !email || !company || !reason) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Please fill in all fields.';
+    return;
+  }
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = 'Sending request…';
+  const cfg = window.APP_CONFIG || {};
+  const sb  = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+  const { error } = await sb.from('access_requests').insert({ username: name, email, company, reason });
+  if (error) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '❌ Error sending request. Please try again.';
+    return;
+  }
+  emailjs.send('service_86sbc2i', 'template_e76q1co', {
+    from_name: name, from_email: email, company, reason
+  }).catch(() => {});
+  statusEl.style.color = 'var(--green)';
+  statusEl.textContent = '✅ Request sent! You will be contacted shortly.';
+  setTimeout(() => document.getElementById('access-req-overlay').classList.remove('open'), 3500);
+}
+
+// ── EmailJS init ──────────────────────────────────────────────────
+(function() { emailjs.init('Q0LGSClF9FZ03x7re'); })();
 </script>
 </body>
 </html>
