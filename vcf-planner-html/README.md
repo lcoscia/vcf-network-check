@@ -1,6 +1,8 @@
-# VCF 9 Network Planner — v1.4.0
+# VCF 9 Network Planner — v1.5.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` directly in a browser.
+
+**Available in French and English** — toggle FR / EN in the header. Language persists across sessions (localStorage).
 
 ## Features
 
@@ -48,6 +50,12 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 - NSX TEP calculation per host
 - Workload Domain min 2 hosts when using NFS storage
 
+### Bilingual FR / EN
+- FR ↔ EN toggle pill in the header (persisted in `localStorage`)
+- All UI labels, topology descriptions, fleet model descriptions, validation messages, and VLAN/appliance notes switch language instantly
+- Engine-generated notes (VLAN Notes column, Appliance Notes, Validation messages) follow the active language
+- French content is never removed — both languages coexist in a `translations` object
+
 ### UX
 - Topology explanations with L2/L3 rules per network
 - Domain Role descriptions (Runtime Kubernetes = VKS Supervisor cluster)
@@ -82,6 +90,7 @@ No configuration required. Authentication is disabled — the tool is accessible
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.5.0 | Jun 2026 | Bilingual FR/EN: language toggle in header, localStorage persistence, `translations` object with ~120 keys, all UI/engine strings switch language (topology, fleet, platform, appliances, VLANs, validation) |
 | v1.4.0 | Jun 2026 | TechDocs 9.1 corrections (14 fixes, agent-reviewed): NSX VIP mandatory Simple mode; VCF Automation dedicated FQDN + /29 always 5 IPs; Identity Broker 9.1 = 1 external IP (Services Runtime service, no VM); Log Management 9.1 (1 FQDN VIP + 6 IPs CIDR); Real-time Metrics 9.1 documented; /28→/27 guidance; HA IB hidden 9.1; Remote Collectors → Cloud Proxies 9.x |
 | v1.3.0 | Jun 2026 | VCF 9.0/9.1 dual support: VCF version selector; VCF Management Services 4 FQDNs + /28-/27 block + CIDR 198.18.0.0/15; Shared VLAN / Dedicated VLAN models; Cloud Proxy + License Server appliances; auth fully commented out (free access) |
 | v1.1.0 | Apr 2026 | UX & features: topology explanations (vSAN Stretched, Partially Stretched), Storage Type (NFS/VMFS/vSAN), 4 Fleet network models (NSX Overlay/VLAN Segment), Broadcom TechDocs prerequisites, Platform Services fleet indicator, FQDN Suffix/Prefix, IP prefix from VLAN CIDR, 2 Remote Collectors default |
