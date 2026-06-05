@@ -3,7 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VCF 9.1 Network Planner</title>
+  <title>VCF 9 Network Planner</title>
+  <!-- ══ AUTH DISABLED — décommenter pour réactiver l'authentification Supabase ══
+  <script>
+    window.APP_CONFIG = {
+      supabaseUrl: 'https://zpuwusopejoyrbpgamuw.supabase.co',
+      supabaseKey: 'sb_publishable_HWs9Ov0QoG5rybmORZrB9g_kPsB3Mi-',
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  ══ FIN AUTH DISABLED ══ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
@@ -40,6 +50,75 @@
     ::-webkit-scrollbar-thumb { background: #b0c4d8; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--blue-light); }
 
+    /* ── REQUEST ACCESS LINK ───────────────────────────────────── */
+    .login-request-link {
+      text-align: center; margin-top: 14px; padding-top: 14px;
+      border-top: 1px solid var(--gray-border);
+      font-size: 11px; color: var(--text-muted);
+    }
+    .login-request-link button {
+      background: none; border: none; color: var(--blue-accent);
+      font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .login-request-link button:hover { text-decoration: underline; }
+
+    /* ── ACCESS REQUEST MODAL ──────────────────────────────────── */
+    .access-req-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .access-req-overlay.open { display: flex; }
+    .access-req-box {
+      background: white; border-radius: 10px; width: 100%; max-width: 440px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.4); overflow: hidden;
+    }
+    .access-req-header {
+      background: linear-gradient(135deg, var(--blue-dark), var(--blue-accent));
+      color: white; padding: 20px 24px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .access-req-header h2 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .access-req-header p  { font-size: 11px; opacity: 0.75; }
+    .access-req-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+    .access-req-field label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .access-req-field input,
+    .access-req-field textarea {
+      width: 100%; padding: 7px 10px; border: 1px solid var(--gray-border);
+      border-radius: 4px; font-size: 13px; font-family: inherit;
+      color: var(--text-dark); resize: vertical;
+    }
+    .access-req-field input:focus,
+    .access-req-field textarea:focus { outline: none; border-color: var(--blue-accent); }
+    .access-req-footer {
+      padding: 12px 24px; border-top: 1px solid var(--gray-border);
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .access-req-status { font-size: 12px; color: var(--text-muted); min-height: 16px; }
+
+    /* ── LOGIN ─────────────────────────────────────────────────── */
+    .login-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-card {
+      background: white; border-radius: 12px; width: 100%; max-width: 380px;
+      padding: 40px; box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+    }
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo .brand { font-size: 34px; font-weight: 800; color: var(--blue-mid); letter-spacing: -1px; }
+    .login-logo .sub   { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .login-field { margin-bottom: 14px; }
+    .login-error { font-size: 12px; color: var(--red); min-height: 16px; margin-bottom: 10px; }
+    .login-btn {
+      width: 100%; padding: 11px; background: var(--blue-accent); color: white;
+      border: none; border-radius: 6px; font-size: 14px; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: background 0.15s;
+    }
+    .login-btn:hover:not(:disabled) { background: #155fa0; }
+    .login-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
     /* ── HEADER ────────────────────────────────────────────────── */
     .app-header {
       background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
@@ -59,6 +138,13 @@
       transition: all 0.15s;
     }
     .header-btn:hover { background: rgba(255,255,255,0.12); color: white; border-color: rgba(255,255,255,0.3); }
+
+    /* ── LANG TOGGLE ───────────────────────────────────────────────── */
+    .lang-toggle { display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; padding:2px 3px; border-radius:20px; transition:background 0.15s; }
+    .lang-toggle:hover { background:rgba(255,255,255,0.08); }
+    .toggle-pill { display:inline-flex; background:rgba(255,255,255,0.12); border-radius:12px; padding:2px; }
+    .pill-opt { padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; color:#a8c4de; transition:background 0.15s,color 0.15s; }
+    .pill-opt.active { background:var(--blue-accent); color:white; }
 
     /* ── TAB BAR ───────────────────────────────────────────────── */
     .tab-bar {
@@ -338,18 +424,94 @@
 </head>
 <body x-data="vcfApp()" x-init="init()" x-cloak>
 
+<!-- ══ AUTH DISABLED — décommenter pour réactiver le login overlay ══
+<div class="login-overlay" x-show="!authReady">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="brand">VCF 9</div>
+      <div class="sub">Network Planner — Architecture Edition</div>
+    </div>
+    <form id="vcf-login-form" autocomplete="on" @submit.prevent="doLogin()">
+      <div class="login-field">
+        <div class="field"><label for="vcf-username">Username</label>
+          <input id="vcf-username" class="input" type="text"
+            name="username" autocomplete="username"
+            x-model="loginUsername" placeholder="username" />
+        </div>
+      </div>
+      <div class="login-field">
+        <div class="field"><label for="vcf-password">Password</label>
+          <input id="vcf-password" class="input" type="password"
+            name="password" autocomplete="current-password"
+            x-model="loginPassword" placeholder="••••••••" />
+        </div>
+      </div>
+      <p class="login-error" x-text="loginError"></p>
+      <button type="submit" class="login-btn" :disabled="loginLoading" x-text="loginLoading ? 'Signing in…' : 'Sign In'"></button>
+    </form>
+    <div class="login-request-link">
+      <span>Don't have access? </span>
+      <button type="button" @click="openAccessRequestModal()">Request Access</button>
+    </div>
+  </div>
+</div>
+══ FIN AUTH DISABLED ══ -->
+
+<!-- ══ AUTH DISABLED — décommenter pour réactiver la modale de demande d'accès ══
+<div id="access-req-overlay" class="access-req-overlay" onclick="if(event.target===this)document.getElementById('access-req-overlay').classList.remove('open')">
+  <div class="access-req-box">
+    <div class="access-req-header">
+      <span style="font-size:22px;">📧</span>
+      <div>
+        <h2>Request VCF 9 Network Planner Access</h2>
+        <p>Your request will be sent to the administrator for approval.</p>
+      </div>
+      <button onclick="document.getElementById('access-req-overlay').classList.remove('open')"
+              style="margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:white;font-size:18px;cursor:pointer;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;">&times;</button>
+    </div>
+    <div class="access-req-body">
+      <div style="display:flex;gap:12px;">
+        <div class="access-req-field" style="flex:1;"><label>Full Name</label><input type="text" id="req-name" placeholder="John Doe"></div>
+        <div class="access-req-field" style="flex:1;"><label>Email</label><input type="email" id="req-email" placeholder="john@company.com"></div>
+      </div>
+      <div class="access-req-field"><label>Company / Organization</label><input type="text" id="req-company" placeholder="ACME Corp"></div>
+      <div class="access-req-field">
+        <label>Reason for Access</label>
+        <textarea id="req-reason" rows="3" placeholder="Describe why you need access to the VCF 9 Network Planner…"></textarea>
+      </div>
+      <p id="req-status" class="access-req-status"></p>
+    </div>
+    <div class="access-req-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('access-req-overlay').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="sendAccessRequest()">📧 Send Request</button>
+    </div>
+  </div>
+</div>
+══ FIN AUTH DISABLED ══ -->
+
 <!-- ══ APP SHELL ═════════════════════════════════════════════════ -->
+<!-- AUTH DISABLED — accès libre. Pour réactiver : remplacer <div> par <div x-show="authReady"> -->
 <div>
 
   <!-- Header -->
   <header class="app-header">
     <div class="app-header-left">
-      <span class="app-header-brand" x-text="'VCF ' + project.vcfVersion + ' Network Planner'">VCF Network Planner</span>
+      <span class="app-header-brand">VCF 9 Network Planner</span>
       <span class="app-header-project" x-text="project.projectName ? '— ' + project.projectName : ''"></span>
     </div>
+    <!-- AUTH DISABLED — décommenter pour réactiver user/logout dans le header
     <div class="app-header-right">
-      <span x-text="'VMware Cloud Foundation ' + project.vcfVersion" style="font-size:11px;color:#a8c4de;background:rgba(255,255,255,0.1);border:1px solid rgba(168,196,222,0.3);border-radius:20px;padding:3px 10px;"></span>
-      <span x-show="project.vcfVersion==='9.1'" style="font-size:10px;color:#7fffb8;background:rgba(39,174,96,0.25);border:1px solid rgba(39,174,96,0.4);border-radius:20px;padding:3px 8px;font-weight:700;">9.1 FEATURES ON</span>
+      <span class="header-user" x-text="currentUser ? currentUser.username : ''"></span>
+      <button class="header-btn" @click="doLogout()">Sign out</button>
+    </div>
+    -->
+    <div class="app-header-right">
+      <div class="lang-toggle" @click="lang = lang==='fr' ? 'en' : 'fr'" title="Switch language / Changer de langue">
+        <div class="toggle-pill">
+          <span class="pill-opt" :class="{ active: lang==='fr' }">FR</span>
+          <span class="pill-opt" :class="{ active: lang==='en' }">EN</span>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -358,8 +520,8 @@
 
   <!-- Tab Bar -->
   <div class="tab-bar">
-    <template x-for="t in tabs" :key="t.id">
-      <button class="tab-btn" :class="{active: activeTab===t.id}" @click="activeTab=t.id" x-text="t.label"></button>
+    <template x-for="tab in tabs" :key="tab.id">
+      <button class="tab-btn" :class="{active: activeTab===tab.id}" @click="activeTab=tab.id" x-text="tab.label"></button>
     </template>
   </div>
 
@@ -376,37 +538,20 @@
         <div class="card-header">
           <h2 class="sec-title">Global Configuration</h2>
         </div>
-        <!-- Version selector — must be first, gates 9.1-only features throughout -->
-        <div style="margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,#0d1b2a,#1b3a5c);border-radius:8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-          <div style="color:white;font-size:12px;font-weight:700;letter-spacing:0.3px;flex-shrink:0;">VCF VERSION</div>
-          <div style="display:flex;gap:8px;">
-            <button @click="project.vcfVersion='9.0'"
-              :style="project.vcfVersion==='9.0' ? 'background:#1e6abf;color:white;border-color:#1e6abf;' : 'background:rgba(255,255,255,0.08);color:#a8c4de;border-color:rgba(168,196,222,0.3);'"
-              style="border:1px solid;border-radius:20px;padding:5px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.15s;">
-              VCF 9.0
-            </button>
-            <button @click="project.vcfVersion='9.1'"
-              :style="project.vcfVersion==='9.1' ? 'background:#27ae60;color:white;border-color:#27ae60;' : 'background:rgba(255,255,255,0.08);color:#a8c4de;border-color:rgba(168,196,222,0.3);'"
-              style="border:1px solid;border-radius:20px;padding:5px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.15s;">
-              VCF 9.1
-            </button>
-          </div>
-          <div style="flex:1;min-width:200px;">
-            <div x-show="project.vcfVersion==='9.0'" style="font-size:11px;color:#a8c4de;">
-              VCF 9.0 — Baseline. Fonctionnalités : vSAN ESA, NSX Geneve TEP, VKS, EVPN non disponible.
-            </div>
-            <div x-show="project.vcfVersion==='9.1'" style="font-size:11px;color:#7fffb8;">
-              VCF 9.1 — Nouvelles fonctionnalités : EVPN-VXLAN Fabric, LACP teaming, VNA cluster, VKS Multi-NIC, NSX RTEP, VLAN+MTU pre-check Edge.
-            </div>
-          </div>
-        </div>
-
-        <div class="g4 mb12">
+        <div class="g5 mb12">
           <div class="field"><label>Project Name</label>
             <input class="input" x-model="project.projectName" placeholder="e.g. ACME-VCF9-DC1" />
           </div>
           <div class="field"><label>Customer</label>
             <input class="input" x-model="project.customerName" placeholder="Customer name" />
+          </div>
+          <div class="field"><label>VCF Version</label>
+            <select class="select" x-model="project.vcfVersion">
+              <option value="9.0">VCF 9.0</option>
+              <option value="9.1">VCF 9.1 (Recommended)</option>
+            </select>
+            <span class="field-note" x-show="project.vcfVersion==='9.1'">VCF Management Services — 4 FQDNs + /28 runtime block</span>
+            <span class="field-note" x-show="project.vcfVersion==='9.0'">Fleet Appliance — 1 FQDN</span>
           </div>
           <div class="field"><label>Scenario</label>
             <select class="select" x-model="project.scenario">
@@ -485,121 +630,29 @@
             <label>Topology Mode</label>
             <select class="select" x-model="managementDomain.topologyMode">
               <option value="single-site">Single Site</option>
-              <option value="vsan-stretched">vSAN Stretched Cluster (avec Witness)</option>
-              <option value="stretched">Stretched (vMSC — stockage non-vSAN)</option>
+              <option value="vsan-stretched" x-text="t('topo.vsan_opt')"></option>
+              <option value="stretched" x-text="t('topo.vmsc_opt')"></option>
               <option value="partially-stretched">Partially Stretched</option>
             </select>
-            <div x-show="managementDomain.topologyMode==='single-site'" class="role-desc">
-              Déploiement standard sur un seul site. Tous les hôtes et VLANs sont locaux.
-            </div>
-            <div x-show="managementDomain.topologyMode==='vsan-stretched'" class="help-desc">
-              <strong>vSAN Stretched Cluster :</strong> Topologie VCF 9.1 standard pour les déploiements bi-site avec vSAN comme stockage primaire. Les données sont répliquées synchrone entre les 2 sites. Un hôte Witness tiers assure le quorum.
-              <br><br>
-              <strong style="color:#b05000">⚡ Prérequis réseau (Broadcom TechDocs VCF 9.1)</strong>
-              <ul>
-                <li><strong>Latence inter-sites (data ↔ data) :</strong> ≤ 5 ms RTT</li>
-                <li><strong>Latence data ↔ Witness :</strong> ≤ 200 ms RTT (100 ms one-way recommandé) ; si &gt; 10 hôtes/site : &lt; 100 ms RTT</li>
-                <li><strong>Bande passante inter-sites :</strong> 10 Gbps minimum (ESA et OSA)</li>
-                <li><strong>Witness :</strong> 2 Mbps par tranche de 1 000 composants vSAN</li>
-              </ul>
-              <strong style="color:#1a4a8b">🖧 VLANs et L2/L3</strong>
-              <ul>
-                <li><strong>vSAN VMkernel :</strong> L2 obligatoire entre les 2 sites (même VLAN ID)</li>
-                <li><strong>VM Management Network :</strong> L2 étendu sur les 2 sites — même VLAN ID requis</li>
-                <li><strong>ESXi Management (vmk0) :</strong> L2 recommandé pour l'automatisation VCF Ops (ajout de serveur)</li>
-                <li><strong>vMotion :</strong> L2 recommandé pour conserver les automatismes VCF Ops</li>
-                <li><strong>NSX Host TEP :</strong> L3 accepté (BGP/OSPF), L2 recommandé pour simplifier</li>
-                <li><strong>NFS (si stockage NFS) :</strong> L2 obligatoire sur les 2 sites</li>
-              </ul>
-              <strong style="color:#145c2e">✅ Prérequis architecture</strong>
-              <ul>
-                <li>Nombre d'hôtes <strong>identique</strong> sur chaque site (symétrie obligatoire)</li>
-                <li><strong>vSAN Witness Host</strong> requis sur un 3ème site indépendant — ne fait pas tourner de VMs, même version ESXi que les data hosts</li>
-                <li>Dans VCF : le cluster Management Domain <strong>doit être étendu en premier</strong> avant tout Workload Domain</li>
-                <li>Hôtes DPU (SmartNIC) et hôtes sur subnets mixtes : <strong>non supportés</strong> en stretched</li>
-                <li>Mapping vmnic → vDS <strong>identique</strong> entre les 2 zones</li>
-                <li>SMP-FT non supporté avec Site Disaster Tolerance ≥ 1</li>
-                <li>vSAN ESA et OSA sont tous deux supportés en stretched</li>
-              </ul>
-              <div style="font-size:10px;color:#7a8fa8;margin-top:6px;">
-                Sources : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom — Bandwidth &amp; Latency</a> ·
-                <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a>
-              </div>
-            </div>
-            <div x-show="managementDomain.topologyMode==='stretched'" class="help-desc">
-              <strong>Stretched (vMSC) :</strong> Le cluster est étendu sur 2 sites actifs-actifs avec vSAN Stretched Cluster.
-              <br><br>
-
-              <strong style="color:#b05000">⚡ Prérequis réseau (source : Broadcom TechDocs VCF 9.1)</strong>
-              <ul>
-                <li><strong>Latence inter-sites (data ↔ data) :</strong> ≤ 5 ms RTT</li>
-                <li><strong>Latence data ↔ Witness :</strong> ≤ 200 ms RTT (100 ms one-way recommandé) ; si &gt; 10 hôtes/site : &lt; 100 ms RTT</li>
-                <li><strong>Bande passante inter-sites :</strong> 10 Gbps minimum (ESA et OSA)</li>
-                <li><strong>Witness :</strong> 2 Mbps par tranche de 1 000 composants vSAN</li>
-              </ul>
-
-              <strong style="color:#1a4a8b">🖧 Prérequis réseau VLANs</strong>
-              <ul>
-                <li><strong>VM Network (Management VMs) :</strong> L2 étendu sur les 2 sites — même VLAN ID requis</li>
-                <li><strong>ESXi Management (vmk0) :</strong> peut être L3 (zone-specific), mais L2 recommandé pour l'automatisation VCF Ops (ajout de serveur)</li>
-                <li><strong>vMotion :</strong> L2 recommandé pour conserver les automatismes VCF Ops ; L3 possible mais perte d'automatisation</li>
-                <li><strong>vSAN :</strong> L2 obligatoire entre les 2 sites (même VLAN ID)</li>
-                <li><strong>NFS (si stockage NFS) :</strong> L2 obligatoire entre ESXi et serveur NFS sur les 2 sites</li>
-                <li><strong>NSX Host TEP :</strong> L3 accepté (BGP/OSPF), L2 recommandé pour simplifier la configuration</li>
-              </ul>
-
-              <strong style="color:#145c2e">✅ Prérequis architecture vSAN Stretched</strong>
-              <ul>
-                <li>Nombre d'hôtes <strong>identique</strong> sur chaque site (symétrie obligatoire)</li>
-                <li><strong>vSAN Witness Host</strong> requis sur un 3ème site (ou vSAN Witness Appliance) — ne fait pas tourner de VMs, même version ESXi que les data hosts</li>
-                <li>Dans VCF : le cluster Management Domain <strong>doit être étendu en premier</strong> avant tout Workload Domain</li>
-                <li>Hôtes DPU (SmartNIC) et hôtes sur subnets mixtes : <strong>non supportés</strong> en stretched</li>
-                <li>Mapping vmnic → vDS <strong>identique</strong> entre les 2 zones</li>
-                <li>SMP-FT non supporté avec Site Disaster Tolerance ≥ 1</li>
-              </ul>
-
-              <div style="font-size:10px;color:#7a8fa8;margin-top:6px;">
-                Sources : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — Bandwidth &amp; Latency</a> ·
-                <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a>
-              </div>
-            </div>
-            <div x-show="managementDomain.topologyMode==='partially-stretched'" class="help-desc">
-              <strong>Partially Stretched :</strong> Les composants de management restent sur le site principal. Seuls des hôtes compute sont étendus vers un site secondaire.
-              <ul>
-                <li>Les VLANs de management <strong>ne nécessitent pas d'extension L2 complète</strong> — seules les VLANs de la couche compute (ESXi Mgmt secondaire, vMotion compute) doivent être étendues.</li>
-                <li>Le site secondaire héberge uniquement des VMs de workload, pas les composants VCF.</li>
-                <li>Différent du mode Stretched complet : SDDC Manager, vCenter, NSX Managers restent au site principal.</li>
-              </ul>
-            </div>
+            <div x-show="managementDomain.topologyMode==='single-site'" class="role-desc" x-text="t('topo.single')"></div>
+            <div x-show="managementDomain.topologyMode==='vsan-stretched'" class="help-desc" x-html="t('topo.vsan')"></div>
+            <div x-show="managementDomain.topologyMode==='stretched'" class="help-desc" x-html="t('topo.vmsc')"></div>
+            <div x-show="managementDomain.topologyMode==='partially-stretched'" class="help-desc" x-html="t('topo.partial')"></div>
           </div>
           <div class="field"><label>TEP Interfaces / Host</label>
             <input class="input" type="number" min="1" max="4" x-model.number="managementDomain.tepInterfacesPerHost" />
-            <span class="field-note">Min 2 recommandé (TEP HA actif-actif)</span>
-          </div>
-          <div class="field">
-            <label>Uplink Teaming Policy</label>
-            <select class="select" x-model="managementDomain.teamingPolicy">
-              <option value="active-active">Active-Active (défaut)</option>
-              <option value="active-standby">Active-Standby</option>
-              <option value="lacp" :disabled="project.vcfVersion!=='9.1'">LACP (VCF 9.1 uniquement)</option>
-            </select>
-            <span class="field-note" x-show="managementDomain.teamingPolicy==='lacp' && project.vcfVersion!=='9.1'" style="color:var(--red)">LACP nécessite VCF 9.1.</span>
-            <span class="field-note" x-show="managementDomain.teamingPolicy==='lacp' && project.vcfVersion==='9.1'" style="color:var(--blue-accent)">LACP : Link Aggregation Control Protocol — supporté via API workload domain/cluster deployment en VCF 9.1.</span>
+            <span class="field-note" x-text="t('ui.tep_note')"></span>
           </div>
           <div class="field">
             <label>Storage Type</label>
             <select class="select" x-model="managementDomain.storageType">
-              <option value="vsan-esa">vSAN ESA (VCF 9.1 default)</option>
+              <option value="vsan-esa">vSAN ESA (VCF 9 default)</option>
               <option value="vsan-osa">vSAN OSA</option>
-              <option value="nfs">NFS (stockage primaire NFS)</option>
+              <option value="nfs" x-text="t('storage.nfs_opt')"></option>
               <option value="vmfs">VMFS (iSCSI / FC)</option>
             </select>
-            <span class="field-note" x-show="managementDomain.storageType==='nfs'">
-              NFS : VLAN NFS généré à la place de vSAN. <strong>L2 obligatoire</strong> entre hôtes ESXi et serveur NFS.
-            </span>
-            <span class="field-note" x-show="managementDomain.storageType==='vmfs'">
-              VMFS : datastores sur baie SAN (iSCSI ou FC). Aucun VLAN de stockage VMkernel généré (iSCSI : à configurer manuellement via Additional Services si VLAN dédié requis).
-            </span>
+            <span class="field-note" x-show="managementDomain.storageType==='nfs'" x-html="t('storage.nfs_note')"></span>
+            <span class="field-note" x-show="managementDomain.storageType==='vmfs'" x-html="t('storage.vmfs_note')"></span>
           </div>
         </div>
         <div class="mt12">
@@ -607,15 +660,7 @@
             <input type="checkbox" x-model="managementDomain.layer2AdjacencyConfirmed" />
             <span>L2 Adjacency Confirmed (bring-up)</span>
           </label>
-          <div class="help-desc mt8">
-            <strong>L2 Adjacency Confirmed :</strong> Confirme que les VLANs requis pour le bring-up VCF sont accessibles en L2 depuis le SDDC Manager / Cloud Builder :
-            <ul>
-              <li><strong>ESXi Management</strong> (vmk0 des hôtes)</li>
-              <li><strong>Management VM Network</strong> (SDDC Manager, vCenter, NSX Managers)</li>
-              <li><strong>vMotion</strong> (requis par le bring-up pour la validation HA)</li>
-            </ul>
-            Ce n'est <em>pas</em> une exigence permanente (le NSX TEP et les uplinks Edge peuvent être L3 en production), mais le bring-up Cloud Builder valide la connectivité L2 initiale.
-          </div>
+          <div class="help-desc mt8" x-html="t('l2.help')"></div>
         </div>
       </div>
 
@@ -638,112 +683,52 @@
             <label class="check-row"><input type="checkbox" x-model="managementDomain.aviDeployed" /> AVI / NSX ALB Deployed</label>
           </div>
         </div>
-        <!-- NSX Federation / RTEP -->
-        <div class="mt12" x-show="managementDomain.nsxEdgeDeployed">
-          <label class="check-row">
-            <input type="checkbox" x-model="managementDomain.nsxRtepEnabled" />
-            NSX Federation / RTEP (Route TEP)
-          </label>
-          <div x-show="managementDomain.nsxRtepEnabled" class="help-desc mt8">
-            <strong>NSX Route TEP (RTEP) :</strong> VLAN dédié pour le trafic East-West entre instances NSX fédérées (multi-sites / DR). Requis uniquement si NSX Federation est activée.
-            <ul>
-              <li>Un VLAN RTEP dédié est généré dans le VLAN Design</li>
-              <li>1 IP RTEP par Edge node (sur les nœuds configurés pour la fédération)</li>
-              <li>MTU 9000 recommandé — même MTU que les autres VLANs NSX</li>
-              <li>Distinct du TEP Overlay standard (Geneve) : utilisé uniquement pour le trafic inter-instance NSX</li>
-            </ul>
-          </div>
-        </div>
-        <!-- Network Fabric Model — EVPN-VXLAN (9.1 only) -->
-        <div class="mt12">
-          <div class="field">
-            <label>
-              Network Fabric Model
-              <span x-show="project.vcfVersion==='9.1'" style="font-size:10px;background:#27ae60;color:white;border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:700;">9.1</span>
-            </label>
-            <select class="select" x-model="managementDomain.networkFabricModel">
-              <option value="standard">Standard (VLAN trunk — modèle par défaut)</option>
-              <option value="evpn-vxlan" :disabled="project.vcfVersion!=='9.1'">EVPN-VXLAN Fabric Interoperability (VCF 9.1)</option>
-            </select>
-            <div x-show="managementDomain.networkFabricModel==='evpn-vxlan'" class="help-desc mt8">
-              <strong>EVPN-VXLAN Fabric Interoperability (VCF 9.1) :</strong> Interopérabilité standards-based entre VCF et les fabrics physiques Arista UCN, Cisco Nexus ONE, SONiC. Permet une connectivité cohérente sur toute l'infrastructure réseau.
-              <ul>
-                <li><strong>Élimine le besoin de nœuds Edge dédiés</strong> dans certains scénarios — routage East-West assuré par le fabric</li>
-                <li>Protocole unifié : EVPN + VXLAN entre hôtes ESX et switches Top-of-Rack</li>
-                <li>Un VLAN <strong>EVPN Fabric Interop</strong> dédié est généré dans le VLAN Design (peering BGP EVPN)</li>
-                <li>Supporte Arista UCN, Cisco Nexus ONE, SONiC nativement</li>
-                <li>Compatible avec les workflows VKS VPC et NSX Distributed</li>
-              </ul>
-              <div style="font-size:10px;color:#7a8fa8;margin-top:4px;">
-                Source : <a href="https://blogs.vmware.com/cloud-foundation/2026/05/05/simplify-workload-connectivity-and-enhance-network-scale-and-performance-with-vcf-9-1/" target="_blank" style="color:#1e6abf">VMware Blog — VCF 9.1 Networking</a>
-              </div>
-            </div>
-            <div x-show="managementDomain.networkFabricModel==='evpn-vxlan' && project.vcfVersion!=='9.1'" class="infobox yellow mt8">
-              ⚠️ EVPN-VXLAN Fabric Interoperability est disponible uniquement en VCF 9.1. Passez à VCF 9.1 dans l'onglet Overview.
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="card">
-        <h2 class="sec-title">Fleet &amp; Platform Services Network Model</h2>
+        <h2 class="sec-title" x-text="project.vcfVersion==='9.1' ? t('fleet.title_91') : t('fleet.title_90')"></h2>
         <div class="mt12">
           <div class="field">
-            <label>Modèle réseau des composants Fleet</label>
-            <select class="select" x-model="managementDomain.fleetPlacement">
-              <option value="shared-mgmt-vlan">1 — Shared Management VM Network (Day 0, défaut)</option>
-              <option value="dedicated-fleet-vlan">2 — Dedicated Fleet VLAN (Day 2, séparé)</option>
-              <option value="nsx-vlan-segment">3 — NSX VLAN Segment (segment NSX backé VLAN)</option>
-              <option value="nsx-overlay-segment">4 — NSX Overlay Segment (segment NSX overlay, Edge requis)</option>
+            <label x-text="project.vcfVersion==='9.1' ? t('fleet.label_91') : t('fleet.label_90')"></label>
+            <!-- VCF 9.0 -->
+            <select x-show="project.vcfVersion==='9.0'" class="select" x-model="managementDomain.fleetPlacement">
+              <option value="shared-mgmt-vlan" x-text="t('fleet.shared_opt_90')"></option>
+              <option value="dedicated-fleet-vlan" x-text="t('fleet.dedicated_opt_90')"></option>
+              <option value="nsx-vlan-segment" x-text="t('fleet.nsxvlan_opt_90')"></option>
+              <option value="nsx-overlay-segment" x-text="t('fleet.nsxoverlay_opt_90')"></option>
+            </select>
+            <!-- VCF 9.1 -->
+            <select x-show="project.vcfVersion==='9.1'" class="select" x-model="managementDomain.fleetPlacement">
+              <option value="shared-mgmt-vlan" x-text="t('fleet.shared_opt_91')"></option>
+              <option value="dedicated-fleet-vlan" x-text="t('fleet.dedicated_opt_91')"></option>
+              <option value="nsx-vlan-segment" x-text="t('fleet.nsxvlan_opt_91')"></option>
+              <option value="nsx-overlay-segment" x-text="t('fleet.nsxoverlay_opt_91')"></option>
             </select>
           </div>
 
-          <!-- Model 1: Shared -->
-          <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan'" class="role-desc mt8">
-            <strong>Modèle 1 — Shared Management VM Network :</strong> Fleet et tous les services platform partagent le Management VM Network (port group existant). Déploiement Day 0. Aucun VLAN supplémentaire requis. Simple, recommandé pour les petits déploiements.
-          </div>
+          <!-- VCF 9.1 — VCF Management Services info box (C8, C13) -->
+          <div x-show="project.vcfVersion==='9.1'" class="infobox blue mt8" x-html="t('fleet.infobox_91')"></div>
 
-          <!-- Model 2: Dedicated Fleet VLAN -->
-          <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan'" class="help-desc mt8">
-            <strong>Modèle 2 — Dedicated Fleet VLAN :</strong> Un VLAN dédié est créé pour le Fleet Appliance et les nœuds des services platform (Ops, Logs, Networks, Automation). Les Collectors restent toujours dans le Management VM Network.
-            <ul>
-              <li>Configuration Day 2 (post bring-up via API)</li>
-              <li>Un VLAN physique supplémentaire est requis et généré dans VLAN Design</li>
-              <li>Les collecteurs (Remote Collectors, Proxy VMs) restent dans Management VM Network</li>
-            </ul>
-          </div>
+          <!-- Shared VLAN — VCF 9.0 -->
+          <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan' && project.vcfVersion==='9.0'" class="role-desc mt8" x-html="t('fleet.shared_desc_90')"></div>
 
-          <!-- Model 3: NSX VLAN Segment -->
-          <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" class="help-desc mt8">
-            <strong>Modèle 3 — NSX VLAN Segment :</strong> Segment NSX backé par un VLAN physique (VLAN transport zone). Le routage est assuré par le fabric physique.
-            <ul>
-              <li>Créer une VLAN transport zone dans le NSX Manager du Management Domain</li>
-              <li>Créer un segment NSX sur cette nouvelle transport zone</li>
-              <li>Attacher la VLAN transport zone au transport node profile du cluster primary</li>
-              <li><strong>NSX Edge non requis</strong> — routage physique</li>
-              <li>Pas de NSX Federation ni de stretching overlay possible</li>
-            </ul>
-            <div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-vlan-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX VLAN Segment</a></div>
-          </div>
+          <!-- Shared VLAN — VCF 9.1 -->
+          <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan' && project.vcfVersion==='9.1'" class="role-desc mt8" x-html="t('fleet.shared_desc_91')"></div>
 
-          <!-- Model 4: NSX Overlay Segment -->
-          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment'" class="help-desc mt8">
-            <strong>Modèle 4 — NSX Overlay Segment :</strong> Segment NSX overlay (Geneve). Isolation réseau complète, policies de sécurité dédiées.
-            <ul>
-              <li><strong style="color:var(--red)">NSX Edge Cluster obligatoire</strong> — avec Tier-0 et Tier-1 gateways configurés</li>
-              <li>BGP requis avec peer ASN et passwords pour la connectivité externe</li>
-              <li>NSX Load Balancer disponible pour les composants Fleet</li>
-              <li>Supporte <strong>NSX Federation</strong> pour le stretching multi-sites (DR)</li>
-              <li>Les VCF Operations Collectors sont toujours déployés dans le Management VM Network</li>
-              <li><strong>Pas de VLAN ID physique</strong> — segment overlay (encapsulation Geneve)</li>
-            </ul>
-            <div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-overlay-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX Overlay Segment</a></div>
-          </div>
+          <!-- Dedicated VLAN — VCF 9.0 -->
+          <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan' && project.vcfVersion==='9.0'" class="help-desc mt8" x-html="t('fleet.dedicated_desc_90')"></div>
+
+          <!-- Dedicated VLAN — VCF 9.1 (C8) -->
+          <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan' && project.vcfVersion==='9.1'" class="help-desc mt8" x-html="t('fleet.dedicated_desc_91')"></div>
+
+          <!-- NSX VLAN Segment (identique 9.0 et 9.1) -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" class="help-desc mt8" x-html="t('fleet.nsxvlan_desc')"></div>
+
+          <!-- NSX Overlay Segment (identique 9.0 et 9.1) -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment'" class="help-desc mt8" x-html="t('fleet.nsxoverlay_desc')"></div>
 
           <!-- Warning: NSX Overlay requires Edge -->
-          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && !managementDomain.nsxEdgeDeployed" class="infobox yellow mt8">
-            ⚠️ <strong>NSX Edge non déployé</strong> — Le modèle NSX Overlay Segment nécessite un NSX Edge Cluster. Activez "NSX Edge Deployed" dans la section NSX Configuration ci-dessus.
-          </div>
+          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && !managementDomain.nsxEdgeDeployed" class="infobox yellow mt8" x-html="t('fleet.overlay_warn')"></div>
         </div>
       </div>
 
@@ -756,25 +741,6 @@
         <div x-show="managementDomain.vksEnabled">
           <div class="infobox blue mb12">
             <strong>VKS Infrastructure VLAN:</strong>&nbsp;5 CONSECUTIVE IPs required — 3 control plane VMs + 1 floating IP + 1 patching IP.
-          </div>
-          <!-- Multi-NIC VKS — 9.1 only -->
-          <div class="mb12">
-            <label class="check-row">
-              <input type="checkbox" x-model="managementDomain.vksMultiNicEnabled" :disabled="project.vcfVersion!=='9.1'" />
-              <span>
-                VKS Multi-NIC (Secondary NIC)
-                <span style="font-size:10px;background:#27ae60;color:white;border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:700;">9.1</span>
-              </span>
-            </label>
-            <div x-show="managementDomain.vksMultiNicEnabled && project.vcfVersion==='9.1'" class="help-desc mt8">
-              <strong>VKS Multi-NIC (VCF 9.1) :</strong> Les clusters VKS supportent des interfaces réseau secondaires pour la séparation du trafic et l'accès direct aux systèmes physiques.
-              <ul>
-                <li>Un VLAN <strong>VKS Secondary NIC</strong> dédié est généré pour le trafic secondaire</li>
-                <li>Permet la séparation storage traffic / compute traffic au niveau Kubernetes</li>
-                <li>Supporte l'accès direct aux bare-metal ou systèmes physiques depuis les pods</li>
-              </ul>
-            </div>
-            <div x-show="project.vcfVersion!=='9.1'" class="field-note">VKS Multi-NIC est disponible uniquement en VCF 9.1.</div>
           </div>
           <div class="nest">
             <div class="flex-between mb8">
@@ -846,18 +812,18 @@
 
       <!-- Indicateur dynamique du modèle réseau Fleet -->
       <div class="help-desc mb12">
-        <strong>Réseau des services platform :</strong> Les composants ci-dessous (Ops, Logs, Networks, Automation, Identity Broker) sont déployés sur le réseau configuré dans l'onglet <em>Management Domain → Fleet &amp; Platform Services Network Model</em> :
+        <span x-html="t('platform.intro')"></span>
         <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan'" style="margin-top:6px;padding:6px 10px;background:#eef4fb;border-radius:4px;">
-          📌 Modèle actuel : <strong>Shared Management VM Network</strong> — tous les services platform partagent le Management VM Network.
+          📌 Current model: <strong x-text="project.vcfVersion==='9.1' ? t('platform.shared_lbl_91') : t('platform.shared_lbl_90')"></strong> — <span x-text="project.vcfVersion==='9.1' ? t('platform.shared_desc_91') : t('platform.shared_desc_90')"></span>
         </div>
         <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan'" style="margin-top:6px;padding:6px 10px;background:#fff8e1;border-radius:4px;">
-          📌 Modèle actuel : <strong>Dedicated Fleet VLAN</strong> — les nœuds des services platform sont déployés dans le VLAN Fleet Network dédié. Les Collectors restent dans le Management VM Network.
+          📌 Current model: <strong x-text="project.vcfVersion==='9.1' ? t('platform.dedicated_lbl_91') : t('platform.dedicated_lbl_90')"></strong> — <span x-text="project.vcfVersion==='9.1' ? t('platform.dedicated_desc_91') : t('platform.dedicated_desc_90')"></span>
         </div>
         <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" style="margin-top:6px;padding:6px 10px;background:#e8f8f0;border-radius:4px;">
-          📌 Modèle actuel : <strong>NSX VLAN Segment</strong> — les services platform sont déployés sur le segment NSX backé VLAN. Les Collectors restent dans le Management VM Network.
+          📌 Current model: <strong>NSX VLAN Segment</strong> — <span x-text="t('platform.nsxvlan_desc')"></span>
         </div>
         <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment'" style="margin-top:6px;padding:6px 10px;background:#e8f0fe;border-radius:4px;">
-          📌 Modèle actuel : <strong>NSX Overlay Segment</strong> — les services platform sont déployés sur le segment NSX overlay (Geneve). NSX Edge Cluster requis. Les Collectors restent dans le Management VM Network.
+          📌 Current model: <strong>NSX Overlay Segment</strong> — <span x-text="t('platform.nsxoverlay_desc')"></span>
         </div>
       </div>
 
@@ -874,28 +840,46 @@
             <div class="field"><label>Mode</label>
               <select class="select" x-model="managementDomain.vcfOperations.mode">
                 <option value="standalone">Standalone (1 node)</option>
-                <option value="enterprise">Enterprise (3 nodes + VIP)</option>
+                <option value="enterprise">Enterprise (Primary + Replica + Data node + VIP)</option>
               </select>
             </div>
-            <div class="field"><label>Remote Collectors</label>
+            <!-- C11: Remote Collectors → Cloud Proxies en 9.x -->
+            <div class="field">
+              <label x-text="project.vcfVersion==='9.1' ? t('ops.collectors_91') : t('ops.collectors_90')"></label>
               <input class="input" type="number" min="0" x-model.number="managementDomain.vcfOperations.remoteCollectorCount" />
-              <span class="field-note">
-                Agents de collecte déployés près des sources de données (WLDs, NSX, vCenter) pour réduire la charge réseau sur le cluster analytics. <strong>≠ Cloud Proxy / Cloud Gateway</strong> (qui est utilisé pour l'intégration VCF Cloud/VCFA). Ces collecteurs restent toujours dans le Management VM Network, indépendamment du Fleet/VLAN dédié.
-              </span>
+              <span class="field-note" x-show="project.vcfVersion==='9.1'" x-text="t('ops.collectors_note_91')"></span>
+              <span class="field-note" x-show="project.vcfVersion==='9.0'" x-text="t('ops.collectors_note_90')"></span>
+            </div>
+            <div class="field">
+              <label x-text="t('ops.additional')"></label>
+              <label class="check-row mb4">
+                <input type="checkbox" x-model="managementDomain.vcfOperations.cloudProxyEnabled" />
+                Cloud Proxy
+              </label>
+              <span class="field-note" style="margin-bottom:8px">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-ops-proxy.vcf.domain.local</span></span>
+              <label class="check-row mt4">
+                <input type="checkbox" x-model="managementDomain.vcfOperations.licenseServerEnabled" />
+                License Server
+              </label>
+              <span class="field-note">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-license.vcf.domain.local</span></span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- VCF Operations for Logs -->
+      <!-- VCF Operations for Logs / Log Management -->
       <div class="svc-block">
         <div class="svc-head">
           <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
             <input type="checkbox" x-model="managementDomain.vcfOperationsForLogs.enabled" />
-            VCF Operations for Logs <span class="text-muted text-xs" style="font-weight:400;margin-left:6px">(formerly vRLI)</span>
+            <span x-text="project.vcfVersion==='9.1' ? t('logs.lbl_91') : t('logs.lbl_90')"></span>
+            <span class="text-muted text-xs" style="font-weight:400;margin-left:6px" x-text="project.vcfVersion==='9.1' ? t('logs.badge_91') : t('logs.badge_90')"></span>
           </label>
         </div>
-        <div class="svc-body" x-show="managementDomain.vcfOperationsForLogs.enabled">
+        <!-- C6: 9.1 — architecture Log Management (1 FQDN + 6 IPs internes) -->
+        <div x-show="managementDomain.vcfOperationsForLogs.enabled && project.vcfVersion==='9.1'" class="infobox blue mt4" style="margin:8px 12px 0" x-html="t('logs.infobox_91')"></div>
+        <!-- C6: 9.0 — controls classiques master+workers -->
+        <div class="svc-body" x-show="managementDomain.vcfOperationsForLogs.enabled && project.vcfVersion==='9.0'">
           <div class="g4">
             <div class="field"><label>Mode</label>
               <select class="select" x-model="managementDomain.vcfOperationsForLogs.mode">
@@ -942,19 +926,23 @@
             VCF Automation <span class="text-muted text-xs" style="font-weight:400;margin-left:6px">(formerly vRA)</span>
           </label>
         </div>
+        <!-- C10: note 9.1 cloud-native -->
+        <div x-show="managementDomain.vcfAutomation.enabled && project.vcfVersion==='9.1'" class="infobox blue mt4" style="margin:8px 12px 0" x-html="t('auto.infobox_91')"></div>
         <div class="svc-body" x-show="managementDomain.vcfAutomation.enabled">
           <div class="g4">
             <div class="field"><label>Mode</label>
               <select class="select" x-model="managementDomain.vcfAutomation.mode">
-                <option value="standalone">Standalone (1 VA)</option>
-                <option value="clustered">HA (4 node IPs + 1 VIP)</option>
+                <!-- C10: labels adaptés selon version -->
+                <option value="standalone" x-text="project.vcfVersion==='9.1' ? t('auto.simple_91') : t('auto.simple_90')"></option>
+                <option value="clustered" x-text="project.vcfVersion==='9.1' ? t('auto.ha_91') : t('auto.ha_90')"></option>
               </select>
-              <span class="field-note" x-show="managementDomain.vcfAutomation.mode==='clustered'">3 active + 1 upgrade/patching node</span>
+              <span class="field-note" x-show="managementDomain.vcfAutomation.mode==='clustered' && project.vcfVersion==='9.0'">3 active + 1 upgrade/patching node</span>
+              <span class="field-note" x-show="managementDomain.vcfAutomation.mode==='clustered' && project.vcfVersion==='9.1'" x-text="t('auto.ha_note_91')"></span>
             </div>
-            <div class="field"><label>Orchestrator Mode</label>
+            <div class="field"><label x-text="project.vcfVersion==='9.1' ? t('auto.orch_lbl_91') : t('auto.orch_lbl_90')"></label>
               <select class="select" x-model="managementDomain.vcfAutomation.orchestratorMode">
                 <option value="embedded">Embedded vRO</option>
-                <option value="standalone">Standalone vRO</option>
+                <option value="standalone" x-text="project.vcfVersion==='9.1' ? t('auto.vro_standalone') : 'Standalone vRO'"></option>
               </select>
             </div>
             <div class="field" x-show="managementDomain.vcfAutomation.orchestratorMode==='standalone'"><label>Orchestrator Nodes</label>
@@ -971,111 +959,25 @@
           <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
             <input type="checkbox" x-model="managementDomain.vcfIdentityBroker.enabled" />
             VCF Identity Broker
+            <span x-show="project.vcfVersion==='9.1'" class="badge badge-mgmt" style="margin-left:8px;font-size:10px">VCF Management Services — VCF 9.1</span>
           </label>
         </div>
+        <div x-show="project.vcfVersion==='9.1'" class="help-desc" style="margin:8px 0 0 0" x-html="t('ib.help_91')"></div>
         <div class="svc-body" x-show="managementDomain.vcfIdentityBroker.enabled">
           <div class="g4">
             <div class="field"><label>Mode</label>
               <select class="select" x-model="managementDomain.vcfIdentityBroker.mode">
-                <option value="embedded">Embedded</option>
-                <option value="appliance">Appliance</option>
+                <option value="embedded">Embedded (lab/POC only)</option>
+                <option value="appliance" x-text="project.vcfVersion==='9.1' ? t('ib.runtime_opt_91') : 'Appliance'"></option>
               </select>
             </div>
-            <div class="field" x-show="managementDomain.vcfIdentityBroker.mode==='appliance'" style="justify-content:flex-end;padding-bottom:2px">
+            <!-- C9: HA option uniquement en 9.0 — en 9.1 la HA est native dans Services Runtime -->
+            <div class="field" x-show="managementDomain.vcfIdentityBroker.mode==='appliance' && project.vcfVersion==='9.0'" style="justify-content:flex-end;padding-bottom:2px">
               <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfIdentityBroker.haEnabled" /> HA (3 nodes + VIP)</label>
             </div>
+            <div x-show="managementDomain.vcfIdentityBroker.mode==='appliance' && project.vcfVersion==='9.1'" style="font-size:11px;color:var(--text-muted);padding:4px 0" x-text="t('ib.ha_native')"></div>
           </div>
         </div>
-      </div>
-
-      <!-- VCF Management Services (Services Runtime) -->
-      <div class="svc-block" style="border-color:#1b3a5c;background:#f0f5fb;">
-        <div class="svc-head" style="display:flex;align-items:center;gap:10px;">
-          <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
-            <input type="checkbox" x-model="managementDomain.vcfServicesRuntime.enabled" />
-            VCF Management Services (Services Runtime)
-          </label>
-          <span style="font-size:10px;background:#27ae60;color:white;border-radius:10px;padding:2px 8px;font-weight:700;">9.1</span>
-        </div>
-        <div class="svc-body" x-show="managementDomain.vcfServicesRuntime.enabled">
-          <div class="help-desc mb12">
-            <strong>VCF Management Services — VCF Services Runtime :</strong> Cluster Kubernetes interne déployé dans le Management Domain. Remplace l'approche Fleet Appliance monolithique par une plateforme cloud-native de lifecycle management.
-            <br><br>
-            <strong style="color:#1a4a8b;">📦 Services hébergés</strong>
-            <ul>
-              <li x-show="managementDomain.vcfServicesRuntime.isFirstInstance"><strong>Fleet-level</strong> (1ère instance uniquement) : Fleet Lifecycle, Salt RaaS, Log Management</li>
-              <li><strong>Instance-level</strong> : SDDC Lifecycle, Telemetry, Salt Master, Identity Broker, Real-time Metrics, Software Depot</li>
-            </ul>
-            <strong style="color:#b05000;">⚡ Prérequis réseau (Broadcom TechDocs VCF 9.1)</strong>
-            <ul>
-              <li><strong>IP range dédié Services Runtime :</strong> minimum <strong>12 adresses IP</strong> — plage pour les pods/services Kubernetes internes (pod CIDR). Séparé des IPs des VMs nœuds.</li>
-              <li><strong>FQDNs obligatoires (3) :</strong> VCF Services Runtime FQDN · Fleet Component FQDN · Instance Component FQDN — résolvent chacun vers une IP <em>hors</em> du runtime IP range</li>
-              <li><strong>FQDNs additionnels :</strong> Identity Broker FQDN · License Server FQDN — IP uniques hors runtime range</li>
-              <li>Dual-stack : les FQDNs doivent résoudre en IPv4 ET IPv6 si environnement dual-stack</li>
-              <li>Les nœuds VMs (control plane + workers) prennent des IPs dans le <strong>Management VM Network</strong></li>
-            </ul>
-            <div style="font-size:10px;color:#7a8fa8;margin-top:4px;">
-              Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-1/design/vmware-cloud-foundation-concepts/vcf-management-services-models.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — VCF Management Services Models</a>
-            </div>
-          </div>
-          <div class="g4">
-            <div class="field">
-              <label>Modèle de déploiement</label>
-              <select class="select" x-model="managementDomain.vcfServicesRuntime.model">
-                <option value="simple">Simple (1 control plane + 3 workers)</option>
-                <option value="ha">High Availability (3 control planes + workers)</option>
-              </select>
-              <span class="field-note" x-show="managementDomain.vcfServicesRuntime.model==='simple'" style="color:var(--orange)">
-                Simple : perte du control plane → redéploiement + restauration depuis backup. PoC / petits environnements uniquement.
-              </span>
-              <span class="field-note" x-show="managementDomain.vcfServicesRuntime.model==='ha'">
-                HA : 3 control planes — haute disponibilité pour production. Ressources additionnelles requises.
-              </span>
-            </div>
-            <div class="field" x-show="managementDomain.vcfServicesRuntime.model==='ha'">
-              <label>Worker Nodes (HA)</label>
-              <input class="input" type="number" min="3" x-model.number="managementDomain.vcfServicesRuntime.workerCount" />
-              <span class="field-note">Minimum 3 workers recommandé en mode HA.</span>
-            </div>
-            <div class="field">
-              <label class="check-row" style="margin-top:18px">
-                <input type="checkbox" x-model="managementDomain.vcfServicesRuntime.isFirstInstance" />
-                Première instance VCF (Fleet-level)
-              </label>
-              <span class="field-note">Cocher si ce Management Domain héberge les composants fleet-level (Fleet Lifecycle, Salt RaaS, Log Management). Décocher pour les instances VCF additionnelles.</span>
-            </div>
-          </div>
-          <div class="infobox blue mt12">
-            <strong>IPs planifiées dans le Management VM Network :</strong>
-            <span x-text="managementDomain.vcfServicesRuntime.model==='simple'
-              ? '4 nœuds (1 control plane + 3 workers) + 12 IPs runtime range minimum + 5 FQDNs (Runtime · Fleet · Instance · Identity Broker · License Server)'
-              : (3 + managementDomain.vcfServicesRuntime.workerCount) + ' nœuds (3 control planes + ' + managementDomain.vcfServicesRuntime.workerCount + ' workers) + 12 IPs runtime range minimum + 5 FQDNs (Runtime · Fleet · Instance · Identity Broker · License Server)'">
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- VNA — Virtual Network Appliance (9.1 only) -->
-      <div class="svc-block" style="border-color:#27ae60;background:#f8fff9;">
-        <div class="svc-head" style="display:flex;align-items:center;gap:10px;">
-          <label class="check-row" style="font-size:14px;font-weight:700;color:var(--blue-mid)">
-            <input type="checkbox" x-model="managementDomain.vnaEnabled" :disabled="project.vcfVersion!=='9.1'" />
-            VNA — Virtual Network Appliance Cluster
-          </label>
-          <span style="font-size:10px;background:#27ae60;color:white;border-radius:10px;padding:2px 8px;font-weight:700;">9.1</span>
-        </div>
-        <div class="svc-body" x-show="managementDomain.vnaEnabled && project.vcfVersion==='9.1'">
-          <div class="help-desc mb8">
-            <strong>Virtual Network Appliance (VNA) Cluster — VCF 9.1 :</strong> Nouvelle appliance qui fournit des services réseau stateful (NAT, load balancing) dans les architectures VPC distribuées. Remplace les solutions centralisées dans les déploiements VPC distribués.
-            <ul>
-              <li>Services stateful pour architectures VPC distribuées : NAT, load balancing, DHCP</li>
-              <li>Déployé dans le Management Domain, dessert les VPCs Workload</li>
-              <li>Un VLAN <strong>VNA Network</strong> dédié est généré dans le VLAN Design</li>
-              <li>Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-1/release-notes/vmware-cloud-foundation-9-1-0-0-release-notes/what-s-new/whats-new-nsx.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX 9.1</a></li>
-            </ul>
-          </div>
-        </div>
-        <div x-show="project.vcfVersion!=='9.1'" class="field-note mt8" style="color:var(--text-muted)">VNA est disponible uniquement en VCF 9.1. Sélectionnez VCF 9.1 dans Overview.</div>
       </div>
     </div>
 
@@ -1098,7 +1000,7 @@
             <div class="g4 mb12">
               <div class="field"><label>Host Count</label>
                 <input class="input" type="number" min="2" x-model.number="workloadDomains[wi].hostCount" />
-                <span class="field-note">Min 3 pour vSAN FTT=1. Min 2 accepté si stockage NFS primaire.</span>
+                <span class="field-note" x-text="t('wld.host_note')"></span>
               </div>
               <div class="field">
                 <label>Domain Role</label>
@@ -1109,19 +1011,11 @@
                   <option value="ai-workloads">AI Workloads (GPU)</option>
                   <option value="mixed">Mixed</option>
                 </select>
-                <div x-show="workloadDomains[wi].domainRole==='standard-vi'" class="role-desc">Workloads VMs standard (applicatifs, base de données, etc.). Rôle par défaut.</div>
-                <div x-show="workloadDomains[wi].domainRole==='platform-services'" class="role-desc">Héberge des services de plateforme VCF (VCF Operations, Automation, etc.) ou des services partagés.</div>
-                <div x-show="workloadDomains[wi].domainRole==='runtime-kubernetes'" class="help-desc">
-                  <strong>Runtime Kubernetes (VKS Supervisor) :</strong> Ce domaine est dédié à l'hébergement du <strong>VKS Supervisor</strong> — le plan de gestion Kubernetes de VMware. Vous installerez le Supervisor sur ce cluster, puis créerez des namespaces et des clusters de workloads VKS dessus.
-                  <ul>
-                    <li>Activez <strong>VKS Enabled</strong> pour ce domaine.</li>
-                    <li>NSX + NSX Edge requis pour les réseaux overlay VKS.</li>
-                    <li>AVI (NSX ALB) recommandé pour le load balancing des VIPs Kubernetes.</li>
-                    <li>Ce n'est <em>pas</em> un cluster de workloads VMs standard.</li>
-                  </ul>
-                </div>
-                <div x-show="workloadDomains[wi].domainRole==='ai-workloads'" class="role-desc">Cluster dédié aux workloads IA/ML nécessitant des GPUs (Private AI Foundation). Requiert des hôtes avec GPUs compatibles vGPU.</div>
-                <div x-show="workloadDomains[wi].domainRole==='mixed'" class="role-desc">Domaine mixte — héberge plusieurs types de workloads (VMs + conteneurs + services).</div>
+                <div x-show="workloadDomains[wi].domainRole==='standard-vi'" class="role-desc" x-text="t('wld.role.standard')"></div>
+                <div x-show="workloadDomains[wi].domainRole==='platform-services'" class="role-desc" x-text="t('wld.role.platform')"></div>
+                <div x-show="workloadDomains[wi].domainRole==='runtime-kubernetes'" class="help-desc" x-html="t('wld.role.k8s')"></div>
+                <div x-show="workloadDomains[wi].domainRole==='ai-workloads'" class="role-desc" x-text="t('wld.role.ai')"></div>
+                <div x-show="workloadDomains[wi].domainRole==='mixed'" class="role-desc" x-text="t('wld.role.mixed')"></div>
               </div>
               <div class="field"><label>TEP Interfaces / Host</label>
                 <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].tepInterfacesPerHost" />
@@ -1129,13 +1023,13 @@
               <div class="field">
                 <label>Storage Type</label>
                 <select class="select" x-model="workloadDomains[wi].storageType">
-                  <option value="vsan-esa">vSAN ESA (VCF 9.1 default)</option>
+                  <option value="vsan-esa">vSAN ESA (VCF 9 default)</option>
                   <option value="vsan-osa">vSAN OSA</option>
-                  <option value="nfs">NFS (stockage primaire NFS)</option>
+                  <option value="nfs" x-text="t('wld.nfs_opt')"></option>
                   <option value="vmfs">VMFS (iSCSI / FC)</option>
                 </select>
-                <span class="field-note" x-show="workloadDomains[wi].storageType==='nfs'">VLAN NFS généré. L2 obligatoire. Min 2 hôtes possible.</span>
-                <span class="field-note" x-show="workloadDomains[wi].storageType==='vmfs'">VMFS sur SAN. Aucun VLAN de stockage VMkernel généré automatiquement.</span>
+                <span class="field-note" x-show="workloadDomains[wi].storageType==='nfs'" x-text="t('wld.nfs_note')"></span>
+                <span class="field-note" x-show="workloadDomains[wi].storageType==='vmfs'" x-text="t('wld.vmfs_note')"></span>
               </div>
             </div>
             <div class="flex-center gap12 mb12">
@@ -1159,22 +1053,9 @@
                 <div class="field" style="gap:8px">
                   <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].edgeRequired" /> NSX Edge Required</label>
                   <label class="check-row" x-show="workloadDomains[wi].edgeRequired"><input type="checkbox" x-model="workloadDomains[wi].sharedEdgeUplinks" /> Shared Edge Uplinks</label>
-                  <label class="check-row" x-show="workloadDomains[wi].edgeRequired">
-                    <input type="checkbox" x-model="workloadDomains[wi].nsxRtepEnabled" />
-                    NSX Federation / RTEP
-                    <span style="font-size:9px;color:#7a8fa8;margin-left:4px;">(Route TEP)</span>
-                  </label>
                 </div>
                 <div class="field" x-show="workloadDomains[wi].edgeRequired"><label>Edge Node Count</label>
                   <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].edgeNodeCount" />
-                </div>
-                <div class="field">
-                  <label>Teaming Policy</label>
-                  <select class="select" x-model="workloadDomains[wi].teamingPolicy">
-                    <option value="active-active">Active-Active</option>
-                    <option value="active-standby">Active-Standby</option>
-                    <option value="lacp" :disabled="project.vcfVersion!=='9.1'">LACP (VCF 9.1)</option>
-                  </select>
                 </div>
               </div>
             </div>
@@ -1183,14 +1064,6 @@
             <div x-show="workloadDomains[wi].vksEnabled" class="nest mt12">
               <div class="infobox yellow">
                 5 CONSECUTIVE IPs required for VKS Infrastructure VLAN (3 control plane + 1 floating + 1 patching).
-              </div>
-              <div class="mb8">
-                <label class="check-row">
-                  <input type="checkbox" x-model="workloadDomains[wi].vksMultiNicEnabled" :disabled="project.vcfVersion!=='9.1'" />
-                  VKS Multi-NIC
-                  <span style="font-size:9px;background:#27ae60;color:white;border-radius:8px;padding:1px 6px;margin-left:6px;">9.1</span>
-                </label>
-                <div x-show="project.vcfVersion!=='9.1'" class="field-note">VKS Multi-NIC nécessite VCF 9.1.</div>
               </div>
               <div class="flex-between mb8">
                 <div class="nest-title" style="margin-bottom:0">NSX VPCs</div>
@@ -1314,18 +1187,13 @@
       <!-- FQDN prefix banner -->
       <div class="card" style="padding:12px 16px;margin-bottom:12px" x-show="project.fqdnSuffix">
         <div class="flex-center gap8">
-          <span class="text-xs text-muted">Suffixe FQDN actif :</span>
+          <span class="text-xs text-muted" x-text="t('app.fqdn_active')"></span>
           <span class="tbl-mono font-bold" style="color:var(--blue-accent)" x-text="'*.' + project.fqdnSuffix"></span>
-          <span class="text-xs text-muted">— modifiable dans l'onglet Overview</span>
+          <span class="text-xs text-muted" x-text="t('app.fqdn_editable')"></span>
         </div>
       </div>
       <!-- Subnet pre-fill hint -->
-      <div class="infobox blue mb8">
-        <div class="text-xs">
-          <strong>Pré-remplissage :</strong> Si vous avez renseigné un CIDR dans l'onglet <strong>VLAN Design</strong> (ex: 10.0.1.0/24), le préfixe réseau (10.0.1.) apparaît en placeholder dans le champ IP. Saisissez uniquement le numéro d'hôte.
-          Le suffixe FQDN est défini dans <strong>Overview → FQDN Suffix</strong>.
-        </div>
-      </div>
+      <div class="infobox blue mb8" x-html="t('app.prefill')"></div>
       <div class="tbl-wrap">
         <table class="tbl">
           <thead>
@@ -1384,8 +1252,8 @@
       </div>
       <div class="infobox blue mb8" x-show="project.fqdnSuffix || vlans.some(v=>v.cidr)">
         <div class="text-xs">
-          <span x-show="project.fqdnSuffix"><strong>FQDN suffix :</strong> <span class="tbl-mono" x-text="project.fqdnSuffix"></span> — placeholders pré-remplis. </span>
-          <span x-show="vlans.some(v=>v.cidr)"><strong>CIDR renseignés :</strong> préfixes IP disponibles en placeholder selon le VLAN du VIP.</span>
+          <span x-show="project.fqdnSuffix"><strong>FQDN suffix:</strong> <span class="tbl-mono" x-text="project.fqdnSuffix"></span> — placeholders pre-filled. </span>
+          <span x-show="vlans.some(v=>v.cidr)" x-html="t('vips.cidr_note')"></span>
         </div>
       </div>
       <div class="tbl-wrap">
@@ -1464,9 +1332,7 @@
     <div x-show="activeTab==='export'">
       <h2 class="sec-title mb12">Export &amp; Import</h2>
       <div class="infobox blue mb12">
-        <div class="text-xs">
-          <strong>Domain Summary — VLAN Count :</strong> Le compteur VLAN par domaine inclut uniquement les VLANs physiques générés. Dans le Management Domain, les services platform (Ops, Logs, Networks, Automation, Identity Broker) n'ajoutent un VLAN dédié que si "Dedicated VLAN" est activé pour chacun dans l'onglet Platform Services. Sans VLAN dédié, ces services partagent le Management VM Network ou le Fleet Network.
-        </div>
+        <div class="text-xs" x-html="t('export.vlan_note')"></div>
       </div>
       <div class="export-grid">
 
@@ -1524,12 +1390,12 @@
       <div class="card" style="background:linear-gradient(135deg,var(--blue-dark) 0%,var(--blue-mid) 100%);border:none;color:white;padding:32px 36px;margin-bottom:20px;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px;">
           <div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;" x-text="'VCF ' + project.vcfVersion + ' Network Planner'">VCF Network Planner</div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9 Network Planner</div>
             <div style="font-size:14px;color:#a8c4de;margin-bottom:18px;">Architecture Edition — Pre-Deployment Network Planning Tool</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.2.0</span>
-              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;">May 2026</span>
-              <span x-text="'VMware Cloud Foundation ' + project.vcfVersion" style="background:rgba(39,174,96,0.3);border:1px solid rgba(39,174,96,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#7fffb8;font-weight:700;"></span>
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.3.0</span>
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;">April 2026</span>
+              <span style="background:rgba(39,174,96,0.3);border:1px solid rgba(39,174,96,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#7fffb8;font-weight:700;">VMware Cloud Foundation 9</span>
             </div>
           </div>
           <div style="text-align:right;">
@@ -1546,7 +1412,7 @@
         <div class="card">
           <h2 class="sec-title" style="margin-bottom:14px;">Purpose</h2>
           <p class="text-sm text-muted" style="margin-bottom:10px;">
-            The VCF 9.1 Network Planner automates the pre-deployment network design process for VMware Cloud Foundation 9.1 deployments. It replaces manual spreadsheet workflows with a single, self-consistent planning document.
+            The VCF 9 Network Planner automates the pre-deployment network design process for VMware Cloud Foundation 9 deployments. It replaces manual spreadsheet workflows with a single, self-consistent planning document.
           </p>
           <p class="text-sm text-muted">
             From a handful of configuration choices, the tool derives the complete set of VLANs, appliance IP allocations, VIPs, and runs architectural validation — ready for export to Excel or JSON.
@@ -1564,23 +1430,24 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
-                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.2.0</span></td>
-                <td style="padding:8px 10px;color:var(--text-muted);">May 2026</td>
-                <td style="padding:8px 10px;color:var(--text-muted);">
-                  Double support VCF 9.0 / 9.1 — sélecteur de version conditionne toutes les fonctionnalités. VCF 9.1 : EVPN-VXLAN Fabric Interoperability (Arista/Cisco/SONiC), LACP teaming, VNA cluster, VKS Multi-NIC secondary NIC, NSX RTEP (Federation), checks de validation 9.0/9.1. Suppression authentification Supabase (accès public direct). Sources : Broadcom TechDocs VCF 9.1, VMware Blog.
-                </td>
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.4.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-text="t('ver.140')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.3.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-text="t('ver.130')"></td>
               </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.1.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Apr 2026</td>
-                <td style="padding:8px 10px;color:var(--text-muted);">
-                  UX &amp; features: explications Topology Mode (vSAN Stretched, Partially Stretched, vMSC), L2 Adjacency, Remote Collectors (≠ Cloud Proxy), Domain Roles (Runtime Kubernetes), Storage Type (NFS / VMFS / vSAN), NSX Overlay/VLAN Segment Fleet model, prérequis vSAN Stretched (Broadcom TechDocs), suppression Dedicated VLAN par service, indicateur Fleet dans Platform Services, FQDN Suffix/Prefix, IP prefix depuis CIDR VLAN, Identity Broker Embedded → N/A, Host Count min 2 (NFS), 2 Remote Collectors par défaut.
-                </td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.110')"></td>
               </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.0.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Apr 2026</td>
-                <td style="padding:8px 10px;color:var(--text-muted);">Initial release — full HTML, Alpine.js, VCF-DD design</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Initial release — full HTML, Alpine.js, Supabase auth, VCF-DD design</td>
               </tr>
             </tbody>
           </table>
@@ -1590,19 +1457,7 @@
         <div class="card">
           <h2 class="sec-title" style="margin-bottom:14px;">Capabilities</h2>
           <div style="display:flex;flex-direction:column;gap:8px;">
-            <template x-for="cap in [
-              {icon:'🗂', text:'Auto-génère VLANs pour Management &amp; Workload Domains (vSAN ESA/OSA, NFS, VMFS)'},
-              {icon:'🖥', text:'Allocation des appliances avec champs IP/FQDN (SDDC Mgr, vCenter, NSX, AVI, Fleet, VCF Suite)'},
-              {icon:'🔗', text:'Inventaire VIPs pour tous les services clusterisés'},
-              {icon:'✅', text:'Moteur de validation architecturale avec sévérité Blocker / Warning / Info'},
-              {icon:'🌐', text:'4 modèles réseau Fleet : Shared, Dedicated VLAN, NSX VLAN Segment, NSX Overlay Segment'},
-              {icon:'📐', text:'Topologies : Single-Site, vSAN Stretched Cluster (prérequis Broadcom), Stretched vMSC, Partially Stretched'},
-              {icon:'📊', text:'Export Excel — 5 feuilles (Domain Summary, VLANs, Appliances, VIPs, Validation)'},
-              {icon:'💾', text:'JSON save/restore — état complet incluant IPs, FQDNs et VLAN IDs saisis'},
-              {icon:'🔀', text:'Double support VCF 9.0 / VCF 9.1 — sélecteur de version conditionne les fonctionnalités réseau disponibles'},
-              {icon:'🌐', text:'VCF 9.1 : EVPN-VXLAN Fabric Interoperability (Arista UCN, Cisco Nexus ONE, SONiC), LACP teaming, VNA cluster, VKS Multi-NIC, NSX RTEP Federation'},
-              {icon:'⚙️', text:'VCF Management Services (Services Runtime) : cluster Kubernetes interne — Simple (1 CP + 3 workers) ou HA (3 CPs). Génère : nœuds VMs, runtime IP range (min 12 IPs), 5 FQDNs (Runtime · Fleet · Instance · Identity Broker · License Server)'},
-            ]">
+            <template x-for="cap in capabilitiesList()">
               <div style="display:flex;align-items:flex-start;gap:10px;font-size:12px;">
                 <span x-text="cap.icon" style="font-size:16px;flex-shrink:0;"></span>
                 <span x-html="cap.text" style="color:var(--text-dark);"></span>
@@ -1615,17 +1470,17 @@
         <div class="card">
           <h2 class="sec-title" style="margin-bottom:14px;">Technology Stack</h2>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <template x-for="t in [
+            <template x-for="tech in [
               {label:'Frontend',value:'Vanilla HTML5 + Alpine.js v3'},
               {label:'Styling',value:'Custom CSS — VCF-DD Design System'},
+              {label:'Authentication',value:'Supabase Auth (email + username)'},
               {label:'Excel Export',value:'SheetJS (xlsx.full.min.js)'},
               {label:'Runtime',value:'Browser-only, no build step'},
               {label:'Compatibility',value:'Chrome, Edge, Firefox, Safari'},
-              {label:'VCF Version',value:'VMware Cloud Foundation 9.1'},
             ]">
               <div style="background:var(--gray-light);border-radius:6px;padding:10px 12px;">
-                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px;" x-text="t.label"></div>
-                <div style="font-size:12px;color:var(--text-dark);" x-text="t.value"></div>
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px;" x-text="tech.label"></div>
+                <div style="font-size:12px;color:var(--text-dark);" x-text="tech.value"></div>
               </div>
             </template>
           </div>
@@ -1635,7 +1490,7 @@
 
       <!-- Footer note -->
       <div style="text-align:center;padding:16px;font-size:11px;color:var(--text-muted);">
-        <span x-text="'VCF ' + project.vcfVersion + ' Network Planner'"></span> &nbsp;·&nbsp; Designed for VMware Cloud Foundation pre-deployment architecture &nbsp;·&nbsp; © 2026 Leonardo Coscia
+        VCF 9 Network Planner &nbsp;·&nbsp; Designed for VMware Cloud Foundation 9 pre-deployment architecture &nbsp;·&nbsp; © 2026 Leonardo Coscia
       </div>
     </div>
 
@@ -1671,21 +1526,23 @@ function makeVLAN(domain,vlanName,vlanType,description,purpose,mandatory,scope,r
   return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,vlanId:'',cidr:''};
 }
 
-function buildManagementVLANs(mgmt, project, workloadDomains=[]) {
+function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) {
   resetVlanCounter();
   const vlans=[];
   const buf=project.subnetBufferEnabled, bufPct=project.subnetBufferPercent;
   const domain='Management Domain';
+  const is91=project.vcfVersion==='9.1';
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
-  const fleetVLANName=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':'Fleet Network';
+  const fleetVLANName=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
   const fleetVLANType=mgmt.fleetPlacement==='nsx-overlay-segment'?'overlay':mgmt.fleetPlacement==='nsx-vlan-segment'?'service':'fleet';
 
   vlans.push(makeVLAN(domain,'ESXi Management','management','ESXi vmk0 only','VMkernel vmk0 for out-of-band ESXi management','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk0 IPs (1 per host)`,buf,bufPct));
 
   const nsxManagerCount=mgmt.nsxManagerMode==='clustered'?3:1;
-  const nsxVIPCount=mgmt.nsxManagerMode==='clustered'?1:0;
+  // C14: VIP obligatoire dans TOUS les modes NSX (Simple + HA) — VCF-NSX-LM-REQD-CFG-002
+  const nsxVIPCount=1;
   const nsxEdgeMgmtIPs=mgmt.nsxEdgeDeployed?mgmt.nsxEdgeNodeCount:0;
-  const fleetCountInMgmtVM=fleetDedicated?0:1;
+  const fleetCountInMgmtVM=fleetDedicated?0:(is91?14:1);
   const additionalSvcIPs=mgmt.additionalServices.filter(s=>!s.requiresDedicatedVLAN).reduce((a,s)=>a+s.applianceCount,0);
   const aviControllerIPs=mgmt.aviDeployed?3+1:0;
   const wldNSXManagerIPs=workloadDomains.reduce((sum,wld)=>{
@@ -1695,21 +1552,34 @@ function buildManagementVLANs(mgmt, project, workloadDomains=[]) {
   const opsCollectors=mgmt.vcfOperations.enabled?mgmt.vcfOperations.remoteCollectorCount:0;
   const netsCollectors=mgmt.vcfOperationsForNetworks.enabled?mgmt.vcfOperationsForNetworks.collectorCount:0;
   const opsNodesInMgmtVM=(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN&&!fleetDedicated)?(mgmt.vcfOperations.mode==='enterprise'?3+1:1):0;
-  const logsInMgmtVM=(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN&&!fleetDedicated)?(mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1):0;
+  // C6: 9.1 Log Management = 1 IP (VIP endpoint externe) ; 9.0 = architecture master+workers
+  const logsInMgmtVM=(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN&&!fleetDedicated)?(is91?1:(mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1)):0;
   const netsNodesInMgmtVM=(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN&&!fleetDedicated)?mgmt.vcfOperationsForNetworks.platformNodeCount:0;
-  const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&!fleetDedicated)?((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0)):0;
-  const ibInMgmtVM=(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&!mgmt.vcfIdentityBroker.requiresDedicatedVLAN)?(mgmt.vcfIdentityBroker.haEnabled?3+1:1):0;
-  const srtCPCount=mgmt.vcfServicesRuntime?.enabled?(mgmt.vcfServicesRuntime.model==='ha'?3:1):0;
-  const srtWorkerCount=mgmt.vcfServicesRuntime?.enabled?(mgmt.vcfServicesRuntime.workerCount||3):0;
-  const srtNodeIPs=srtCPCount+srtWorkerCount;
-  const srtRuntimeIPs=mgmt.vcfServicesRuntime?.enabled?12:0; // min 12 IPs for pod/service CIDR range
-  const mgmtVMIPs=1+1+nsxManagerCount+nsxVIPCount+nsxEdgeMgmtIPs+wldNSXManagerIPs+fleetCountInMgmtVM+additionalSvcIPs+aviControllerIPs+opsNodesInMgmtVM+opsCollectors+logsInMgmtVM+netsNodesInMgmtVM+netsCollectors+autoInMgmtVM+ibInMgmtVM+srtNodeIPs;
-  vlans.push(makeVLAN(domain,'Management VM Network','vm-network','SDDC Manager, vCenter, NSX Managers, platform service VMs','All management plane VMs','mandatory','dedicated',mgmtVMIPs,`SDDC Manager, vCenter, ${nsxManagerCount} NSX Mgr${nsxVIPCount?' + VIP':''}${nsxEdgeMgmtIPs?' + '+nsxEdgeMgmtIPs+' Edge Mgmt':''}${!fleetDedicated?' + Fleet':''}${aviControllerIPs?' + AVI Controllers':''}${opsCollectors?' + '+opsCollectors+' Ops Collectors':''}${netsCollectors?' + '+netsCollectors+' Nets Collectors':''}${srtNodeIPs?' + '+srtNodeIPs+' Services Runtime nodes':''}`,buf,bufPct));
-  if(mgmt.vcfServicesRuntime?.enabled) vlans.push(makeVLAN(domain,'VCF Services Runtime IP Range','vcf-srt','Plage IP dédiée au pod/service CIDR interne du cluster Kubernetes Services Runtime (VCF 9.1). Distincte des IPs des VMs nœuds.','VCF Services Runtime — pod/service CIDR interne. Min 12 IPs. FQDNs (Runtime, Fleet, Instance, Identity Broker, License Server) résolvent vers IPs hors de cette plage.','mandatory','dedicated',srtRuntimeIPs+5,`${srtRuntimeIPs} IPs runtime range (pod CIDR) + 5 IPs pour FQDNs (Services Runtime · Fleet Component · Instance Component · Identity Broker · License Server). Source: Broadcom TechDocs VCF 9.1.`,buf,bufPct));
+  // C2: 9.1 VCF Automation = toujours 5 IPs (/29 : 3 actifs + 2 buffer) ; 9.0 = VA nodes
+  const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&!fleetDedicated)?(is91?5:((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0))):0;
+  // C4: 9.1 Identity Broker = 1 IP externe (endpoint Services Runtime) ; 9.0 = VM appliances
+  const ibInMgmtVM=(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&!mgmt.vcfIdentityBroker.requiresDedicatedVLAN)?(is91?1:(mgmt.vcfIdentityBroker.haEnabled?3+1:1)):0;
+  const cloudProxyIP=mgmt.vcfOperations.enabled&&mgmt.vcfOperations.cloudProxyEnabled?1:0;
+  const licServerIP=mgmt.vcfOperations.enabled&&mgmt.vcfOperations.licenseServerEnabled?1:0;
+  const mgmtVMIPs=1+1+nsxManagerCount+nsxVIPCount+nsxEdgeMgmtIPs+wldNSXManagerIPs+fleetCountInMgmtVM+additionalSvcIPs+aviControllerIPs+opsNodesInMgmtVM+opsCollectors+logsInMgmtVM+netsNodesInMgmtVM+netsCollectors+autoInMgmtVM+ibInMgmtVM+cloudProxyIP+licServerIP;
+  const mgmtVMNotes=[
+    'SDDC Manager, vCenter',
+    `${nsxManagerCount} NSX Mgr + VIP`,
+    nsxEdgeMgmtIPs?`${nsxEdgeMgmtIPs} Edge Mgmt`:'',
+    !fleetDedicated?(is91?'Fleet + Instance + 12 Svc Runtime nodes':'Fleet'):'',
+    aviControllerIPs?'AVI Controllers':'',
+    opsCollectors?`${opsCollectors} ${is91?'Cloud Proxies':'Ops Collectors'}`:'',
+    netsCollectors?`${netsCollectors} Nets Collectors`:'',
+    autoInMgmtVM&&is91?'5 IPs VCF Auto /29':'',
+    cloudProxyIP?'Cloud Proxy':'',
+    licServerIP?'License Server':'',
+    logsInMgmtVM&&is91?'Log Mgmt VIP':''
+  ].filter(Boolean).join(' | ');
+  vlans.push(makeVLAN(domain,'Management VM Network','vm-network','SDDC Manager, vCenter, NSX Managers, platform service VMs','All management plane VMs','mandatory','dedicated',mgmtVMIPs,mgmtVMNotes,buf,bufPct));
 
   vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion portgroup','Live migration','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs`,buf,bufPct));
   if(mgmt.storageType==='nfs'){
-    vlans.push(makeVLAN(domain,'NFS Storage','nfs','VMkernel portgroup pour le trafic NFS — L2 obligatoire','NFS stockage primaire — 1 vmk par hôte. L2 obligatoire entre ESXi et serveur NFS.','mandatory','dedicated',mgmt.hostCount,`${mgmt.hostCount} vmk IPs (NFS, 1 par hôte). L2 obligatoire. VLAN dédié fortement recommandé. En mode Stretched, ce VLAN doit être étendu L2 sur les 2 sites.`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'NFS Storage','nfs',t('vlan.nfs_vmk_desc'),'NFS primary storage — 1 vmk per host. L2 mandatory between ESXi and NFS server.','mandatory','dedicated',mgmt.hostCount,t('vlan.nfs_notes_mgmt',{n:mgmt.hostCount}),buf,bufPct));
   } else if(mgmt.storageType==='vmfs'){
     // VMFS sur SAN (iSCSI/FC) : pas de VLAN VMkernel de stockage généré automatiquement
     // L'iSCSI doit être configuré manuellement via "Additional Services" si un VLAN dédié est requis
@@ -1724,35 +1594,31 @@ function buildManagementVLANs(mgmt, project, workloadDomains=[]) {
     vlans.push(makeVLAN(domain,'NSX Edge TEP','nsx-tep','NSX Edge TEP — separate from Host TEP','Dedicated TEP for Edge nodes','mandatory','dedicated',mgmt.nsxEdgeNodeCount,`${mgmt.nsxEdgeNodeCount} Edge TEP IPs`,buf,bufPct));
     vlans.push(makeVLAN(domain,'NSX Edge Uplink 1','nsx-edge-uplink1','Edge uplink 1 (North-South)','Physical underlay uplink','mandatory','dedicated',mgmt.nsxEdgeNodeCount,`${mgmt.nsxEdgeNodeCount} IPs`,buf,bufPct));
     vlans.push(makeVLAN(domain,'NSX Edge Uplink 2','nsx-edge-uplink2','Edge uplink 2 (redundant)','Redundant underlay uplink','mandatory','dedicated',mgmt.nsxEdgeNodeCount,`${mgmt.nsxEdgeNodeCount} IPs`,buf,bufPct));
-    if(mgmt.nsxRtepEnabled) vlans.push(makeVLAN(domain,'NSX RTEP (Route TEP)','nsx-rtep','NSX Route TEP — trafic East-West inter-instances NSX (Federation)','NSX Federation RTEP — 1 IP par Edge node fédéré. MTU 9000. Distinct du TEP Overlay.','optional','dedicated',mgmt.nsxEdgeNodeCount,`${mgmt.nsxEdgeNodeCount} RTEP IPs (1 par Edge node). NSX Federation requis.`,buf,bufPct));
   }
 
-  if(mgmt.networkFabricModel==='evpn-vxlan') vlans.push(makeVLAN(domain,'EVPN Fabric Interop','evpn-fabric','EVPN-VXLAN Fabric Interoperability (VCF 9.1) — peering BGP EVPN avec switches ToR','Interop EVPN-VXLAN avec Arista UCN / Cisco Nexus ONE / SONiC. Élimine Edge dédié pour certains scénarios.','scenario-driven','dedicated',mgmt.hostCount+4,`${mgmt.hostCount} hôtes ESX + 4 IPs peering BGP ToR. MTU 9000. Source: VMware Blog VCF 9.1.`,buf,bufPct));
-
   if(fleetDedicated){
-    let fleetIPs=1;const fleetNotes=['1 Fleet appliance (Simple mode)'];
+    let fleetIPs=is91?14:1;
+    const fleetNotes=is91?['Fleet appliance (1 IP)','Instance component (1 IP)','Services Runtime nodes /28 min (12 IPs)']:['1 Fleet appliance (Simple mode)'];
     if(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN){const n=mgmt.vcfOperations.mode==='enterprise'?4:1;fleetIPs+=n;fleetNotes.push(`VCF Ops: ${n} IPs`);}
-    if(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){const n=mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1;fleetIPs+=n;fleetNotes.push(`VCF Logs: ${n} IPs`);}
+    // C6: 9.1 Log Management = 1 IP VIP ; 9.0 = master+workers
+    if(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){const n=is91?1:(mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1);fleetIPs+=n;fleetNotes.push(is91?'Log Mgmt VIP (1 IP)':`VCF Logs: ${n} IPs`);}
     if(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN){fleetIPs+=mgmt.vcfOperationsForNetworks.platformNodeCount;fleetNotes.push(`VCF Nets: ${mgmt.vcfOperationsForNetworks.platformNodeCount} IPs`);}
-    if(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){const n=(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);fleetIPs+=n;fleetNotes.push(`VCF Auto: ${n} IPs`);}
+    // C2: 9.1 VCF Automation = toujours 5 IPs (/29) ; 9.0 = VA nodes
+    if(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){const n=is91?5:((mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0));fleetIPs+=n;fleetNotes.push(is91?'VCF Auto /29 (5 IPs)':`VCF Auto: ${n} IPs`);}
     fleetNotes.push('Collectors always in Mgmt VM Network');
     // NSX Overlay Segment: no physical VLAN ID — overlay segment (Geneve encapsulation)
-    const fleetNote2=mgmt.fleetPlacement==='nsx-overlay-segment'?' — Segment NSX Overlay (pas de VLAN ID physique, encapsulation Geneve)':mgmt.fleetPlacement==='nsx-vlan-segment'?' — Segment NSX VLAN (VLAN transport zone NSX)':'';
-    vlans.push(makeVLAN(domain,fleetVLANName,fleetVLANType,`${fleetVLANName} — Fleet appliance + platform service nodes`,`Fleet-level platform network (modèle: ${mgmt.fleetPlacement})`,'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | ')+fleetNote2,buf,bufPct));
+    const fleetNote2=mgmt.fleetPlacement==='nsx-overlay-segment'?t('vlan.fleet_note_overlay'):mgmt.fleetPlacement==='nsx-vlan-segment'?t('vlan.fleet_note_vlan'):'';
+    vlans.push(makeVLAN(domain,fleetVLANName,fleetVLANType,`${fleetVLANName} — Fleet appliance + platform service nodes`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | ')+fleetNote2,buf,bufPct));
   }
 
   if(mgmt.aviDeployed)vlans.push(makeVLAN(domain,'AVI Management','avi','AVI SE management','AVI load balancer management','scenario-driven','dedicated',4,'AVI SE management IPs',buf,bufPct));
-  if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks'){
-    vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 consecutive IPs required','Kubernetes Supervisor control plane','scenario-driven','dedicated',5,'5 CONSECUTIVE IPs: 3 control plane VMs + 1 floating + 1 patching',buf,bufPct));
-    if(mgmt.vksMultiNicEnabled&&project.vcfVersion==='9.1') vlans.push(makeVLAN(domain,'VKS Secondary NIC Network','vks-secondary','VKS Multi-NIC secondary interface (VCF 9.1) — séparation du trafic storage/compute','Interface réseau secondaire pour clusters VKS. Séparation trafic applicatif / trafic data. Accès direct aux systèmes physiques.','scenario-driven','dedicated',10,'IPs pour secondary NIC VKS workers. MTU 9000 recommandé. VCF 9.1 uniquement.',buf,bufPct));
-  }
-  if(mgmt.vnaEnabled&&project.vcfVersion==='9.1') vlans.push(makeVLAN(domain,'VNA Network','vna','Virtual Network Appliance Cluster (VCF 9.1) — services réseau stateful pour VPCs distribués','NAT, load balancing, DHCP pour architectures VPC distribuées. Remplace solutions centralisées.','scenario-driven','dedicated',4,'IPs pour le cluster VNA (minimum 2 nœuds recommandés). VCF 9.1 uniquement.',buf,bufPct));
+  if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks')vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 consecutive IPs required','Kubernetes Supervisor control plane','scenario-driven','dedicated',5,'5 CONSECUTIVE IPs: 3 control plane VMs + 1 floating + 1 patching',buf,bufPct));
 
   mgmt.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated network for ${svc.name}`,`Service VLAN: ${svc.name}`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||`${svc.applianceCount} appliances`,buf,bufPct)));
   return vlans;
 }
 
-function buildWorkloadVLANs(wld, project) {
+function buildWorkloadVLANs(wld, project, t=k=>k) {
   resetVlanCounter();
   const vlans=[];
   const buf=project.subnetBufferEnabled,bufPct=project.subnetBufferPercent;
@@ -1763,7 +1629,7 @@ function buildWorkloadVLANs(wld, project) {
   vlans.push(makeVLAN(domain,'VM / Application Network','vm-network','Workload VM network','Application VLAN','mandatory',scope,32,'Adjust to actual VM count',buf,bufPct));
   vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion','Live migration','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs`,buf,bufPct));
   if(wld.storageType==='nfs'){
-    vlans.push(makeVLAN(domain,'NFS Storage','nfs','VMkernel NFS — L2 obligatoire','NFS stockage primaire — 1 vmk par hôte. L2 entre ESXi et serveur NFS.','mandatory',scope,wld.hostCount,`${wld.hostCount} vmk IPs (NFS). L2 obligatoire. Avec stockage NFS, min 2 hôtes accepté (pas de contrainte vSAN FTT).`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'NFS Storage','nfs',t('vlan.nfs_vmk_desc'),'NFS primary storage — 1 vmk per host. L2 mandatory.','mandatory',scope,wld.hostCount,t('vlan.nfs_notes_wld',{n:wld.hostCount}),buf,bufPct));
   } else if(wld.storageType==='vmfs'){
     // VMFS sur SAN : pas de VLAN VMkernel de stockage généré
   } else {
@@ -1778,14 +1644,10 @@ function buildWorkloadVLANs(wld, project) {
       vlans.push(makeVLAN(domain,'NSX Edge TEP','nsx-tep','Edge TEP — separate from Host TEP','Dedicated TEP for Edge','mandatory',scope,wld.edgeNodeCount,`${wld.edgeNodeCount} Edge TEP IPs`,buf,bufPct));
       vlans.push(makeVLAN(domain,'NSX Edge Uplink 1','nsx-edge-uplink1','Edge uplink 1','N-S uplink','mandatory',edgeScope,wld.edgeNodeCount,`${wld.edgeNodeCount} IPs`,buf,bufPct));
       vlans.push(makeVLAN(domain,'NSX Edge Uplink 2','nsx-edge-uplink2','Edge uplink 2','Redundant uplink','mandatory',edgeScope,wld.edgeNodeCount,`${wld.edgeNodeCount} IPs`,buf,bufPct));
-      if(wld.nsxRtepEnabled) vlans.push(makeVLAN(domain,'NSX RTEP (Route TEP)','nsx-rtep','NSX Route TEP — trafic inter-instances NSX (Federation)','NSX Federation RTEP. 1 IP par Edge node fédéré. MTU 9000.','optional','dedicated',wld.edgeNodeCount,`${wld.edgeNodeCount} RTEP IPs. NSX Federation requis.`,buf,bufPct));
     }
   }
   if(wld.aviEnabled)vlans.push(makeVLAN(domain,'AVI VIP Network','avi','AVI VIP pool','VIP pool for AVI load balancer services','scenario-driven','dedicated',32,'Adjust to service count',buf,bufPct));
-  if(wld.vksEnabled){
-    vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 consecutive IPs','Kubernetes Supervisor','scenario-driven','dedicated',5,'5 CONSECUTIVE IPs: 3 control plane + 1 floating + 1 patching',buf,bufPct));
-    if(wld.vksMultiNicEnabled&&project.vcfVersion==='9.1') vlans.push(makeVLAN(domain,'VKS Secondary NIC Network','vks-secondary','VKS Multi-NIC secondary interface (VCF 9.1)','Interface secondaire pour séparation trafic VKS. VCF 9.1 uniquement.','scenario-driven','dedicated',10,'IPs pour secondary NIC VKS workers. MTU 9000.',buf,bufPct));
-  }
+  if(wld.vksEnabled)vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 consecutive IPs','Kubernetes Supervisor','scenario-driven','dedicated',5,'5 CONSECUTIVE IPs: 3 control plane + 1 floating + 1 patching',buf,bufPct));
   wld.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated VLAN for ${svc.name}`,`Service VLAN`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||'',buf,bufPct)));
   return vlans;
 }
@@ -1797,12 +1659,13 @@ function mkApp(name,type,domain,hostingArea,vlan,staticIP,vipReq,fqdnReq,notes){
   return {id:`appliance-${++_appId}`,applianceName:name,applianceType:type,domain,hostingArea,vlan,staticIPRequired:staticIP,vipRequired:vipReq,fqdnRequired:fqdnReq,notes,ipAddress:'',fqdn:''};
 }
 
-function buildManagementAppliances(mgmt,project){
+function buildManagementAppliances(mgmt,project,t=k=>k){
   resetAppCounter();
   const apps=[];
   const domain='Management Domain';
+  const is91=project.vcfVersion==='9.1';
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
-  const _fvn=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':'Fleet Network';
+  const _fvn=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
   const fleetVLAN=fleetDedicated?_fvn:'Management VM Network';
   function platVLAN(req,name){if(req)return name;return fleetDedicated?_fvn:'Management VM Network';}
 
@@ -1811,9 +1674,16 @@ function buildManagementAppliances(mgmt,project){
 
   const nsxCount=mgmt.nsxManagerMode==='clustered'?3:1;
   for(let i=1;i<=nsxCount;i++) apps.push(mkApp(`nsx-manager-mgmt-0${i}`,'NSX Manager',domain,'Management VM Network','Management VM Network',true,i===1&&mgmt.nsxManagerMode==='clustered',true,`NSX Manager node ${i} of ${nsxCount}.`));
-  if(mgmt.nsxManagerMode==='clustered') apps.push(mkApp('nsx-vip-mgmt','NSX Manager VIP',domain,'Management VM Network','Management VM Network',true,false,true,'NSX Manager cluster VIP.'));
+  // C14: VIP obligatoire dans TOUS les modes (Simple + HA) — VCF-NSX-LM-REQD-CFG-002
+  apps.push(mkApp('nsx-vip-mgmt','NSX Manager VIP',domain,'Management VM Network','Management VM Network',true,false,true,mgmt.nsxManagerMode==='clustered'?'NSX Manager cluster VIP — HA mode.':t('app.nsx_vip_simple')));
 
-  apps.push(mkApp('fleet-01','Fleet Appliance',domain,fleetVLAN,fleetVLAN,true,false,true,`Fleet appliance (VCF 9.1 Simple mode). Placement: ${mgmt.fleetPlacement}.`));
+  if(is91){
+    apps.push(mkApp('fleet-01','Fleet Appliance (VCF 9.1)',domain,fleetVLAN,fleetVLAN,true,false,true,t('app.fleet_91',{placement:mgmt.fleetPlacement})));
+    apps.push(mkApp('mgmt-instance-01','VCF Mgmt Services Instance',domain,fleetVLAN,fleetVLAN,true,false,true,t('app.instance_91')));
+    apps.push(mkApp('vcf-svc-runtime','VCF Services Runtime',domain,fleetVLAN,fleetVLAN,true,false,true,t('app.svc_runtime')));
+  } else {
+    apps.push(mkApp('fleet-01','Fleet Appliance (VCF 9.0)',domain,fleetVLAN,fleetVLAN,true,false,true,t('app.fleet_90',{placement:mgmt.fleetPlacement})));
+  }
 
   if(mgmt.nsxEdgeDeployed){
     for(let i=1;i<=mgmt.nsxEdgeNodeCount;i++) apps.push(mkApp(`nsx-edge-mgmt-0${i}`,'NSX Edge Node',domain,'Management VM Network','Management VM Network',true,false,true,`Edge node ${i}: eth0→Mgmt VM Net, TEP→NSX Edge TEP, fp-eth0/1→Uplink 1/2.`));
@@ -1828,16 +1698,25 @@ function buildManagementAppliances(mgmt,project){
     const nc=mgmt.vcfOperations.mode==='enterprise'?3:1;
     for(let i=1;i<=nc;i++) apps.push(mkApp(`vcf-ops-${String(i).padStart(2,'0')}`,nc===1?'VCF Operations Node':i===1?'VCF Operations Master Node':'VCF Operations Replica Node',domain,opsVLAN,opsVLAN,true,false,true,`VCF Operations node ${i}${nc>1?' of '+nc:''}.`));
     if(mgmt.vcfOperations.mode==='enterprise') apps.push(mkApp('vcf-ops-vip','VCF Operations Cluster VIP',domain,opsVLAN,opsVLAN,true,false,true,'Cluster VIP for VCF Operations enterprise mode.'));
-    for(let r=1;r<=mgmt.vcfOperations.remoteCollectorCount;r++) apps.push(mkApp(`vcf-ops-rc-${String(r).padStart(2,'0')}`,'VCF Operations Remote Collector',domain,'Management VM Network','Management VM Network',true,false,true,`Remote Collector ${r} — instance-level, always in Mgmt VM Network.`));
+    for(let r=1;r<=mgmt.vcfOperations.remoteCollectorCount;r++) apps.push(mkApp(`vcf-ops-rc-${String(r).padStart(2,'0')}`,'VCF Operations Remote Collector',domain,'Management VM Network','Management VM Network',true,false,true,t('app.rc_note',{r})));
+    if(mgmt.vcfOperations.cloudProxyEnabled) apps.push(mkApp('vcf-ops-cloud-proxy-01','VCF Operations Cloud Proxy',domain,'Management VM Network','Management VM Network',true,false,true,t('app.cloud_proxy')));
+    if(mgmt.vcfOperations.licenseServerEnabled) apps.push(mkApp('vcf-license-server-01','VCF License Server',domain,'Management VM Network','Management VM Network',true,false,true,t('app.license_server')));
   }
 
   if(mgmt.vcfOperationsForLogs.enabled){
-    const lVLAN=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'VCF Operations for Logs Network');
-    apps.push(mkApp('vcf-logs-master-01','VCF Ops for Logs Master',domain,lVLAN,lVLAN,true,false,true,'Master node.'));
-    if(mgmt.vcfOperationsForLogs.mode==='clustered'){
-      for(let w=1;w<=mgmt.vcfOperationsForLogs.workerCount;w++) apps.push(mkApp(`vcf-logs-worker-${String(w).padStart(2,'0')}`,'VCF Ops for Logs Worker',domain,lVLAN,lVLAN,true,false,true,`Worker node ${w}.`));
-      apps.push(mkApp('vcf-logs-ui-vip','VCF Ops for Logs UI VIP',domain,lVLAN,lVLAN,true,false,true,'UI/API access VIP.'));
-      if(mgmt.vcfOperationsForLogs.integratedLBVIP) apps.push(mkApp('vcf-logs-ilb-vip','VCF Ops for Logs ILB VIP',domain,lVLAN,lVLAN,true,false,true,'ILB VIP for syslog/CFAPI. All log sources must use this VIP.'));
+    if(is91){
+      // C6: 9.1 — Log Management intégré dans VCF Management Services (Aria Ops for Logs 8.18)
+      const lVLAN=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'Log Management Network');
+      apps.push(mkApp('vcf-log-mgmt-01','VCF Log Management',domain,lVLAN,lVLAN,true,false,true,t('app.log_mgmt_91')));
+    } else {
+      // VCF 9.0 — architecture master + workers classique
+      const lVLAN=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'VCF Operations for Logs Network');
+      apps.push(mkApp('vcf-logs-master-01','VCF Ops for Logs Master',domain,lVLAN,lVLAN,true,false,true,'Master node.'));
+      if(mgmt.vcfOperationsForLogs.mode==='clustered'){
+        for(let w=1;w<=mgmt.vcfOperationsForLogs.workerCount;w++) apps.push(mkApp(`vcf-logs-worker-${String(w).padStart(2,'0')}`,'VCF Ops for Logs Worker',domain,lVLAN,lVLAN,true,false,true,`Worker node ${w}.`));
+        apps.push(mkApp('vcf-logs-ui-vip','VCF Ops for Logs UI VIP',domain,lVLAN,lVLAN,true,false,true,'UI/API access VIP.'));
+        if(mgmt.vcfOperationsForLogs.integratedLBVIP) apps.push(mkApp('vcf-logs-ilb-vip','VCF Ops for Logs ILB VIP',domain,lVLAN,lVLAN,true,false,true,'ILB VIP for syslog/CFAPI. All log sources must use this VIP.'));
+      }
     }
   }
 
@@ -1849,23 +1728,40 @@ function buildManagementAppliances(mgmt,project){
 
   if(mgmt.vcfAutomation.enabled){
     const aVLAN=platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
-    const vc=mgmt.vcfAutomation.mode==='clustered'?4:1;
-    for(let v=1;v<=vc;v++){
-      const isUpgrade=mgmt.vcfAutomation.mode==='clustered'&&v===4;
-      apps.push(mkApp(`vcf-auto-va-${String(v).padStart(2,'0')}`,isUpgrade?'VCF Automation VA (upgrade/patching)':mgmt.vcfAutomation.mode==='clustered'?`VCF Automation VA (node ${v} of 3 active)`:'VCF Automation VA',domain,aVLAN,aVLAN,true,false,true,isUpgrade?'Node 4: reserved for upgrade/patching.':`VA node ${v}.`));
-    }
-    if(mgmt.vcfAutomation.mode==='clustered') apps.push(mkApp('vcf-auto-vip','VCF Automation Cluster VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for HA deployment (3 active + 1 upgrade node).'));
-    if(mgmt.vcfAutomation.orchestratorMode==='standalone'){
-      const vrc=mgmt.vcfAutomation.orchestratorNodeCount;
-      for(let r=1;r<=vrc;r++) apps.push(mkApp(`vcf-vro-${String(r).padStart(2,'0')}`,'VCF Automation Orchestrator (vRO)',domain,aVLAN,aVLAN,true,false,true,`Standalone vRO node ${r} of ${vrc}.`));
-      if(vrc>1) apps.push(mkApp('vcf-vro-vip','VCF Automation Orchestrator VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for standalone vRO HA.'));
+    if(is91){
+      // C1: VCF 9.1 — 1 FQDN dédié (endpoint utilisateur/VIP). Nodes /29 sans DNS individuel.
+      apps.push(mkApp('vcf-automation-01','VCF Automation',domain,aVLAN,aVLAN,true,false,true,t('app.auto_91')));
+      // C3: En 9.1, pas de vcf-auto-vip séparé — le FQDN Automation EST le VIP endpoint.
+      if(mgmt.vcfAutomation.orchestratorMode==='standalone'){
+        const vrc=mgmt.vcfAutomation.orchestratorNodeCount;
+        for(let r=1;r<=vrc;r++) apps.push(mkApp(`vcf-vro-${String(r).padStart(2,'0')}`,'VCF Operations Orchestrator (vRO)',domain,aVLAN,aVLAN,true,false,true,`vRO node ${r} of ${vrc} — VM appliance (encore VM-based en 9.1).`));
+        if(vrc>1) apps.push(mkApp('vcf-vro-vip','VCF Operations Orchestrator VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for vRO HA.'));
+      }
+    } else {
+      // VCF 9.0 — VA nodes classiques
+      const vc=mgmt.vcfAutomation.mode==='clustered'?4:1;
+      for(let v=1;v<=vc;v++){
+        const isUpgrade=mgmt.vcfAutomation.mode==='clustered'&&v===4;
+        apps.push(mkApp(`vcf-auto-va-${String(v).padStart(2,'0')}`,isUpgrade?'VCF Automation VA (upgrade/patching)':mgmt.vcfAutomation.mode==='clustered'?`VCF Automation VA (node ${v} of 3 active)`:'VCF Automation VA',domain,aVLAN,aVLAN,true,false,true,isUpgrade?'Node 4: reserved for upgrade/patching.':`VA node ${v}.`));
+      }
+      if(mgmt.vcfAutomation.mode==='clustered') apps.push(mkApp('vcf-auto-vip','VCF Automation Cluster VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for HA deployment (3 active + 1 upgrade node).'));
+      if(mgmt.vcfAutomation.orchestratorMode==='standalone'){
+        const vrc=mgmt.vcfAutomation.orchestratorNodeCount;
+        for(let r=1;r<=vrc;r++) apps.push(mkApp(`vcf-vro-${String(r).padStart(2,'0')}`,'VCF Automation Orchestrator (vRO)',domain,aVLAN,aVLAN,true,false,true,`Standalone vRO node ${r} of ${vrc}.`));
+        if(vrc>1) apps.push(mkApp('vcf-vro-vip','VCF Automation Orchestrator VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for standalone vRO HA.'));
+      }
     }
   }
 
   if(mgmt.vcfIdentityBroker.enabled){
     if(mgmt.vcfIdentityBroker.mode==='embedded'){
-      apps.push(mkApp('vcf-identity-broker-embedded','VCF Identity Broker (Embedded)',domain,'Embedded (vCenter/NSX)','Management VM Network',false,false,false,'Embedded — no dedicated appliance IP.'));
+      apps.push(mkApp('vcf-identity-broker-embedded','VCF Identity Broker (Embedded)',domain,'Embedded (vCenter/NSX)','Management VM Network',false,false,false,t('app.ib_embedded')));
+    } else if(is91){
+      // C5: 9.1 — Identity Broker est un service dans Services Runtime (pas de VMs séparées)
+      const ibVLAN=mgmt.vcfIdentityBroker.requiresDedicatedVLAN?'VCF Identity Broker Network':'Management VM Network';
+      apps.push(mkApp('vcf-identity-broker-01','VCF Identity Broker',domain,ibVLAN,ibVLAN,true,false,true,t('app.ib_91')));
     } else {
+      // VCF 9.0 — VM appliances classiques
       const ibVLAN=mgmt.vcfIdentityBroker.requiresDedicatedVLAN?'VCF Identity Broker Network':'Management VM Network';
       const ibc=mgmt.vcfIdentityBroker.haEnabled?3:1;
       for(let b=1;b<=ibc;b++) apps.push(mkApp(`vcf-identity-broker-${String(b).padStart(2,'0')}`,mgmt.vcfIdentityBroker.haEnabled?`VCF Identity Broker (node ${b} of ${ibc})`:'VCF Identity Broker',domain,ibVLAN,ibVLAN,true,false,true,`Identity Broker appliance ${b}.`));
@@ -1873,20 +1769,7 @@ function buildManagementAppliances(mgmt,project){
     }
   }
 
-  if(mgmt.vcfServicesRuntime?.enabled){
-    const srtCP=mgmt.vcfServicesRuntime.model==='ha'?3:1;
-    const srtW=mgmt.vcfServicesRuntime.workerCount||3;
-    const srtDesc=mgmt.vcfServicesRuntime.isFirstInstance?'Fleet Lifecycle, Salt RaaS, Log Mgmt, SDDC Lifecycle, Telemetry, Salt Master, Identity Broker, Real-time Metrics, Software Depot':'SDDC Lifecycle, Telemetry, Salt Master, Identity Broker, Real-time Metrics, Software Depot';
-    for(let i=1;i<=srtCP;i++) apps.push(mkApp(`vcf-srt-cp-0${i}`,srtCP===1?'VCF Services Runtime — Control Plane':`VCF Services Runtime — Control Plane ${i}`,domain,'Management VM Network','Management VM Network',true,false,true,`K8s control plane node ${i}/${srtCP}. Héberge: ${srtDesc}.`));
-    for(let i=1;i<=srtW;i++) apps.push(mkApp(`vcf-srt-worker-${String(i).padStart(2,'0')}`,`VCF Services Runtime — Worker ${i}`,domain,'Management VM Network','Management VM Network',true,false,true,`K8s worker node ${i}/${srtW}.`));
-    apps.push(mkApp('vcf-srt-license-server','VCF License Server',domain,'Management VM Network','Management VM Network',true,false,true,'License Server — déployé avec VCF Management Services (VCF 9.1). IP hors du runtime IP range.'));
-  }
-
   if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks') apps.push(mkApp('vks-supervisor','VKS Supervisor Cluster',domain,'VKS Infrastructure','VKS Infrastructure',true,false,true,'5 CONSECUTIVE IPs: 3 control plane VMs + 1 floating + 1 patching.'));
-  if(mgmt.vnaEnabled&&project.vcfVersion==='9.1'){
-    apps.push(mkApp('vna-node-01','VNA Node (VCF 9.1)',domain,'VNA Network','VNA Network',true,false,true,'Virtual Network Appliance node 1 — NAT, LB, DHCP pour VPCs distribués.'));
-    apps.push(mkApp('vna-node-02','VNA Node (VCF 9.1)',domain,'VNA Network','VNA Network',true,false,true,'Virtual Network Appliance node 2 — HA pair recommandée.'));
-  }
 
   mgmt.additionalServices.forEach(svc=>{
     const sVLAN=svc.requiresDedicatedVLAN?`${svc.name} Network`:'Management VM Network';
@@ -1897,7 +1780,7 @@ function buildManagementAppliances(mgmt,project){
   return apps;
 }
 
-function buildWorkloadAppliances(wld){
+function buildWorkloadAppliances(wld,t=k=>k){
   const apps=[];
   const domain=wld.domainName;
   apps.push(mkApp(`vcenter-${domain.toLowerCase()}-01`,'vCenter Server',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,`vCenter for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
@@ -1954,13 +1837,6 @@ function buildManagementVIPs(mgmt,project){
   }
   if(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'){const v=mgmt.vcfIdentityBroker.requiresDedicatedVLAN?'VCF Identity Broker Network':'Management VM Network';vips.push(mkVIP('VCF Identity Broker VIP','VCF Identity Broker',domain,v,mgmt.vcfIdentityBroker.haEnabled?'HA VIP for Identity Broker cluster.':'Standalone Identity Broker VIP.'));}
   if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks'){vips.push(mkVIP('VKS Supervisor API VIP','VKS Supervisor',domain,'VKS Infrastructure','Kubernetes API server VIP.'));vips.push(mkVIP('VKS Ingress VIP Pool','VKS Load Balancer',domain,'VKS Infrastructure','NSX ALB VIP pool for VKS workload ingress.'));}
-  if(mgmt.vcfServicesRuntime?.enabled){
-    vips.push(mkVIP('VCF Services Runtime FQDN','VCF Management Services — Runtime',domain,'VCF Services Runtime IP Range','FQDN principal du cluster Services Runtime. Doit résoudre vers une IP hors du runtime IP range. VCF 9.1.'));
-    if(mgmt.vcfServicesRuntime.isFirstInstance) vips.push(mkVIP('VCF Fleet Component FQDN','VCF Management Services — Fleet',domain,'VCF Services Runtime IP Range','FQDN du composant Fleet-level (Fleet Lifecycle, Salt RaaS, Log Management). IP hors runtime range. 1ère instance uniquement.'));
-    vips.push(mkVIP('VCF Instance Component FQDN','VCF Management Services — Instance',domain,'VCF Services Runtime IP Range','FQDN du composant Instance-level (SDDC Lifecycle, Telemetry, Salt Master, Metrics, Software Depot). IP hors runtime range.'));
-    vips.push(mkVIP('VCF Identity Broker FQDN (Runtime)','VCF Management Services — Identity Broker',domain,'Management VM Network','FQDN Identity Broker déployé dans le Services Runtime. IP hors runtime range. VCF 9.1.'));
-    vips.push(mkVIP('VCF License Server FQDN','VCF License Server',domain,'Management VM Network','FQDN du License Server déployé avec VCF Management Services. IP hors runtime range. VCF 9.1.'));
-  }
   mgmt.additionalServices.forEach(svc=>{if(svc.requiresVIP&&svc.vipCount>0){const v=svc.requiresDedicatedVLAN?`${svc.name} Network`:'Management VM Network';for(let i=1;i<=svc.vipCount;i++) vips.push(mkVIP(`${svc.name} VIP ${i}`,svc.name,domain,v,`Service VIP ${i} for ${svc.name}.`));}});
   return vips;
 }
@@ -1979,7 +1855,7 @@ function buildWorkloadVIPs(wld){
 let _valId=0;
 function mkMsg(severity,category,domain,message,resolution){return {id:`val-${++_valId}`,severity,category,domain,message,resolution};}
 
-function runValidation(project,mgmt,workloads,vlans){
+function runValidation(project,mgmt,workloads,vlans,t=k=>k){
   _valId=0;
   const msgs=[];
   const domain='Management Domain';
@@ -1988,11 +1864,11 @@ function runValidation(project,mgmt,workloads,vlans){
   if(!mgmt.fleetPlacement) msgs.push(mkMsg('blocker','vlan',domain,'Fleet placement is undefined.','Select Fleet placement.'));
   if(!mgmt.layer2AdjacencyConfirmed) msgs.push(mkMsg('warning','bring-up',domain,'L2 adjacency for bring-up not confirmed.','Confirm L2 adjacency.'));
   if(mgmt.topologyMode==='vsan-stretched'){
-    msgs.push(mkMsg('warning','bring-up',domain,'vSAN Stretched Cluster : vSAN VMkernel et VM Management Network doivent être L2 sur les 2 sites. Latence inter-sites ≤ 5ms RTT. Witness Host requis.','Vérifier L2, latence et Witness.'));
-    if(!mgmt.layer2AdjacencyConfirmed)msgs.push(mkMsg('blocker','bring-up',domain,'vSAN Stretched : L2 Adjacency non confirmée. La connectivité L2 est obligatoire pour vSAN et le Management Network.','Confirmer L2 adjacency.'));
+    msgs.push(mkMsg('warning','bring-up',domain,t('val.vsan_warn'),t('val.vsan_warn_res')));
+    if(!mgmt.layer2AdjacencyConfirmed)msgs.push(mkMsg('blocker','bring-up',domain,t('val.vsan_l2_block'),t('val.vsan_l2_res')));
   }
   if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,'Stretched topology (vMSC): ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
-  if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,'NSX Overlay Segment sélectionné mais NSX Edge non déployé. Le modèle Overlay Segment requiert un NSX Edge Cluster avec T0/T1.','Activer NSX Edge dans la configuration NSX.'));
+  if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,t('val.overlay_block'),t('val.overlay_res')));
   if((mgmt.vksEnabled||project.scenario==='vcf-automation-vks')&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario',domain,'VKS enabled but NSX Edge not deployed.','Deploy NSX Edge or confirm overlay from WLD NSX.'));
   if(mgmt.aviDeployed&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('info','scenario',domain,'AVI enabled but NSX Edge not deployed. Verify data plane connectivity.','Verify AVI SE network design.'));
   if(mgmt.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',domain,'TEP interfaces per host < 2. Recommend 2 for TEP HA.','Set TEP to 2+.'));
@@ -2000,14 +1876,6 @@ function runValidation(project,mgmt,workloads,vlans){
   if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&!mgmt.vcfOperationsForLogs.integratedLBVIP) msgs.push(mkMsg('warning','vip',domain,'VCF Ops for Logs clustered but ILB VIP disabled. Log sources cannot use a single syslog endpoint.','Enable ILB VIP.'));
   if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&mgmt.vcfOperationsForLogs.workerCount<2) msgs.push(mkMsg('warning','scenario',domain,`VCF Ops for Logs: only ${mgmt.vcfOperationsForLogs.workerCount} worker(s). Min 2 recommended.`,'Set worker count ≥ 2.'));
   if(mgmt.vcfAutomation.enabled&&!mgmt.vcfIdentityBroker.enabled) msgs.push(mkMsg('warning','scenario',domain,'VCF Automation enabled but VCF Identity Broker not configured.','Enable VCF Identity Broker.'));
-  if(mgmt.teamingPolicy==='lacp'&&project.vcfVersion!=='9.1') msgs.push(mkMsg('blocker','nsx',domain,'LACP teaming sélectionné mais VCF 9.0 ne supporte pas LACP sur les hôtes. Passez à VCF 9.1 ou changez la politique de teaming.','Sélectionner Active-Active ou Active-Standby, ou passer à VCF 9.1.'));
-  if(mgmt.networkFabricModel==='evpn-vxlan'&&project.vcfVersion!=='9.1') msgs.push(mkMsg('blocker','nsx',domain,'EVPN-VXLAN Fabric Interoperability nécessite VCF 9.1.','Passer à VCF 9.1 ou sélectionner le modèle Standard.'));
-  if(mgmt.vnaEnabled&&project.vcfVersion!=='9.1') msgs.push(mkMsg('blocker','scenario',domain,'VNA (Virtual Network Appliance) nécessite VCF 9.1.','Passer à VCF 9.1 ou désactiver VNA.'));
-  if(mgmt.vksMultiNicEnabled&&project.vcfVersion!=='9.1') msgs.push(mkMsg('blocker','scenario',domain,'VKS Multi-NIC nécessite VCF 9.1.','Passer à VCF 9.1 ou désactiver Multi-NIC.'));
-  if(mgmt.nsxRtepEnabled&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,'NSX RTEP (Federation) activé mais NSX Edge non déployé. Le RTEP nécessite des Edge nodes fédérés.','Activer NSX Edge ou désactiver NSX Federation/RTEP.'));
-  if(mgmt.vcfServicesRuntime?.enabled&&project.vcfVersion!=='9.1') msgs.push(mkMsg('blocker','scenario',domain,'VCF Management Services (Services Runtime) est disponible uniquement en VCF 9.1.','Passer à VCF 9.1 ou désactiver Services Runtime.'));
-  if(mgmt.vcfServicesRuntime?.enabled&&mgmt.vcfServicesRuntime.model==='simple') msgs.push(mkMsg('warning','scenario',domain,'VCF Services Runtime en mode Simple : la perte du control plane unique nécessite un redéploiement complet + restauration depuis backup.','Utiliser le mode HA pour les environnements de production.'));
-  if(mgmt.vcfServicesRuntime?.enabled&&mgmt.hostCount<4) msgs.push(mkMsg('blocker','bring-up',domain,'VCF Services Runtime nécessite au minimum 4 hôtes ESX dans le Management Domain (1 control plane + 3 workers minimum).','Augmenter le nombre d\'hôtes à 4+.'));
   const bringUpReady=mgmt.hostCount>=4&&mgmt.layer2AdjacencyConfirmed&&mgmt.tepInterfacesPerHost>=2;
   msgs.push(bringUpReady?mkMsg('info','bring-up',domain,'Bring-up readiness check PASSED.'):mkMsg('blocker','bring-up',domain,'Bring-up readiness check FAILED.','Address all blockers before VCF Cloud Builder.'));
 
@@ -2019,9 +1887,6 @@ function runValidation(project,mgmt,workloads,vlans){
     if(wld.vksEnabled&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','scenario',d,`"${d}": VKS enabled but NSX not enabled.`,'Enable NSX.'));
     if(wld.edgeRequired&&wld.edgeNodeCount<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": only 1 Edge node. Min 2 recommended.`,'Increase Edge count.'));
     if(wld.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
-    if(wld.teamingPolicy==='lacp'&&project.vcfVersion!=='9.1') msgs.push(mkMsg('blocker','nsx',d,`"${d}": LACP teaming nécessite VCF 9.1.`,'Passer à VCF 9.1 ou changer la politique de teaming.'));
-    if(wld.nsxRtepEnabled&&!wld.edgeRequired) msgs.push(mkMsg('blocker','nsx',d,`"${d}": NSX RTEP activé mais Edge non requis.`,'Activer NSX Edge ou désactiver NSX Federation/RTEP.'));
-    if(wld.vksMultiNicEnabled&&project.vcfVersion!=='9.1') msgs.push(mkMsg('blocker','scenario',d,`"${d}": VKS Multi-NIC nécessite VCF 9.1.`,'Passer à VCF 9.1 ou désactiver Multi-NIC.'));
   });
 
   const domains=[...new Set(vlans.map(v=>v.domain))];
@@ -2054,9 +1919,6 @@ function buildDomainSummaries(project,mgmt,workloads,vlans,vips){
   if(mgmt.vcfIdentityBroker.enabled)services.push('VCF Identity Broker');
   if(mgmt.aviDeployed)services.push('AVI');
   if(mgmt.vksEnabled)services.push('VKS');
-  if(mgmt.vnaEnabled&&project.vcfVersion==='9.1')services.push('VNA');
-  if(mgmt.networkFabricModel==='evpn-vxlan')services.push('EVPN-VXLAN');
-  if(mgmt.vcfServicesRuntime?.enabled)services.push(`Services Runtime (${mgmt.vcfServicesRuntime.model==='ha'?'HA':'Simple'})`);
   summaries.push({domain:'Management Domain',domainType:'management',hostCount:mgmt.hostCount,enabledServices:services,vlanCount:mgmtVlans.length,totalIPCount:mgmtVlans.reduce((a,v)=>a+v.requiredIPs,0),vipCount:vips.filter(v=>v.domain==='Management Domain').length,notes:`${project.scenario} | ${mgmt.fleetPlacement}`});
   workloads.forEach(wld=>{
     const wVlans=vlans.filter(v=>v.domain===wld.domainName);
@@ -2083,7 +1945,7 @@ function applyHdr(ws,range){
 
 function doExcelExport(state){
   const wb=XLSX.utils.book_new();
-  wb.Props={Title:`VCF ${state.project.vcfVersion||'9.1'} Network Plan — ${state.project.projectName||'Export'}`,Author:`VCF ${state.project.vcfVersion||'9.1'} Network Planner`,CreatedDate:new Date()};
+  wb.Props={Title:`VCF 9 Network Plan — ${state.project.projectName||'Export'}`,Author:'VCF 9 Network Planner',CreatedDate:new Date()};
 
   const ds=[['Domain','Type','Hosts','Services','VLANs','Total IPs','VIPs','Notes'],...state.domainSummaries.map(s=>[xs(s.domain),s.domainType==='management'?'Management':'Workload',s.hostCount,xs(s.enabledServices.join(', ')),s.vlanCount,s.totalIPCount,s.vipCount,xs(s.notes)])];
   const ws1=XLSX.utils.aoa_to_sheet(ds);ws1['!cols']=[32,18,10,40,10,12,8,40].map(colW);applyHdr(ws1,'A1:H1');
@@ -2113,25 +1975,344 @@ function doExcelExport(state){
 function newId(){return 'id-'+Math.random().toString(36).slice(2);}
 
 function defaultWorkloadDomain(index){
-  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,teamingPolicy:'active-active',nsxRtepEnabled:false,vksMultiNicEnabled:false,additionalServices:[],vksVPCs:[],storageType:'vsan-esa',notes:''};
+  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],storageType:'vsan-esa',notes:''};
 }
 
-const DEFAULT_PROJECT={projectName:'',customerName:'',vcfVersion:'9.1',scenario:'vcf-standard',deploymentType:'greenfield',workloadDomainCount:1,subnetBufferEnabled:true,subnetBufferPercent:20,fqdnSuffix:'',fqdnPrefix:''};
-const DEFAULT_MGMT={hostCount:4,nsxManagerMode:'clustered',fleetMode:'standalone',fleetPlacement:'shared-mgmt-vlan',nsxEdgeDeployed:false,nsxEdgeNodeCount:2,aviDeployed:false,vksEnabled:false,tepInterfacesPerHost:2,edgeUplinksDedicated:true,teamingPolicy:'active-active',networkFabricModel:'standard',nsxRtepEnabled:false,vnaEnabled:false,vksMultiNicEnabled:false,additionalServices:[],topologyMode:'single-site',layer2AdjacencyConfirmed:false,storageType:'vsan-esa',vcfOperations:{enabled:true,mode:'enterprise',remoteCollectorCount:2,requiresDedicatedVLAN:false},vcfOperationsForLogs:{enabled:true,mode:'clustered',workerCount:2,integratedLBVIP:true,requiresDedicatedVLAN:false},vcfOperationsForNetworks:{enabled:true,platformNodeCount:1,collectorCount:1,requiresDedicatedVLAN:false},vcfAutomation:{enabled:true,mode:'clustered',orchestratorMode:'embedded',orchestratorNodeCount:1,requiresDedicatedVLAN:false},vcfIdentityBroker:{enabled:true,mode:'appliance',haEnabled:false,requiresDedicatedVLAN:false},vcfServicesRuntime:{enabled:true,model:'simple',workerCount:3,isFirstInstance:true},vksVPCs:[]};
+const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-standard',deploymentType:'greenfield',workloadDomainCount:1,subnetBufferEnabled:true,subnetBufferPercent:20,fqdnSuffix:'',fqdnPrefix:'',vcfVersion:'9.1'};
+const DEFAULT_MGMT={hostCount:4,nsxManagerMode:'clustered',fleetMode:'standalone',fleetPlacement:'shared-mgmt-vlan',nsxEdgeDeployed:false,nsxEdgeNodeCount:2,aviDeployed:false,vksEnabled:false,tepInterfacesPerHost:2,edgeUplinksDedicated:true,additionalServices:[],topologyMode:'single-site',layer2AdjacencyConfirmed:false,storageType:'vsan-esa',vcfOperations:{enabled:true,mode:'enterprise',remoteCollectorCount:2,requiresDedicatedVLAN:false,cloudProxyEnabled:true,licenseServerEnabled:true},vcfOperationsForLogs:{enabled:true,mode:'clustered',workerCount:2,integratedLBVIP:true,requiresDedicatedVLAN:false},vcfOperationsForNetworks:{enabled:true,platformNodeCount:1,collectorCount:1,requiresDedicatedVLAN:false},vcfAutomation:{enabled:true,mode:'clustered',orchestratorMode:'embedded',orchestratorNodeCount:1,requiresDedicatedVLAN:false},vcfIdentityBroker:{enabled:true,mode:'appliance',haEnabled:false,requiresDedicatedVLAN:false},vksVPCs:[]};
+
+// ── TRANSLATIONS ─────────────────────────────────────────────────
+const translations = {
+  fr: {
+    // Topology options
+    'topo.vsan_opt': 'vSAN Stretched Cluster (avec Witness)',
+    'topo.vmsc_opt': 'Stretched (vMSC — stockage non-vSAN)',
+    // Topology descriptions
+    'topo.single': 'Déploiement standard sur un seul site. Tous les hôtes et VLANs sont locaux.',
+    'topo.vsan': `<strong>vSAN Stretched Cluster :</strong> Topologie VCF 9 standard pour les déploiements bi-site avec vSAN comme stockage primaire. Les données sont répliquées synchrone entre les 2 sites. Un hôte Witness tiers assure le quorum.<br><br><strong style="color:#b05000">⚡ Prérequis réseau (Broadcom TechDocs VCF 9)</strong><ul><li><strong>Latence inter-sites (data ↔ data) :</strong> ≤ 5 ms RTT</li><li><strong>Latence data ↔ Witness :</strong> ≤ 200 ms RTT (100 ms one-way recommandé) ; si &gt; 10 hôtes/site : &lt; 100 ms RTT</li><li><strong>Bande passante inter-sites :</strong> 10 Gbps minimum (ESA et OSA)</li><li><strong>Witness :</strong> 2 Mbps par tranche de 1 000 composants vSAN</li></ul><strong style="color:#1a4a8b">🖧 VLANs et L2/L3</strong><ul><li><strong>vSAN VMkernel :</strong> L2 obligatoire entre les 2 sites (même VLAN ID)</li><li><strong>VM Management Network :</strong> L2 étendu sur les 2 sites — même VLAN ID requis</li><li><strong>ESXi Management (vmk0) :</strong> L2 recommandé pour l'automatisation VCF Ops (ajout de serveur)</li><li><strong>vMotion :</strong> L2 recommandé pour conserver les automatismes VCF Ops</li><li><strong>NSX Host TEP :</strong> L3 accepté (BGP/OSPF), L2 recommandé pour simplifier</li><li><strong>NFS (si stockage NFS) :</strong> L2 obligatoire sur les 2 sites</li></ul><strong style="color:#145c2e">✅ Prérequis architecture</strong><ul><li>Nombre d'hôtes <strong>identique</strong> sur chaque site (symétrie obligatoire)</li><li><strong>vSAN Witness Host</strong> requis sur un 3ème site indépendant — ne fait pas tourner de VMs, même version ESXi que les data hosts</li><li>Dans VCF : le cluster Management Domain <strong>doit être étendu en premier</strong> avant tout Workload Domain</li><li>Hôtes DPU (SmartNIC) et hôtes sur subnets mixtes : <strong>non supportés</strong> en stretched</li><li>Mapping vmnic → vDS <strong>identique</strong> entre les 2 zones</li><li>SMP-FT non supporté avec Site Disaster Tolerance ≥ 1</li><li>vSAN ESA et OSA sont tous deux supportés en stretched</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:6px;">Sources : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom — Bandwidth &amp; Latency</a> · <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a></div>`,
+    'topo.vmsc': `<strong>Stretched (vMSC) :</strong> Le cluster est étendu sur 2 sites actifs-actifs avec vSAN Stretched Cluster.<br><br><strong style="color:#b05000">⚡ Prérequis réseau (source : Broadcom TechDocs VCF 9)</strong><ul><li><strong>Latence inter-sites (data ↔ data) :</strong> ≤ 5 ms RTT</li><li><strong>Latence data ↔ Witness :</strong> ≤ 200 ms RTT (100 ms one-way recommandé) ; si &gt; 10 hôtes/site : &lt; 100 ms RTT</li><li><strong>Bande passante inter-sites :</strong> 10 Gbps minimum (ESA et OSA)</li><li><strong>Witness :</strong> 2 Mbps par tranche de 1 000 composants vSAN</li></ul><strong style="color:#1a4a8b">🖧 Prérequis réseau VLANs</strong><ul><li><strong>VM Network (Management VMs) :</strong> L2 étendu sur les 2 sites — même VLAN ID requis</li><li><strong>ESXi Management (vmk0) :</strong> peut être L3 (zone-specific), mais L2 recommandé pour l'automatisation VCF Ops (ajout de serveur)</li><li><strong>vMotion :</strong> L2 recommandé pour conserver les automatismes VCF Ops ; L3 possible mais perte d'automatisation</li><li><strong>vSAN :</strong> L2 obligatoire entre les 2 sites (même VLAN ID)</li><li><strong>NFS (si stockage NFS) :</strong> L2 obligatoire entre ESXi et serveur NFS sur les 2 sites</li><li><strong>NSX Host TEP :</strong> L3 accepté (BGP/OSPF), L2 recommandé pour simplifier la configuration</li></ul><strong style="color:#145c2e">✅ Prérequis architecture vSAN Stretched</strong><ul><li>Nombre d'hôtes <strong>identique</strong> sur chaque site (symétrie obligatoire)</li><li><strong>vSAN Witness Host</strong> requis sur un 3ème site (ou vSAN Witness Appliance) — ne fait pas tourner de VMs, même version ESXi que les data hosts</li><li>Dans VCF : le cluster Management Domain <strong>doit être étendu en premier</strong> avant tout Workload Domain</li><li>Hôtes DPU (SmartNIC) et hôtes sur subnets mixtes : <strong>non supportés</strong> en stretched</li><li>Mapping vmnic → vDS <strong>identique</strong> entre les 2 zones</li><li>SMP-FT non supporté avec Site Disaster Tolerance ≥ 1</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:6px;">Sources : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — Bandwidth &amp; Latency</a> · <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a></div>`,
+    'topo.partial': `<strong>Partially Stretched :</strong> Les composants de management restent sur le site principal. Seuls des hôtes compute sont étendus vers un site secondaire.<ul><li>Les VLANs de management <strong>ne nécessitent pas d'extension L2 complète</strong> — seules les VLANs de la couche compute (ESXi Mgmt secondaire, vMotion compute) doivent être étendues.</li><li>Le site secondaire héberge uniquement des VMs de workload, pas les composants VCF.</li><li>Différent du mode Stretched complet : SDDC Manager, vCenter, NSX Managers restent au site principal.</li></ul>`,
+    // TEP
+    'ui.tep_note': 'Min 2 recommandé (TEP HA actif-actif)',
+    // Storage
+    'storage.nfs_opt': 'NFS (stockage primaire NFS)',
+    'storage.nfs_note': 'NFS : VLAN NFS généré à la place de vSAN. <strong>L2 obligatoire</strong> entre hôtes ESXi et serveur NFS.',
+    'storage.vmfs_note': 'VMFS : datastores sur baie SAN (iSCSI ou FC). Aucun VLAN de stockage VMkernel généré (iSCSI : à configurer manuellement via Additional Services si VLAN dédié requis).',
+    // L2 Adjacency
+    'l2.help': `<strong>L2 Adjacency Confirmed :</strong> Confirme que les VLANs requis pour le bring-up VCF sont accessibles en L2 depuis le SDDC Manager / Cloud Builder :<ul><li><strong>ESXi Management</strong> (vmk0 des hôtes)</li><li><strong>Management VM Network</strong> (SDDC Manager, vCenter, NSX Managers)</li><li><strong>vMotion</strong> (requis par le bring-up pour la validation HA)</li></ul>Ce n'est <em>pas</em> une exigence permanente (le NSX TEP et les uplinks Edge peuvent être L3 en production), mais le bring-up Cloud Builder valide la connectivité L2 initiale.`,
+    // Fleet section titles
+    'fleet.title_91': 'VCF Management Services — Modèle Réseau (VCF 9.1)',
+    'fleet.title_90': 'Fleet & Platform Services Network Model (VCF 9.0)',
+    'fleet.label_91': 'Modèle réseau VCF Management Services',
+    'fleet.label_90': 'Modèle réseau des composants Fleet',
+    // Fleet select options 9.0
+    'fleet.shared_opt_90': '1 — Shared Management VM Network (Day 0, défaut)',
+    'fleet.dedicated_opt_90': '2 — Dedicated Fleet VLAN (Day 2, séparé)',
+    'fleet.nsxvlan_opt_90': '3 — NSX VLAN Segment (segment NSX backé VLAN)',
+    'fleet.nsxoverlay_opt_90': '4 — NSX Overlay Segment (segment NSX overlay, Edge requis)',
+    // Fleet select options 9.1
+    'fleet.shared_opt_91': 'Shared VLAN — VCF Management Shared VLAN Network Model (défaut)',
+    'fleet.dedicated_opt_91': 'Dedicated VLAN — VCF Management Dedicated VLAN Network Model',
+    'fleet.nsxvlan_opt_91': 'NSX VLAN Segment (avancé)',
+    'fleet.nsxoverlay_opt_91': 'NSX Overlay Segment (avancé — NSX Edge requis)',
+    // Fleet model descriptions
+    'fleet.infobox_91': `<div class="text-xs"><strong>VCF Management Services (VCF 9.1)</strong> — FQDNs Day 0 obligatoires, minuscules uniquement (Broadcom TechDocs 9.1) :<ul style="margin:5px 0 0 14px;padding:0;line-height:1.7"><li><strong>Fleet</strong> : 1 FQDN — ex : <span class="tbl-mono">fleet.vcf.domain.local</span></li><li><strong>Instance</strong> : 1 FQDN — ex : <span class="tbl-mono">instance.vcf.domain.local</span></li><li><strong>VCF Services Runtime</strong> : 1 FQDN + bloc IP <strong>/28 min (12 IPs)</strong> — ex : <span class="tbl-mono">svc-runtime.vcf.domain.local</span></li><li><strong>Identity Broker</strong> : 1 FQDN + 1 IP externe — ex : <span class="tbl-mono">idbroker.vcf.domain.local</span></li></ul><div style="margin-top:6px;padding-top:5px;border-top:1px solid #c3d9f0"><strong>Composants Day-N (Services Runtime) :</strong><ul style="margin:4px 0 0 14px;padding:0;line-height:1.7"><li><strong>Log Management</strong> : 1 FQDN (VIP LB) + 6 IPs internes CIDR — ex : <span class="tbl-mono">log-mgmt.vcf.domain.local</span></li><li><strong>Real-time Metrics</strong> : 0 FQDN + 6 IPs internes CIDR (purement interne, auto-déployé)</li></ul></div><div style="margin-top:6px;padding-top:5px;border-top:1px solid #c3d9f0"><strong>VCF Automation</strong> : 1 FQDN propre (ex : <span class="tbl-mono">automation.vcf.domain.local</span>) + 1 FQDN Services Runtime partagé + bloc <strong>/29 (5 IPs)</strong> pour nodes (sans DNS individuel)</div><div style="margin-top:5px">CIDR interne runtime : <strong>198.18.0.0/15</strong> (alternatives si conflit : 240.0.0.0/15 ou 250.0.0.0/15) — C8 : /28 → /27 recommandé si Log Management + Real-time Metrics déployés.</div></div>`,
+    'fleet.shared_desc_90': '<strong>Modèle 1 — Shared Management VM Network :</strong> Fleet et tous les services platform partagent le Management VM Network (port group existant). Déploiement Day 0. Aucun VLAN supplémentaire requis. Simple, recommandé pour les petits déploiements.',
+    'fleet.shared_desc_91': '<strong>VCF Management Shared VLAN Network Model :</strong> Fleet, Instance et Services Runtime nodes partagent le Management VM Network (Day 0, défaut). Aucun VLAN physique supplémentaire requis. Le bloc /28 des runtime nodes est alloué dans le subnet Management VM Network existant.',
+    'fleet.dedicated_desc_90': `<strong>Modèle 2 — Dedicated Fleet VLAN :</strong> Un VLAN dédié est créé pour le Fleet Appliance et les nœuds des services platform (Ops, Logs, Networks, Automation). Les Collectors restent toujours dans le Management VM Network.<ul><li>Configuration Day 2 (post bring-up via API)</li><li>Un VLAN physique supplémentaire est requis et généré dans VLAN Design</li><li>Les collecteurs (Remote Collectors, Proxy VMs) restent dans Management VM Network</li></ul>`,
+    'fleet.dedicated_desc_91': `<strong>VCF Management Dedicated VLAN Network Model :</strong> Un VLAN physique dédié pour les composants VCF Management Services (Fleet, Instance, Services Runtime nodes, Identity Broker endpoint).<ul><li>IPs VLAN dédié — Day 0 : <strong>1 Fleet + 1 Instance + /28 (12 IPs) runtime nodes + 1 Identity Broker = 15 IPs minimum</strong></li><li>IPs VLAN dédié — si VCF Automation activé : <strong>+ /29 (5 IPs) Automation nodes = 20 IPs → /27 recommandé</strong></li><li>CIDR interne Services Runtime : <strong>198.18.0.0/15</strong> (configurable si conflit réseau)</li><li>Configuration Day 2 via SDDC Manager lifecycle API</li><li>Cloud Proxy et Collectors restent dans le Management VM Network</li></ul>`,
+    'fleet.nsxvlan_desc': `<strong>NSX VLAN Segment :</strong> Segment NSX backé par un VLAN physique (VLAN transport zone). Le routage est assuré par le fabric physique.<ul><li>Créer une VLAN transport zone dans le NSX Manager du Management Domain</li><li>Créer un segment NSX sur cette nouvelle transport zone</li><li>Attacher la VLAN transport zone au transport node profile du cluster primary</li><li><strong>NSX Edge non requis</strong> — routage physique</li><li>Pas de NSX Federation ni de stretching overlay possible</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-vlan-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX VLAN Segment</a></div>`,
+    'fleet.nsxoverlay_desc': `<strong>NSX Overlay Segment :</strong> Segment NSX overlay (Geneve). Isolation réseau complète, policies de sécurité dédiées.<ul><li><strong style="color:var(--red)">NSX Edge Cluster obligatoire</strong> — avec Tier-0 et Tier-1 gateways configurés</li><li>BGP requis avec peer ASN et passwords pour la connectivité externe</li><li>NSX Load Balancer disponible pour les composants Fleet/Management Services</li><li>Supporte <strong>NSX Federation</strong> pour le stretching multi-sites (DR)</li><li>Cloud Proxy et Collectors toujours dans le Management VM Network</li><li><strong>Pas de VLAN ID physique</strong> — segment overlay (encapsulation Geneve)</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source : <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-overlay-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX Overlay Segment</a></div>`,
+    'fleet.overlay_warn': '⚠️ <strong>NSX Edge non déployé</strong> — Le modèle NSX Overlay Segment nécessite un NSX Edge Cluster. Activez "NSX Edge Deployed" dans la section NSX Configuration ci-dessus.',
+    // Platform services
+    'platform.intro': '<strong>Réseau des services platform :</strong> Les composants ci-dessous (Ops, Logs, Networks, Automation, Identity Broker) sont déployés sur le réseau configuré dans l\'onglet <em>Management Domain → Fleet &amp; Platform Services Network Model</em> :',
+    'platform.shared_lbl_91': 'VCF Management Shared VLAN Network Model',
+    'platform.shared_lbl_90': 'Shared Management VM Network',
+    'platform.dedicated_lbl_91': 'VCF Management Dedicated VLAN Network Model',
+    'platform.dedicated_lbl_90': 'Dedicated Fleet VLAN',
+    'platform.shared_desc_91': 'Fleet, Instance et Services Runtime partagent le Management VM Network.',
+    'platform.shared_desc_90': 'tous les services platform partagent le Management VM Network.',
+    'platform.dedicated_desc_91': 'Fleet, Instance et Services Runtime nodes déployés sur le VLAN dédié. Cloud Proxy et Collectors restent dans le Management VM Network.',
+    'platform.dedicated_desc_90': 'les nœuds des services platform sont dans le VLAN Fleet Network dédié. Les Collectors restent dans le Management VM Network.',
+    'platform.nsxvlan_desc': 'les services platform sont déployés sur le segment NSX backé VLAN. Les Collectors restent dans le Management VM Network.',
+    'platform.nsxoverlay_desc': 'les services platform sont déployés sur le segment NSX overlay (Geneve). NSX Edge Cluster requis. Les Collectors restent dans le Management VM Network.',
+    // VCF Operations collectors
+    'ops.collectors_91': 'Cloud Proxies (par instance VCF)',
+    'ops.collectors_90': 'Remote Collectors',
+    'ops.collectors_note_91': 'En VCF 9.x, les Remote Collectors sont remplacés par Cloud Proxy. 1 Cloud Proxy par instance VCF additionnelle — toujours dans le Management VM Network.',
+    'ops.collectors_note_90': 'Agents de collecte instance-level — toujours dans le Management VM Network (indépendant du modèle Fleet/Dedicated VLAN).',
+    'ops.additional': 'Composants additionnels',
+    // Log Management
+    'logs.lbl_91': 'VCF Log Management',
+    'logs.lbl_90': 'VCF Operations for Logs',
+    'logs.badge_91': '(Aria Ops for Logs 8.18 — Management Services)',
+    'logs.badge_90': '(formerly vRLI)',
+    'logs.infobox_91': '<div class="text-xs"><strong>VCF 9.1 — Log Management :</strong> Intégré dans VCF Management Services. <strong>1 FQDN</strong> (VIP LB endpoint) + <strong>6 IPs base</strong> internes (CIDR Services Runtime 198.18.0.0/15) + 1–2 IP par réplica supplémentaire. Day-N — déployé via VCF Operations Build. Cloud Proxy par défaut dans chaque workload domain.</div>',
+    // VCF Automation
+    'auto.infobox_91': '<div class="text-xs"><strong>VCF 9.1 :</strong> VCF Automation est une application cloud-native (containers dans Services Runtime). <strong>1 FQDN dédié</strong> (endpoint/VIP utilisateur) + bloc <strong>/29 (5 IPs)</strong> alloué sur le réseau — 3 actifs (HA) ou 1 actif (Simple) + 2 buffer pour redéploiement. Nodes sans DNS records individuels. VCF Services Runtime FQDN partagé.</div>',
+    'auto.simple_91': 'Simple (1 node, /29 block 5 IPs)',
+    'auto.ha_91': 'HA (3 nodes actifs, /29 block 5 IPs)',
+    'auto.simple_90': 'Standalone (1 VA)',
+    'auto.ha_90': 'HA (4 node IPs + 1 VIP)',
+    'auto.ha_note_91': '3 nodes actifs + 2 IPs buffer = /29',
+    'auto.orch_lbl_91': 'Orchestrateur (vRO)',
+    'auto.orch_lbl_90': 'Orchestrator Mode',
+    'auto.vro_standalone': 'Standalone vRO (VM appliance)',
+    // Identity Broker
+    'ib.help_91': 'En VCF 9.1, l\'Identity Broker est un <strong>service containerisé dans VCF Services Runtime</strong> (pas de VMs séparées). 1 FQDN externe obligatoire (minuscules) — ex : <span class="tbl-mono">idbroker.vcf.domain.local</span>. 1 IP externe hors du bloc Services Runtime. HA gérée nativement par Services Runtime — pas de VM séparée.',
+    'ib.runtime_opt_91': 'Services Runtime (recommandé 9.1)',
+    'ib.ha_native': 'HA native — gérée par Services Runtime. 1 IP externe + 1 FQDN uniquement.',
+    // Workload domains
+    'wld.host_note': 'Min 3 pour vSAN FTT=1. Min 2 accepté si stockage NFS primaire.',
+    'wld.role.standard': 'Workloads VMs standard (applicatifs, base de données, etc.). Rôle par défaut.',
+    'wld.role.platform': 'Héberge des services de plateforme VCF (VCF Operations, Automation, etc.) ou des services partagés.',
+    'wld.role.k8s': `<strong>Runtime Kubernetes (VKS Supervisor) :</strong> Ce domaine est dédié à l'hébergement du <strong>VKS Supervisor</strong> — le plan de gestion Kubernetes de VMware. Vous installerez le Supervisor sur ce cluster, puis créerez des namespaces et des clusters de workloads VKS dessus.<ul><li>Activez <strong>VKS Enabled</strong> pour ce domaine.</li><li>NSX + NSX Edge requis pour les réseaux overlay VKS.</li><li>AVI (NSX ALB) recommandé pour le load balancing des VIPs Kubernetes.</li><li>Ce n'est <em>pas</em> un cluster de workloads VMs standard.</li></ul>`,
+    'wld.role.ai': 'Cluster dédié aux workloads IA/ML nécessitant des GPUs (Private AI Foundation). Requiert des hôtes avec GPUs compatibles vGPU.',
+    'wld.role.mixed': 'Domaine mixte — héberge plusieurs types de workloads (VMs + conteneurs + services).',
+    'wld.nfs_opt': 'NFS (stockage primaire NFS)',
+    'wld.nfs_note': 'VLAN NFS généré. L2 obligatoire. Min 2 hôtes possible.',
+    'wld.vmfs_note': 'VMFS sur SAN. Aucun VLAN de stockage VMkernel généré automatiquement.',
+    // Appliances tab
+    'app.fqdn_active': 'Suffixe FQDN actif :',
+    'app.fqdn_editable': '— modifiable dans l\'onglet Overview',
+    'app.prefill': `<strong>Pré-remplissage :</strong> Si vous avez renseigné un CIDR dans l'onglet <strong>VLAN Design</strong> (ex: 10.0.1.0/24), le préfixe réseau (10.0.1.) apparaît en placeholder dans le champ IP. Saisissez uniquement le numéro d'hôte. Le suffixe FQDN est défini dans <strong>Overview → FQDN Suffix</strong>.`,
+    // VIPs tab
+    'vips.cidr_note': 'CIDR renseignés : préfixes IP disponibles en placeholder selon le VLAN du VIP.',
+    // Export tab
+    'export.vlan_note': `<strong>Domain Summary — VLAN Count :</strong> Le compteur VLAN par domaine inclut uniquement les VLANs physiques générés. Dans le Management Domain, les services platform (Ops, Logs, Networks, Automation, Identity Broker) n'ajoutent un VLAN dédié que si "Dedicated VLAN" est activé pour chacun dans l'onglet Platform Services. Sans VLAN dédié, ces services partagent le Management VM Network ou le Fleet Network.`,
+    // About - capabilities
+    'cap.vlans': 'Auto-génère VLANs pour Management &amp; Workload Domains (vSAN ESA/OSA, NFS, VMFS)',
+    'cap.appliances': 'Allocation des appliances avec champs IP/FQDN (SDDC Mgr, vCenter, NSX, AVI, Fleet, VCF Suite)',
+    'cap.vips': 'Inventaire VIPs pour tous les services clusterisés',
+    'cap.validation': 'Moteur de validation architecturale avec sévérité Blocker / Warning / Info',
+    'cap.fleet': '4 modèles réseau Fleet : Shared, Dedicated VLAN, NSX VLAN Segment, NSX Overlay Segment',
+    'cap.topology': 'Topologies : Single-Site, vSAN Stretched Cluster (prérequis Broadcom), Stretched vMSC, Partially Stretched',
+    'cap.excel': 'Export Excel — 5 feuilles (Domain Summary, VLANs, Appliances, VIPs, Validation)',
+    'cap.json': 'JSON save/restore — état complet incluant IPs, FQDNs et VLAN IDs saisis',
+    'cap.auth': 'Authentification Supabase — accès multi-utilisateurs, demande de compte intégrée',
+    // About - version history
+    'ver.140': `Corrections TechDocs 9.1 (revue agents) : C14 NSX Manager VIP obligatoire en mode Simple (VCF-NSX-LM-REQD-CFG-002) ; C1 FQDN VCF Automation propre (9.1) ; C2 VCF Automation /29 toujours 5 IPs en 9.1 (Simple + HA) ; C3 pas de vcf-auto-vip séparé en 9.1 (FQDN = VIP) ; C4/C5 Identity Broker 9.1 = 1 IP externe (service Services Runtime, pas de VMs séparées) ; C6 Log Management 9.1 (1 FQDN VIP + 6 IPs internes CIDR) remplace architecture master+workers ; C7 Real-time Metrics 9.1 documenté (0 FQDN, 6 IPs CIDR interne, Day-N) ; C8 info /28→/27 dynamique ; C9 HA Identity Broker masqué en 9.1 ; C10 labels VCF Automation adaptés 9.1 ; C11 Remote Collectors → Cloud Proxies 9.x ; C12 LB VIP optionnel noté.`,
+    'ver.130': `VCF 9.0 / 9.1 dual support : sélecteur VCF Version (Overview) ; VCF Management Services (VCF 9.1) — 4 FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker) + bloc IP /28-/27 + CIDR interne 198.18.0.0/15 ; 2 modèles réseau VCF 9.1 (Shared VLAN / Dedicated VLAN) avec terminologie officielle Broadcom TechDocs ; Cloud Proxy et License Server ajoutés comme appliances dédiées avec FQDN (basé TechDocs 9.1) ; IP count Management VM Network mis à jour (Cloud Proxy, License Server, 14 IPs 9.1 shared runtime) ; VLAN dédié 9.1 → 14 IPs min (Fleet + Instance + /28 runtime nodes).`,
+    'ver.110': `UX &amp; features: explications Topology Mode (vSAN Stretched, Partially Stretched, vMSC), L2 Adjacency, Remote Collectors (≠ Cloud Proxy), Domain Roles (Runtime Kubernetes), Storage Type (NFS / VMFS / vSAN), NSX Overlay/VLAN Segment Fleet model, prérequis vSAN Stretched (Broadcom TechDocs), suppression Dedicated VLAN par service, indicateur Fleet dans Platform Services, FQDN Suffix/Prefix, IP prefix depuis CIDR VLAN, Identity Broker Embedded → N/A, Host Count min 2 (NFS), demande d'accès via modale Supabase+EmailJS, 2 Remote Collectors par défaut.`,
+    // JS engine notes (French)
+    'vlan.nfs_vmk_desc': 'VMkernel portgroup pour le trafic NFS — L2 obligatoire',
+    'vlan.nfs_notes_mgmt': '{n} vmk IPs (NFS, 1 par hôte). L2 obligatoire. VLAN dédié fortement recommandé. En mode Stretched, ce VLAN doit être étendu L2 sur les 2 sites.',
+    'vlan.nfs_notes_wld': '{n} vmk IPs (NFS). L2 obligatoire. Avec stockage NFS, min 2 hôtes accepté (pas de contrainte vSAN FTT).',
+    'vlan.fleet_platform_purpose': 'Fleet-level platform network (modèle: {placement})',
+    'vlan.fleet_note_overlay': ' — Segment NSX Overlay (pas de VLAN ID physique, encapsulation Geneve)',
+    'vlan.fleet_note_vlan': ' — Segment NSX VLAN (VLAN transport zone NSX)',
+    'vlan.collectors_always_mgmt': 'Collectors always in Mgmt VM Network',
+    'app.nsx_vip_simple': 'NSX Manager VIP — Simple mode. Obligatoire même en 1 node (prépare future expansion, req. VCF-NSX-LM-REQD-CFG-002).',
+    'app.fleet_91': 'VCF Management Services — Fleet component. 1 FQDN requis (minuscules). Placement: {placement}.',
+    'app.instance_91': 'VCF Management Services — Instance component (nouveau VCF 9.1). 1 FQDN requis (minuscules) — ex : instance.vcf.domain.local.',
+    'app.svc_runtime': 'VCF Management Services — Services Runtime (nouveau VCF 9.1). 1 FQDN requis (minuscules) — ex : svc-runtime.vcf.domain.local. Bloc IP /28 (12 IPs min) à /27 (30 IPs max). CIDR interne : 198.18.0.0/15. Partagé avec VCF Automation.',
+    'app.fleet_90': 'Fleet appliance (VCF 9.0). 1 FQDN requis. Placement: {placement}.',
+    'app.rc_note': 'Remote Collector {r} — instance-level, toujours dans Management VM Network.',
+    'app.cloud_proxy': 'Cloud Proxy — 1 FQDN requis (minuscules) — ex : vcf-ops-proxy.vcf.domain.local. Connectivité cloud VCF Operations / VCFA.',
+    'app.license_server': 'License Server — 1 FQDN requis (minuscules) — ex : vcf-license.vcf.domain.local.',
+    'app.log_mgmt_91': 'Log Management (VCF 9.1) — Aria Operations for Logs 8.18 intégré dans VCF Management Services. 1 FQDN requis (minuscules) — ex : log-mgmt.vcf.domain.local. 1 IP externe (VIP LB endpoint sur réseau management). 6 IPs base internes (CIDR Services Runtime 198.18.0.0/15). Day-N — déployé via VCF Operations Build.',
+    'app.auto_91': 'VCF Automation (9.1) — 1 FQDN requis (minuscules) — ex : automation.vcf.domain.local. Endpoint utilisateur (VIP LB). Application cloud-native dans Services Runtime. Bloc /29 (5 IPs) alloué sur le réseau pour les nodes (3 actifs en HA / 1 en Simple + 2 buffer) — nodes sans DNS individuel. VCF Services Runtime FQDN partagé.',
+    'app.ib_embedded': "Embedded dans vCenter — lab/POC uniquement. Pas d'IP dédiée. Non recommandé en production.",
+    'app.ib_91': 'Identity Broker (VCF 9.1) — service containerisé dans VCF Services Runtime. 1 FQDN externe requis (minuscules) — ex : idbroker.vcf.domain.local. 1 IP externe (hors bloc Services Runtime /28-/27). HA gérée nativement par Services Runtime — pas de VM séparée.',
+    // Validation messages
+    'val.vsan_warn': 'vSAN Stretched Cluster : vSAN VMkernel et VM Management Network doivent être L2 sur les 2 sites. Latence inter-sites ≤ 5ms RTT. Witness Host requis.',
+    'val.vsan_warn_res': 'Vérifier L2, latence et Witness.',
+    'val.vsan_l2_block': 'vSAN Stretched : L2 Adjacency non confirmée. La connectivité L2 est obligatoire pour vSAN et le Management Network.',
+    'val.vsan_l2_res': 'Confirmer L2 adjacency.',
+    'val.overlay_block': 'NSX Overlay Segment sélectionné mais NSX Edge non déployé. Le modèle Overlay Segment requiert un NSX Edge Cluster avec T0/T1.',
+    'val.overlay_res': 'Activer NSX Edge dans la configuration NSX.',
+  },
+  en: {
+    // Topology options
+    'topo.vsan_opt': 'vSAN Stretched Cluster (with Witness)',
+    'topo.vmsc_opt': 'Stretched (vMSC — non-vSAN storage)',
+    // Topology descriptions
+    'topo.single': 'Standard single-site deployment. All hosts and VLANs are local.',
+    'topo.vsan': `<strong>vSAN Stretched Cluster:</strong> Standard VCF 9 topology for dual-site deployments with vSAN as primary storage. Data is synchronously replicated between the 2 sites. A third-site Witness host ensures quorum.<br><br><strong style="color:#b05000">⚡ Network Prerequisites (Broadcom TechDocs VCF 9)</strong><ul><li><strong>Inter-site latency (data ↔ data):</strong> ≤ 5 ms RTT</li><li><strong>Data ↔ Witness latency:</strong> ≤ 200 ms RTT (100 ms one-way recommended); if &gt; 10 hosts/site: &lt; 100 ms RTT</li><li><strong>Inter-site bandwidth:</strong> 10 Gbps minimum (ESA and OSA)</li><li><strong>Witness:</strong> 2 Mbps per 1,000 vSAN components</li></ul><strong style="color:#1a4a8b">🖧 VLANs and L2/L3</strong><ul><li><strong>vSAN VMkernel:</strong> L2 mandatory between both sites (same VLAN ID)</li><li><strong>VM Management Network:</strong> L2 extended across both sites — same VLAN ID required</li><li><strong>ESXi Management (vmk0):</strong> L2 recommended for VCF Ops automation (host add)</li><li><strong>vMotion:</strong> L2 recommended to preserve VCF Ops automation</li><li><strong>NSX Host TEP:</strong> L3 accepted (BGP/OSPF), L2 recommended for simplicity</li><li><strong>NFS (if NFS storage):</strong> L2 mandatory on both sites</li></ul><strong style="color:#145c2e">✅ Architecture Prerequisites</strong><ul><li><strong>Identical</strong> host count on each site (symmetry mandatory)</li><li><strong>vSAN Witness Host</strong> required on a 3rd independent site — no VMs, same ESXi version as data hosts</li><li>In VCF: the Management Domain cluster <strong>must be stretched first</strong> before any Workload Domain</li><li>DPU (SmartNIC) hosts and hosts on mixed subnets: <strong>not supported</strong> in stretched</li><li>vmnic → vDS mapping <strong>identical</strong> between both sites</li><li>SMP-FT not supported with Site Disaster Tolerance ≥ 1</li><li>vSAN ESA and OSA are both supported in stretched</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:6px;">Sources: <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom — Bandwidth &amp; Latency</a> · <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a></div>`,
+    'topo.vmsc': `<strong>Stretched (vMSC):</strong> The cluster is extended across 2 active-active sites with vSAN Stretched Cluster.<br><br><strong style="color:#b05000">⚡ Network Prerequisites (source: Broadcom TechDocs VCF 9)</strong><ul><li><strong>Inter-site latency (data ↔ data):</strong> ≤ 5 ms RTT</li><li><strong>Data ↔ Witness latency:</strong> ≤ 200 ms RTT (100 ms one-way recommended); if &gt; 10 hosts/site: &lt; 100 ms RTT</li><li><strong>Inter-site bandwidth:</strong> 10 Gbps minimum (ESA and OSA)</li><li><strong>Witness:</strong> 2 Mbps per 1,000 vSAN components</li></ul><strong style="color:#1a4a8b">🖧 VLAN Network Prerequisites</strong><ul><li><strong>VM Network (Management VMs):</strong> L2 extended across both sites — same VLAN ID required</li><li><strong>ESXi Management (vmk0):</strong> can be L3 (zone-specific), but L2 recommended for VCF Ops automation (host add)</li><li><strong>vMotion:</strong> L2 recommended to preserve VCF Ops automation; L3 possible but automation lost</li><li><strong>vSAN:</strong> L2 mandatory between both sites (same VLAN ID)</li><li><strong>NFS (if NFS storage):</strong> L2 mandatory between ESXi and NFS server on both sites</li><li><strong>NSX Host TEP:</strong> L3 accepted (BGP/OSPF), L2 recommended for simpler configuration</li></ul><strong style="color:#145c2e">✅ vSAN Stretched Architecture Prerequisites</strong><ul><li><strong>Identical</strong> host count on each site (symmetry mandatory)</li><li><strong>vSAN Witness Host</strong> required on a 3rd site (or vSAN Witness Appliance) — no VMs, same ESXi version as data hosts</li><li>In VCF: the Management Domain cluster <strong>must be stretched first</strong> before any Workload Domain</li><li>DPU (SmartNIC) hosts and hosts on mixed subnets: <strong>not supported</strong> in stretched</li><li>vmnic → vDS mapping <strong>identical</strong> between both sites</li><li>SMP-FT not supported with Site Disaster Tolerance ≥ 1</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:6px;">Sources: <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/vsan-deployment-administration-and-monitoring/vsan-network-design/understanding-vsan-networking/network-requirements-for-vsan/bandwidth-and-latency-requirements.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — Bandwidth &amp; Latency</a> · <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/design/design-library/storage-models(1)/standard-vsan-storage-model/stretched-cluster-storage-models/vsan-stretched-cluster-network-requirements.html" target="_blank" style="color:#1e6abf">vSAN Stretched Network Requirements</a></div>`,
+    'topo.partial': `<strong>Partially Stretched:</strong> Management components remain on the primary site. Only compute hosts are extended to a secondary site.<ul><li>Management VLANs <strong>do not require full L2 extension</strong> — only compute-layer VLANs (secondary ESXi Mgmt, compute vMotion) need to be extended.</li><li>The secondary site hosts only workload VMs, not VCF components.</li><li>Different from full Stretched mode: SDDC Manager, vCenter, NSX Managers stay on the primary site.</li></ul>`,
+    // TEP
+    'ui.tep_note': 'Min 2 recommended (TEP active-active HA)',
+    // Storage
+    'storage.nfs_opt': 'NFS (primary NFS storage)',
+    'storage.nfs_note': 'NFS: NFS VLAN generated instead of vSAN. <strong>L2 mandatory</strong> between ESXi hosts and NFS server.',
+    'storage.vmfs_note': 'VMFS: datastores on SAN array (iSCSI or FC). No storage VMkernel VLAN generated (iSCSI: configure manually via Additional Services if dedicated VLAN required).',
+    // L2 Adjacency
+    'l2.help': `<strong>L2 Adjacency Confirmed:</strong> Confirms that the VLANs required for VCF bring-up are L2 accessible from the SDDC Manager / Cloud Builder:<ul><li><strong>ESXi Management</strong> (hosts vmk0)</li><li><strong>Management VM Network</strong> (SDDC Manager, vCenter, NSX Managers)</li><li><strong>vMotion</strong> (required by bring-up for HA validation)</li></ul>This is <em>not</em> a permanent requirement (NSX TEP and Edge uplinks can be L3 in production), but the Cloud Builder bring-up validates initial L2 connectivity.`,
+    // Fleet section titles
+    'fleet.title_91': 'VCF Management Services — Network Model (VCF 9.1)',
+    'fleet.title_90': 'Fleet & Platform Services Network Model (VCF 9.0)',
+    'fleet.label_91': 'VCF Management Services network model',
+    'fleet.label_90': 'Fleet components network model',
+    // Fleet select options 9.0
+    'fleet.shared_opt_90': '1 — Shared Management VM Network (Day 0, default)',
+    'fleet.dedicated_opt_90': '2 — Dedicated Fleet VLAN (Day 2, separate)',
+    'fleet.nsxvlan_opt_90': '3 — NSX VLAN Segment (NSX VLAN-backed segment)',
+    'fleet.nsxoverlay_opt_90': '4 — NSX Overlay Segment (NSX overlay segment, Edge required)',
+    // Fleet select options 9.1
+    'fleet.shared_opt_91': 'Shared VLAN — VCF Management Shared VLAN Network Model (default)',
+    'fleet.dedicated_opt_91': 'Dedicated VLAN — VCF Management Dedicated VLAN Network Model',
+    'fleet.nsxvlan_opt_91': 'NSX VLAN Segment (advanced)',
+    'fleet.nsxoverlay_opt_91': 'NSX Overlay Segment (advanced — NSX Edge required)',
+    // Fleet model descriptions
+    'fleet.infobox_91': `<div class="text-xs"><strong>VCF Management Services (VCF 9.1)</strong> — Day 0 mandatory FQDNs, lowercase only (Broadcom TechDocs 9.1):<ul style="margin:5px 0 0 14px;padding:0;line-height:1.7"><li><strong>Fleet</strong>: 1 FQDN — e.g.: <span class="tbl-mono">fleet.vcf.domain.local</span></li><li><strong>Instance</strong>: 1 FQDN — e.g.: <span class="tbl-mono">instance.vcf.domain.local</span></li><li><strong>VCF Services Runtime</strong>: 1 FQDN + <strong>/28 min (12 IPs)</strong> IP block — e.g.: <span class="tbl-mono">svc-runtime.vcf.domain.local</span></li><li><strong>Identity Broker</strong>: 1 FQDN + 1 external IP — e.g.: <span class="tbl-mono">idbroker.vcf.domain.local</span></li></ul><div style="margin-top:6px;padding-top:5px;border-top:1px solid #c3d9f0"><strong>Day-N Components (Services Runtime):</strong><ul style="margin:4px 0 0 14px;padding:0;line-height:1.7"><li><strong>Log Management</strong>: 1 FQDN (LB VIP) + 6 internal CIDR IPs — e.g.: <span class="tbl-mono">log-mgmt.vcf.domain.local</span></li><li><strong>Real-time Metrics</strong>: 0 FQDN + 6 internal CIDR IPs (purely internal, auto-deployed)</li></ul></div><div style="margin-top:6px;padding-top:5px;border-top:1px solid #c3d9f0"><strong>VCF Automation</strong>: 1 dedicated FQDN (e.g.: <span class="tbl-mono">automation.vcf.domain.local</span>) + 1 shared Services Runtime FQDN + <strong>/29 (5 IPs)</strong> block for nodes (no individual DNS)</div><div style="margin-top:5px">Internal runtime CIDR: <strong>198.18.0.0/15</strong> (alternatives if conflict: 240.0.0.0/15 or 250.0.0.0/15) — C8: /28 → /27 recommended if Log Management + Real-time Metrics deployed.</div></div>`,
+    'fleet.shared_desc_90': '<strong>Model 1 — Shared Management VM Network:</strong> Fleet and all platform services share the Management VM Network (existing port group). Day 0 deployment. No additional VLAN required. Simple, recommended for small deployments.',
+    'fleet.shared_desc_91': '<strong>VCF Management Shared VLAN Network Model:</strong> Fleet, Instance and Services Runtime nodes share the Management VM Network (Day 0, default). No additional physical VLAN required. The /28 block for runtime nodes is allocated within the existing Management VM Network subnet.',
+    'fleet.dedicated_desc_90': `<strong>Model 2 — Dedicated Fleet VLAN:</strong> A dedicated VLAN is created for the Fleet Appliance and platform service nodes (Ops, Logs, Networks, Automation). Collectors always remain in the Management VM Network.<ul><li>Day 2 configuration (post bring-up via API)</li><li>One additional physical VLAN required — generated in VLAN Design</li><li>Remote Collectors and Proxy VMs remain in Management VM Network</li></ul>`,
+    'fleet.dedicated_desc_91': `<strong>VCF Management Dedicated VLAN Network Model:</strong> A dedicated physical VLAN for VCF Management Services components (Fleet, Instance, Services Runtime nodes, Identity Broker endpoint).<ul><li>Dedicated VLAN IPs — Day 0: <strong>1 Fleet + 1 Instance + /28 (12 IPs) runtime nodes + 1 Identity Broker = minimum 15 IPs</strong></li><li>Dedicated VLAN IPs — if VCF Automation enabled: <strong>+ /29 (5 IPs) Automation nodes = 20 IPs → /27 recommended</strong></li><li>Services Runtime internal CIDR: <strong>198.18.0.0/15</strong> (configurable if network conflict)</li><li>Day 2 configuration via SDDC Manager lifecycle API</li><li>Cloud Proxy and Collectors remain in Management VM Network</li></ul>`,
+    'fleet.nsxvlan_desc': `<strong>NSX VLAN Segment:</strong> NSX segment backed by a physical VLAN (VLAN transport zone). Routing is handled by the physical fabric.<ul><li>Create a VLAN transport zone in the Management Domain NSX Manager</li><li>Create an NSX segment on this new transport zone</li><li>Attach the VLAN transport zone to the primary cluster transport node profile</li><li><strong>NSX Edge not required</strong> — physical routing</li><li>No NSX Federation or overlay stretching possible</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source: <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-vlan-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX VLAN Segment</a></div>`,
+    'fleet.nsxoverlay_desc': `<strong>NSX Overlay Segment:</strong> NSX overlay segment (Geneve). Full network isolation, dedicated security policies.<ul><li><strong style="color:var(--red)">NSX Edge Cluster mandatory</strong> — with Tier-0 and Tier-1 gateways configured</li><li>BGP required with peer ASN and passwords for external connectivity</li><li>NSX Load Balancer available for Fleet/Management Services components</li><li>Supports <strong>NSX Federation</strong> for multi-site stretching (DR)</li><li>Cloud Proxy and Collectors always in Management VM Network</li><li><strong>No physical VLAN ID</strong> — overlay segment (Geneve encapsulation)</li></ul><div style="font-size:10px;color:#7a8fa8;margin-top:4px;">Source: <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/deployment/deploying-a-new-vmware-cloud-foundation-or-vmware-vsphere-foundation-private-cloud-/manual-deployment-and-configuration-of-components-for-advanced-architectures/deploying-vcf-management-components-with-custom-networking/deploy-vcf-management-components-on-an-nsx-overlay-segment.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — NSX Overlay Segment</a></div>`,
+    'fleet.overlay_warn': '⚠️ <strong>NSX Edge not deployed</strong> — The NSX Overlay Segment model requires an NSX Edge Cluster. Enable "NSX Edge Deployed" in the NSX Configuration section above.',
+    // Platform services
+    'platform.intro': '<strong>Platform services network:</strong> The components below (Ops, Logs, Networks, Automation, Identity Broker) are deployed on the network configured in the <em>Management Domain → Fleet &amp; Platform Services Network Model</em> tab:',
+    'platform.shared_lbl_91': 'VCF Management Shared VLAN Network Model',
+    'platform.shared_lbl_90': 'Shared Management VM Network',
+    'platform.dedicated_lbl_91': 'VCF Management Dedicated VLAN Network Model',
+    'platform.dedicated_lbl_90': 'Dedicated Fleet VLAN',
+    'platform.shared_desc_91': 'Fleet, Instance and Services Runtime share the Management VM Network.',
+    'platform.shared_desc_90': 'all platform services share the Management VM Network.',
+    'platform.dedicated_desc_91': 'Fleet, Instance and Services Runtime nodes deployed on the dedicated VLAN. Cloud Proxy and Collectors remain in Management VM Network.',
+    'platform.dedicated_desc_90': 'platform service nodes are in the dedicated Fleet Network VLAN. Collectors remain in Management VM Network.',
+    'platform.nsxvlan_desc': 'platform services are deployed on the NSX VLAN-backed segment. Collectors remain in Management VM Network.',
+    'platform.nsxoverlay_desc': 'platform services are deployed on the NSX overlay segment (Geneve). NSX Edge Cluster required. Collectors remain in Management VM Network.',
+    // VCF Operations collectors
+    'ops.collectors_91': 'Cloud Proxies (per VCF instance)',
+    'ops.collectors_90': 'Remote Collectors',
+    'ops.collectors_note_91': 'In VCF 9.x, Remote Collectors are replaced by Cloud Proxy. 1 Cloud Proxy per additional VCF instance — always in the Management VM Network.',
+    'ops.collectors_note_90': 'Instance-level collection agents — always in the Management VM Network (independent of the Fleet/Dedicated VLAN model).',
+    'ops.additional': 'Additional components',
+    // Log Management
+    'logs.lbl_91': 'VCF Log Management',
+    'logs.lbl_90': 'VCF Operations for Logs',
+    'logs.badge_91': '(Aria Ops for Logs 8.18 — Management Services)',
+    'logs.badge_90': '(formerly vRLI)',
+    'logs.infobox_91': '<div class="text-xs"><strong>VCF 9.1 — Log Management:</strong> Integrated into VCF Management Services. <strong>1 FQDN</strong> (VIP LB endpoint) + <strong>6 base internal IPs</strong> (Services Runtime CIDR 198.18.0.0/15) + 1–2 IPs per additional replica. Day-N — deployed via VCF Operations Build. Cloud Proxy by default in each workload domain.</div>',
+    // VCF Automation
+    'auto.infobox_91': '<div class="text-xs"><strong>VCF 9.1:</strong> VCF Automation is a cloud-native application (containers in Services Runtime). <strong>1 dedicated FQDN</strong> (user endpoint/VIP) + <strong>/29 (5 IPs)</strong> block allocated on the network — 3 active (HA) or 1 active (Simple) + 2 buffer for redeployment. Nodes without individual DNS records. VCF Services Runtime FQDN shared.</div>',
+    'auto.simple_91': 'Simple (1 node, /29 block 5 IPs)',
+    'auto.ha_91': 'HA (3 active nodes, /29 block 5 IPs)',
+    'auto.simple_90': 'Standalone (1 VA)',
+    'auto.ha_90': 'HA (4 node IPs + 1 VIP)',
+    'auto.ha_note_91': '3 active nodes + 2 IPs buffer = /29',
+    'auto.orch_lbl_91': 'Orchestrator (vRO)',
+    'auto.orch_lbl_90': 'Orchestrator Mode',
+    'auto.vro_standalone': 'Standalone vRO (VM appliance)',
+    // Identity Broker
+    'ib.help_91': 'In VCF 9.1, the Identity Broker is a <strong>containerized service within VCF Services Runtime</strong> (no separate VMs). 1 mandatory external FQDN (lowercase) — e.g.: <span class="tbl-mono">idbroker.vcf.domain.local</span>. 1 external IP outside the Services Runtime block. HA natively managed by Services Runtime — no separate VM.',
+    'ib.runtime_opt_91': 'Services Runtime (recommended 9.1)',
+    'ib.ha_native': 'Native HA — managed by Services Runtime. 1 external IP + 1 FQDN only.',
+    // Workload domains
+    'wld.host_note': 'Min 3 for vSAN FTT=1. Min 2 accepted if NFS is primary storage.',
+    'wld.role.standard': 'Standard VM workloads (applications, databases, etc.). Default role.',
+    'wld.role.platform': 'Hosts VCF platform services (VCF Operations, Automation, etc.) or shared services.',
+    'wld.role.k8s': `<strong>Runtime Kubernetes (VKS Supervisor):</strong> This domain is dedicated to hosting the <strong>VKS Supervisor</strong> — VMware's Kubernetes management plane. You will install the Supervisor on this cluster, then create VKS namespaces and workload clusters on it.<ul><li>Enable <strong>VKS Enabled</strong> for this domain.</li><li>NSX + NSX Edge required for VKS overlay networks.</li><li>AVI (NSX ALB) recommended for Kubernetes VIP load balancing.</li><li>This is <em>not</em> a standard VM workloads cluster.</li></ul>`,
+    'wld.role.ai': 'Cluster dedicated to AI/ML workloads requiring GPUs (Private AI Foundation). Requires hosts with vGPU-compatible GPUs.',
+    'wld.role.mixed': 'Mixed domain — hosts multiple workload types (VMs + containers + services).',
+    'wld.nfs_opt': 'NFS (primary NFS storage)',
+    'wld.nfs_note': 'NFS VLAN generated. L2 mandatory. Min 2 hosts possible.',
+    'wld.vmfs_note': 'VMFS on SAN. No storage VMkernel VLAN generated automatically.',
+    // Appliances tab
+    'app.fqdn_active': 'Active FQDN suffix:',
+    'app.fqdn_editable': '— editable in the Overview tab',
+    'app.prefill': `<strong>Pre-fill:</strong> If you entered a CIDR in the <strong>VLAN Design</strong> tab (e.g.: 10.0.1.0/24), the network prefix (10.0.1.) appears as a placeholder in the IP field. Enter only the host number. The FQDN suffix is defined in <strong>Overview → FQDN Suffix</strong>.`,
+    // VIPs tab
+    'vips.cidr_note': 'CIDRs filled in: IP prefixes available as placeholder based on the VIP VLAN.',
+    // Export tab
+    'export.vlan_note': `<strong>Domain Summary — VLAN Count:</strong> The per-domain VLAN counter includes only the generated physical VLANs. In the Management Domain, platform services (Ops, Logs, Networks, Automation, Identity Broker) only add a dedicated VLAN if "Dedicated VLAN" is enabled for each in the Platform Services tab. Without a dedicated VLAN, these services share the Management VM Network or Fleet Network.`,
+    // About - capabilities
+    'cap.vlans': 'Auto-generates VLANs for Management &amp; Workload Domains (vSAN ESA/OSA, NFS, VMFS)',
+    'cap.appliances': 'Appliance allocation with IP/FQDN fields (SDDC Mgr, vCenter, NSX, AVI, Fleet, VCF Suite)',
+    'cap.vips': 'VIP inventory for all clustered services',
+    'cap.validation': 'Architectural validation engine with Blocker / Warning / Info severity',
+    'cap.fleet': '4 Fleet network models: Shared, Dedicated VLAN, NSX VLAN Segment, NSX Overlay Segment',
+    'cap.topology': 'Topologies: Single-Site, vSAN Stretched Cluster (Broadcom prerequisites), Stretched vMSC, Partially Stretched',
+    'cap.excel': 'Excel Export — 5 sheets (Domain Summary, VLANs, Appliances, VIPs, Validation)',
+    'cap.json': 'JSON save/restore — complete state including IPs, FQDNs and entered VLAN IDs',
+    'cap.auth': 'Supabase Authentication — multi-user access, integrated account request',
+    // About - version history
+    'ver.140': `TechDocs 9.1 corrections (agent-reviewed): C14 NSX Manager VIP mandatory in Simple mode (VCF-NSX-LM-REQD-CFG-002); C1 dedicated VCF Automation FQDN (9.1); C2 VCF Automation /29 always 5 IPs in 9.1 (Simple + HA); C3 no separate vcf-auto-vip in 9.1 (FQDN = VIP); C4/C5 Identity Broker 9.1 = 1 external IP (Services Runtime service, no separate VMs); C6 Log Management 9.1 (1 FQDN VIP + 6 internal CIDR IPs) replaces master+workers architecture; C7 Real-time Metrics 9.1 documented (0 FQDN, 6 internal CIDR IPs, Day-N); C8 dynamic /28→/27 info; C9 Identity Broker HA hidden in 9.1; C10 adapted VCF Automation labels for 9.1; C11 Remote Collectors → Cloud Proxies 9.x; C12 optional LB VIP noted.`,
+    'ver.130': `VCF 9.0/9.1 dual support: VCF Version selector (Overview); VCF Management Services (VCF 9.1) — 4 FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker) + /28-/27 IP block + 198.18.0.0/15 internal CIDR; 2 VCF 9.1 network models (Shared VLAN / Dedicated VLAN) with official Broadcom TechDocs terminology; Cloud Proxy and License Server added as dedicated appliances with FQDN (TechDocs 9.1-based); Management VM Network IP count updated (Cloud Proxy, License Server, 14 IPs 9.1 shared runtime); Dedicated VLAN 9.1 → 14 IPs min (Fleet + Instance + /28 runtime nodes).`,
+    'ver.110': `UX &amp; features: Topology Mode explanations (vSAN Stretched, Partially Stretched, vMSC), L2 Adjacency, Remote Collectors (≠ Cloud Proxy), Domain Roles (Runtime Kubernetes), Storage Type (NFS / VMFS / vSAN), NSX Overlay/VLAN Segment Fleet model, vSAN Stretched prerequisites (Broadcom TechDocs), removal of per-service Dedicated VLAN, Fleet indicator in Platform Services, FQDN Suffix/Prefix, IP prefix from VLAN CIDR, Identity Broker Embedded → N/A, Host Count min 2 (NFS), access request via Supabase+EmailJS modal, 2 Remote Collectors default.`,
+    // JS engine notes (English)
+    'vlan.nfs_vmk_desc': 'VMkernel portgroup for NFS traffic — L2 mandatory',
+    'vlan.nfs_notes_mgmt': '{n} vmk IPs (NFS, 1 per host). L2 mandatory. Dedicated VLAN strongly recommended. In Stretched mode, this VLAN must be extended L2 across both sites.',
+    'vlan.nfs_notes_wld': '{n} vmk IPs (NFS). L2 mandatory. With NFS storage, min 2 hosts accepted (no vSAN FTT constraint).',
+    'vlan.fleet_platform_purpose': 'Fleet-level platform network (model: {placement})',
+    'vlan.fleet_note_overlay': ' — NSX Overlay Segment (no physical VLAN ID, Geneve encapsulation)',
+    'vlan.fleet_note_vlan': ' — NSX VLAN Segment (NSX VLAN transport zone)',
+    'vlan.collectors_always_mgmt': 'Collectors always in Mgmt VM Network',
+    'app.nsx_vip_simple': 'NSX Manager VIP — Simple mode. Mandatory even with 1 node (prepares future expansion, req. VCF-NSX-LM-REQD-CFG-002).',
+    'app.fleet_91': 'VCF Management Services — Fleet component. 1 FQDN required (lowercase). Placement: {placement}.',
+    'app.instance_91': 'VCF Management Services — Instance component (new VCF 9.1). 1 FQDN required (lowercase) — e.g.: instance.vcf.domain.local.',
+    'app.svc_runtime': 'VCF Management Services — Services Runtime (new VCF 9.1). 1 FQDN required (lowercase) — e.g.: svc-runtime.vcf.domain.local. IP block /28 (12 IPs min) to /27 (30 IPs max). Internal CIDR: 198.18.0.0/15. Shared with VCF Automation.',
+    'app.fleet_90': 'Fleet appliance (VCF 9.0). 1 FQDN required. Placement: {placement}.',
+    'app.rc_note': 'Remote Collector {r} — instance-level, always in Management VM Network.',
+    'app.cloud_proxy': 'Cloud Proxy — 1 FQDN required (lowercase) — e.g.: vcf-ops-proxy.vcf.domain.local. Cloud connectivity VCF Operations / VCFA.',
+    'app.license_server': 'License Server — 1 FQDN required (lowercase) — e.g.: vcf-license.vcf.domain.local.',
+    'app.log_mgmt_91': 'Log Management (VCF 9.1) — Aria Operations for Logs 8.18 integrated in VCF Management Services. 1 FQDN required (lowercase) — e.g.: log-mgmt.vcf.domain.local. 1 external IP (VIP LB endpoint on management network). 6 base internal IPs (Services Runtime CIDR 198.18.0.0/15). Day-N — deployed via VCF Operations Build.',
+    'app.auto_91': 'VCF Automation (9.1) — 1 FQDN required (lowercase) — e.g.: automation.vcf.domain.local. User endpoint (VIP LB). Cloud-native application in Services Runtime. /29 (5 IPs) block allocated on the network for nodes (3 active in HA / 1 in Simple + 2 buffer) — nodes without individual DNS. VCF Services Runtime FQDN shared.',
+    'app.ib_embedded': 'Embedded in vCenter — lab/POC only. No dedicated IP. Not recommended in production.',
+    'app.ib_91': 'Identity Broker (VCF 9.1) — containerized service in VCF Services Runtime. 1 external FQDN required (lowercase) — e.g.: idbroker.vcf.domain.local. 1 external IP (outside Services Runtime /28-/27 block). HA natively managed by Services Runtime — no separate VM.',
+    // Validation messages
+    'val.vsan_warn': 'vSAN Stretched Cluster: vSAN VMkernel and VM Management Network must be L2 across both sites. Inter-site latency ≤ 5ms RTT. Witness Host required.',
+    'val.vsan_warn_res': 'Verify L2, latency and Witness.',
+    'val.vsan_l2_block': 'vSAN Stretched: L2 Adjacency not confirmed. L2 connectivity is mandatory for vSAN and the Management Network.',
+    'val.vsan_l2_res': 'Confirm L2 adjacency.',
+    'val.overlay_block': 'NSX Overlay Segment selected but NSX Edge not deployed. The Overlay Segment model requires an NSX Edge Cluster with T0/T1.',
+    'val.overlay_res': 'Enable NSX Edge in the NSX Configuration.',
+  },
+};
 
 // ── ALPINE APP ───────────────────────────────────────────────────
 function vcfApp(){
   return {
+    // AUTH DISABLED — accès libre (authReady toujours true)
+    authReady:true,
+    /* AUTH DISABLED — décommenter pour réactiver l'authentification
+    currentUser:null,
+    loginUsername:'',loginPassword:'',loginError:'',loginLoading:false,
+    sb:null,
+    */
+
+    // Language
+    lang: localStorage.getItem('vcf-lang') || 'fr',
+    t(key, vars) {
+      const tr = translations[this.lang];
+      const fr = translations['fr'];
+      let s = (tr?.[key] ?? fr?.[key]) ?? key;
+      if (vars) Object.keys(vars).forEach(k => s = s.replace(new RegExp(`\\{${k}}`, 'g'), vars[k]));
+      return s;
+    },
+    capabilitiesList() {
+      return [
+        {icon:'🗂', text: this.t('cap.vlans')},
+        {icon:'🖥', text: this.t('cap.appliances')},
+        {icon:'🔗', text: this.t('cap.vips')},
+        {icon:'✅', text: this.t('cap.validation')},
+        {icon:'🌐', text: this.t('cap.fleet')},
+        {icon:'📐', text: this.t('cap.topology')},
+        {icon:'📊', text: this.t('cap.excel')},
+        {icon:'💾', text: this.t('cap.json')},
+        {icon:'🔐', text: this.t('cap.auth')},
+      ];
+    },
+
     // App state
     activeTab:'overview',
-    tabs:[
-      {id:'overview',label:'Overview'},{id:'management',label:'Management Domain'},
-      {id:'platform',label:'Platform Services'},{id:'workloads',label:'Workload Domains'},
-      {id:'vlans',label:'VLAN Design'},{id:'appliances',label:'Appliances'},
-      {id:'vips',label:'VIPs'},{id:'validation',label:'Validation'},
-      {id:'export',label:'Export / Import'},
-      {id:'about',label:'About'},
-    ],
+    get tabs() {
+      return [
+        {id:'overview',    label:'Overview'},
+        {id:'management',  label:'Management Domain'},
+        {id:'platform',    label:'Platform Services'},
+        {id:'workloads',   label:'Workload Domains'},
+        {id:'vlans',       label:'VLAN Design'},
+        {id:'appliances',  label:'Appliances'},
+        {id:'vips',        label:'VIPs'},
+        {id:'validation',  label:'Validation'},
+        {id:'export',      label:'Export / Import'},
+        {id:'about',       label:'About'},
+      ];
+    },
 
     project:JSON.parse(JSON.stringify(DEFAULT_PROJECT)),
     managementDomain:JSON.parse(JSON.stringify(DEFAULT_MGMT)),
@@ -2141,10 +2322,12 @@ function vcfApp(){
     toastMsg:'',toastVisible:false,
 
     init(){
+      this.$watch('lang', v => { localStorage.setItem('vcf-lang', v); this.compute(); });
       this.$watch('project',()=>this.compute());
       this.$watch('managementDomain',()=>this.compute());
       this.$watch('workloadDomains',()=>this.compute());
       this.compute();
+      // AUTH DISABLED — décommenter pour réactiver : this.initAuth();
     },
 
     compute(){
@@ -2158,21 +2341,72 @@ function vcfApp(){
       const vipEdits={};
       this.vips.forEach(v=>{if(v.ipAddress||v.fqdn)vipEdits[v.vipName]={ipAddress:v.ipAddress,fqdn:v.fqdn};});
 
-      const mVlans=buildManagementVLANs(this.managementDomain,this.project,this.workloadDomains);
-      const wVlans=this.workloadDomains.flatMap(w=>buildWorkloadVLANs(w,this.project));
+      const tFn=(key,vars)=>this.t(key,vars);
+
+      const mVlans=buildManagementVLANs(this.managementDomain,this.project,this.workloadDomains,tFn);
+      const wVlans=this.workloadDomains.flatMap(w=>buildWorkloadVLANs(w,this.project,tFn));
       this.vlans=[...mVlans,...wVlans].map(v=>({...v,...(vlanEdits[`${v.domain}|${v.vlanName}`]||{})}));
 
-      const mApps=buildManagementAppliances(this.managementDomain,this.project);
-      const wApps=this.workloadDomains.flatMap(w=>buildWorkloadAppliances(w));
+      const mApps=buildManagementAppliances(this.managementDomain,this.project,tFn);
+      const wApps=this.workloadDomains.flatMap(w=>buildWorkloadAppliances(w,tFn));
       this.appliances=[...mApps,...wApps].map(a=>({...a,...(appEdits[a.applianceName]||{})}));
 
       const mVips=buildManagementVIPs(this.managementDomain,this.project);
       const wVips=this.workloadDomains.flatMap(w=>buildWorkloadVIPs(w));
       this.vips=[...mVips,...wVips].map(v=>({...v,...(vipEdits[v.vipName]||{})}));
 
-      this.validationMessages=runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans);
+      this.validationMessages=runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,tFn);
       this.domainSummaries=buildDomainSummaries(this.project,this.managementDomain,this.workloadDomains,this.vlans,this.vips);
     },
+
+    /* AUTH DISABLED — décommenter pour réactiver l'authentification Supabase
+    async initAuth(){
+      const cfg=window.APP_CONFIG||{};
+      if(!cfg.supabaseUrl||!cfg.supabaseKey){this.loginError='Supabase credentials missing. Contact the administrator.';return;}
+      this.sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true},global:{headers:{'apikey':cfg.supabaseKey}}});
+      const {data:{session}}=await this.sb.auth.getSession();
+      if(session){
+        await this.loadUser(session.user.id);
+        if(this.currentUser?.active){this.authReady=true;this.showToast(`Welcome back, ${this.currentUser.username}`);}
+      }
+      this.sb.auth.onAuthStateChange(async(event)=>{if(event==='SIGNED_OUT'){this.currentUser=null;this.authReady=false;}});
+    },
+
+    async loadUser(userId){
+      const {data}=await this.sb.from('profiles').select('*').eq('id',userId).single();
+      if(data)this.currentUser={...data};
+    },
+
+    async doLogin(){
+      this.loginError='';
+      if(!this.loginUsername||!this.loginPassword){this.loginError='Please fill in all fields.';return;}
+      this.loginLoading=true;
+      try{
+        const {data:email}=await this.sb.rpc('get_email_by_username',{p_username:this.loginUsername});
+        if(!email){this.loginError='Invalid username or password.';return;}
+        const {data,error}=await this.sb.auth.signInWithPassword({email,password:this.loginPassword});
+        if(error){this.loginError='Invalid username or password.';return;}
+        await this.loadUser(data.user.id);
+        if(!this.currentUser?.active){await this.sb.auth.signOut();this.loginError='Account inactive. Contact administrator.';return;}
+        this.authReady=true;
+        this.showToast(`Welcome, ${this.currentUser.username}`);
+      }finally{this.loginLoading=false;}
+    },
+
+    async doLogout(){
+      await this.sb.auth.signOut();
+      this.currentUser=null;
+      this.authReady=false;
+      this.loginUsername='';this.loginPassword='';this.loginError='';
+    },
+
+    openAccessRequestModal(){
+      ['req-name','req-email','req-company','req-reason'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('req-status').textContent='';
+      document.getElementById('req-status').style.color='';
+      document.getElementById('access-req-overlay').classList.add('open');
+    },
+    */ // FIN AUTH DISABLED
 
     showToast(msg,ms=3000){this.toastMsg=msg;this.toastVisible=true;setTimeout(()=>this.toastVisible=false,ms);},
 
@@ -2259,6 +2493,42 @@ function vcfApp(){
   };
 }
 
+/* AUTH DISABLED — décommenter pour réactiver la demande d'accès et EmailJS
+
+// ── ACCESS REQUEST ──────────────────────────────────────────────
+async function sendAccessRequest() {
+  const name     = document.getElementById('req-name').value.trim();
+  const email    = document.getElementById('req-email').value.trim();
+  const company  = document.getElementById('req-company').value.trim();
+  const reason   = document.getElementById('req-reason').value.trim();
+  const statusEl = document.getElementById('req-status');
+  if (!name || !email || !company || !reason) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Please fill in all fields.';
+    return;
+  }
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = 'Sending request…';
+  const cfg = window.APP_CONFIG || {};
+  const sb  = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+  const { error } = await sb.from('access_requests').insert({ username: name, email, company, reason });
+  if (error) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '❌ Error sending request. Please try again.';
+    return;
+  }
+  emailjs.send('service_86sbc2i', 'template_e76q1co', {
+    from_name: name, from_email: email, company, reason
+  }).catch(() => {});
+  statusEl.style.color = 'var(--green)';
+  statusEl.textContent = '✅ Request sent! You will be contacted shortly.';
+  setTimeout(() => document.getElementById('access-req-overlay').classList.remove('open'), 3500);
+}
+
+// ── EmailJS init ────────────────────────────────────────────────
+(function() { emailjs.init('Q0LGSClF9FZ03x7re'); })();
+
+FIN AUTH DISABLED */
 </script>
 </body>
 </html>

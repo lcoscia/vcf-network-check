@@ -1,59 +1,78 @@
-# VCF Network Planner — v1.2.0
+# VCF 9 Network Planner — v1.5.0
 
-Single-page network design tool for VMware Cloud Foundation pre-deployment planning.
-Supports **VCF 9.0 and VCF 9.1** — a version selector conditions all available features.
+Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` directly in a browser.
+
+**Available in French and English** — toggle FR / EN in the header. Language persists across sessions (localStorage).
 
 ## Features
 
 ### Planning tabs
-- **Overview** — version selector (9.0 / 9.1), global config, FQDN suffix/prefix, domain summary cards
-- **Management Domain** — hosts, NSX, storage type, topology mode, Fleet/Platform network model, teaming policy, EVPN-VXLAN fabric, NSX RTEP
-- **Platform Services** — VCF Operations, Logs, Networks, Automation, Identity Broker, VCF Management Services (Services Runtime), VNA
-- **Workload Domains** — per-domain config with storage type, NSX, VKS, domain roles, teaming policy, RTEP
+- **Overview** — global config, VCF version selector (9.0 / 9.1), FQDN suffix/prefix, domain summary cards
+- **Management Domain** — hosts, NSX, storage type, topology mode, VCF Management Services network model
+- **Platform Services** — VCF Operations, Log Management, Networks, Automation, Identity Broker
+- **Workload Domains** — per-domain config with storage type, NSX, VKS, domain roles
 - **VLAN Design** — auto-generated VLAN table with VLAN ID and CIDR input (IP prefix pre-fill)
 - **Appliances** — full appliance list with IP/FQDN fields and FQDN suffix auto-placeholder
 - **VIPs** — virtual IP allocation with IP prefix pre-fill from VLAN CIDRs
-- **Validation** — architectural rules with Blocker / Warning / Info severity (version-aware)
+- **Validation** — architectural rules with Blocker / Warning / Info severity
 - **Export / Import** — Excel workbook (5 sheets) + JSON save/restore
+
+### VCF 9.0 / 9.1 dual support
+
+#### VCF 9.1
+- **VCF Management Services** — 4 mandatory FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker) + IP block /28–/27
+- **2 network models**: VCF Management Shared VLAN Network Model (Day 0) / VCF Management Dedicated VLAN Network Model (Day 2 via API)
+- **VCF Automation (cloud-native)**: 1 dedicated FQDN (endpoint/VIP) + /29 block (5 IPs: 3 active + 2 buffer) — no separate VA VMs
+- **Identity Broker**: containerized service in Services Runtime — 1 external IP/FQDN, HA native
+- **Log Management** (Day-N): Aria Operations for Logs 8.18 integrated in Management Services — 1 FQDN + 6 IPs (internal CIDR)
+- **Real-time Metrics** (Day-N): new 9.x component — 0 FQDN + 6 IPs (internal CIDR 198.18.0.0/15)
+- **NSX Manager VIP**: mandatory in all modes including Simple (VCF-NSX-LM-REQD-CFG-002)
+- **Cloud Proxy**: replaces Remote Collectors in 9.x — 1 FQDN per VCF instance
+
+#### VCF 9.0
+- Fleet Appliance (1 FQDN), classic platform service VM architecture
+- Identity Broker appliance mode with HA (3 nodes + VIP)
+- VCF Automation VA nodes (Standalone / HA 4-node)
+- VCF Operations for Logs: master + workers architecture
 
 ### Network models
 - **4 Fleet/Platform network models**: Shared Management VM Network, Dedicated Fleet VLAN, NSX VLAN Segment, NSX Overlay Segment (Edge required)
-- **Storage types**: vSAN ESA (default), vSAN OSA, NFS, VMFS
+- **Storage types**: vSAN ESA (VCF 9 default), vSAN OSA, NFS, VMFS
 - **Topology modes**: Single-Site, vSAN Stretched Cluster (Broadcom prerequisites), Stretched vMSC, Partially Stretched
-- **Network Fabric models**: Standard (VLAN trunk), EVPN-VXLAN Fabric Interoperability — VCF 9.1
 
-### VCF 9.0 / 9.1 design rules
-
-**Common (9.0 & 9.1)**
-- vSAN Stretched Cluster prerequisites from Broadcom TechDocs (latency ≤ 5 ms RTT, 10 Gbps, Witness Host)
+### VCF 9.x design rules (per Broadcom TechDocs)
+- NSX Manager VIP mandatory in Simple and HA modes (req. VCF-NSX-LM-REQD-CFG-002)
+- VCF Services Runtime: /28 min (12 IPs) — /27 recommended when Log Management + Real-time Metrics deployed
+- VCF Automation /29 block (5 IPs) independent from Services Runtime node block
+- vSAN Stretched Cluster prerequisites (latency ≤ 5 ms RTT, 10 Gbps, Witness Host)
 - Fleet Network routing — collectors always in Management VM Network
 - VKS 5-consecutive-IP requirements
-- VCF Automation 4-node HA (3 active + 1 upgrade)
-- NSX TEP calculation per host × interfaces
-- Remote Collectors (≠ Cloud Proxy) — 2 by default for enterprise mode
-- NSX RTEP (Route TEP) VLAN for NSX Federation
-- Workload Domain min 2 hosts with NFS storage
+- NSX TEP calculation per host
+- Workload Domain min 2 hosts when using NFS storage
 
-**VCF 9.1 only**
-- **EVPN-VXLAN Fabric Interoperability** — Arista UCN, Cisco Nexus ONE, SONiC (generates dedicated VLAN)
-- **LACP teaming policy** — supported on Management and Workload Domains
-- **VCF Management Services (Services Runtime)** — Kubernetes runtime cluster (Simple / HA):
-  - Generates VM node IPs in Management VM Network (1 or 3 control planes + N workers)
-  - Generates dedicated **Services Runtime IP Range** (minimum 12 IPs for pod/service CIDR)
-  - Generates 5 FQDNs: Services Runtime · Fleet Component · Instance Component · Identity Broker · License Server
-  - Fleet-level services (Fleet Lifecycle, Salt RaaS, Log Management) on first VCF instance only
-- **VNA — Virtual Network Appliance Cluster** — stateful NAT/LB/DHCP for distributed VPC architectures
-- **VKS Multi-NIC** — secondary NIC VLAN for traffic separation in VKS clusters
-- Validation blockers if a 9.1-only feature is enabled while version is set to 9.0
+### Bilingual FR / EN
+- FR ↔ EN toggle pill in the header (persisted in `localStorage`)
+- All UI labels, topology descriptions, fleet model descriptions, validation messages, and VLAN/appliance notes switch language instantly
+- Engine-generated notes (VLAN Notes column, Appliance Notes, Validation messages) follow the active language
+- French content is never removed — both languages coexist in a `translations` object
 
 ### UX
-- Dynamic header, title, and About page reflecting the selected VCF version
-- Topology explanations with L2/L3 rules per network (vSAN Stretched, Partially Stretched, vMSC)
+- Topology explanations with L2/L3 rules per network
 - Domain Role descriptions (Runtime Kubernetes = VKS Supervisor cluster)
 - Fleet model indicator in Platform Services tab
 - FQDN Suffix/Prefix → auto-placeholder in Appliances and VIPs
 - IP prefix pre-fill from VLAN CIDR (e.g. `10.0.1.0/24` → placeholder `10.0.1.`)
-- 9.1 feature badges throughout the UI
+- Version-aware UI: VCF 9.1 controls adapt automatically (Automation labels, Identity Broker HA, Log Management model)
+
+## Usage
+
+```bash
+git clone https://github.com/lcoscia/vcf-network-check.git
+cd vcf-network-check/vcf-planner-html
+open index.html   # or serve with any static HTTP server
+```
+
+No configuration required. Authentication is disabled — the tool is accessible directly.
 
 ## Tech Stack
 
@@ -64,15 +83,18 @@ Supports **VCF 9.0 and VCF 9.1** — a version selector conditions all available
 | Excel Export | SheetJS (xlsx.full.min.js) |
 | Runtime | Browser-only, no build step |
 | Compatibility | Chrome, Edge, Firefox, Safari |
-| VCF Versions | VMware Cloud Foundation 9.0 and 9.1 |
+
+> Authentication (Supabase + EmailJS) is fully commented out in the source and can be re-enabled by searching for `AUTH DISABLED` markers.
 
 ## Version History
 
 | Version | Date | Notes |
 |---|---|---|
-| v1.2.0 | May 2026 | VCF 9.0 / 9.1 version selector. VCF 9.1: EVPN-VXLAN Fabric, LACP teaming, VCF Management Services (Services Runtime, Simple/HA, 12-IP range, 5 FQDNs), VNA cluster, VKS Multi-NIC, NSX RTEP. Suppression authentification (accès public direct). Sources: Broadcom TechDocs VCF 9.1, VMware Blog. |
+| v1.5.0 | Jun 2026 | Bilingual FR/EN: language toggle in header, localStorage persistence, `translations` object with ~120 keys, all UI/engine strings switch language (topology, fleet, platform, appliances, VLANs, validation) |
+| v1.4.0 | Jun 2026 | TechDocs 9.1 corrections (14 fixes, agent-reviewed): NSX VIP mandatory Simple mode; VCF Automation dedicated FQDN + /29 always 5 IPs; Identity Broker 9.1 = 1 external IP (Services Runtime service, no VM); Log Management 9.1 (1 FQDN VIP + 6 IPs CIDR); Real-time Metrics 9.1 documented; /28→/27 guidance; HA IB hidden 9.1; Remote Collectors → Cloud Proxies 9.x |
+| v1.3.0 | Jun 2026 | VCF 9.0/9.1 dual support: VCF version selector; VCF Management Services 4 FQDNs + /28-/27 block + CIDR 198.18.0.0/15; Shared VLAN / Dedicated VLAN models; Cloud Proxy + License Server appliances; auth fully commented out (free access) |
 | v1.1.0 | Apr 2026 | UX & features: topology explanations (vSAN Stretched, Partially Stretched), Storage Type (NFS/VMFS/vSAN), 4 Fleet network models (NSX Overlay/VLAN Segment), Broadcom TechDocs prerequisites, Platform Services fleet indicator, FQDN Suffix/Prefix, IP prefix from VLAN CIDR, 2 Remote Collectors default |
-| v1.0.0 | Apr 2026 | Initial release — full HTML, Alpine.js, VCF-DD design |
+| v1.0.0 | Apr 2026 | Initial release — full HTML, Alpine.js, Supabase auth, VCF-DD design |
 
 ## License
 
