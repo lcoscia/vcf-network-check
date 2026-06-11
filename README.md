@@ -1,4 +1,4 @@
-# VCF 9 Network Planner — v1.5.0
+# VCF 9 Network Planner — v1.6.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` directly in a browser.
 
@@ -20,13 +20,13 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 ### VCF 9.0 / 9.1 dual support
 
 #### VCF 9.1
-- **VCF Management Services** — 4 mandatory FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker) + IP block /28–/27
+- **VCF Management Services** — 5 mandatory Day-0 FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker, License Server) + IP block /28–/27 (License Server stays in the Management VM Network, outside the dedicated block)
 - **2 network models**: VCF Management Shared VLAN Network Model (Day 0) / VCF Management Dedicated VLAN Network Model (Day 2 via API)
-- **VCF Automation (cloud-native)**: 1 dedicated FQDN (endpoint/VIP) + /29 block (5 IPs: 3 active + 2 buffer) — no separate VA VMs
+- **VCF Automation (cloud-native)**: 1 dedicated FQDN (endpoint/VIP) + /29 block (5 IPs: 4 node IPs — 3 active + 1 buffer for redeployment) — no separate VA VMs
 - **Identity Broker**: containerized service in Services Runtime — 1 external IP/FQDN, HA native
 - **Log Management** (Day-N): Aria Operations for Logs 8.18 integrated in Management Services — 1 FQDN + 6 IPs (internal CIDR)
 - **Real-time Metrics** (Day-N): new 9.x component — 0 FQDN + 6 IPs (internal CIDR 198.18.0.0/15)
-- **NSX Manager VIP**: mandatory in all modes including Simple (VCF-NSX-LM-REQD-CFG-002)
+- **NSX Manager VIP**: reserved in all modes including Simple (VCF IP Allocation Workbook best practice for non-disruptive future HA scale-out)
 - **Cloud Proxy**: replaces Remote Collectors in 9.x — 1 FQDN per VCF instance
 
 #### VCF 9.0
@@ -35,18 +35,21 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 - VCF Automation VA nodes (Standalone / HA 4-node)
 - VCF Operations for Logs: master + workers architecture
 
+### Use cases / Scenarios
+- **Consolidated / 3-Node vSAN ESA (Compact)** (`project.scenario = consolidated-3node-vsan-esa`) — VCF 9 Consolidated Architecture: Management Domain and VI Workload Domain(s) share a single 3-host vSAN ESA cluster, with isolation enforced via resource pools instead of separate clusters. Use this for small/edge/lab deployments where dedicating separate clusters per domain isn't justified. 3 hosts is the documented vSAN ESA/OSA technical minimum (RAID-1 FTT=1); 4 hosts are recommended for N+1 availability. The host count field allows a minimum of 3, with validation messages adapting accordingly (Info at 3 hosts with vSAN ESA + this scenario, Warning recommending 4 otherwise).
+
 ### Network models
 - **4 Fleet/Platform network models**: Shared Management VM Network, Dedicated Fleet VLAN, NSX VLAN Segment, NSX Overlay Segment (Edge required)
 - **Storage types**: vSAN ESA (VCF 9 default), vSAN OSA, NFS, VMFS
 - **Topology modes**: Single-Site, vSAN Stretched Cluster (Broadcom prerequisites), Stretched vMSC, Partially Stretched
 
 ### VCF 9.x design rules (per Broadcom TechDocs)
-- NSX Manager VIP mandatory in Simple and HA modes (req. VCF-NSX-LM-REQD-CFG-002)
+- NSX Manager VIP reserved in all modes (VCF IP Allocation Workbook best practice for non-disruptive future HA scale-out)
 - VCF Services Runtime: /28 min (12 IPs) — /27 recommended when Log Management + Real-time Metrics deployed
-- VCF Automation /29 block (5 IPs) independent from Services Runtime node block
-- vSAN Stretched Cluster prerequisites (latency ≤ 5 ms RTT, 10 Gbps, Witness Host)
+- VCF Automation /29 block (5 IPs: 4 node IPs — 3 active + 1 buffer for redeployment) independent from Services Runtime node block
+- vSAN Stretched Cluster prerequisites: VM Management Network mandatory L2-stretched across both sites; vSAN VMkernel network L2 or L3 (only Witness link needs independent routing); Witness latency two-tier (≤10 hosts/site <200ms RTT, 11-15 hosts/site <100ms RTT), 10 Gbps
 - Fleet Network routing — collectors always in Management VM Network
-- VKS 5-consecutive-IP requirements
+- VKS Infrastructure VLAN: 5 IPs — recommended contiguous block; 3 control plane + 1 floating + 1 patching; workload network/AVI VIP pool/ingress-egress CIDR/pod CIDR are separate additional requirements
 - NSX TEP calculation per host
 - Workload Domain min 2 hosts when using NFS storage
 
@@ -90,6 +93,8 @@ No configuration required. Authentication is disabled — the tool is accessible
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.6.0 | Jun 2026 | New "Consolidated / 3-Node vSAN ESA (Compact)" scenario (Management + VI Workload Domains share a 3-host vSAN ESA cluster, resource-pool isolation; 3-host minimum, 4 recommended for N+1; reworked validation engine + scenario-specific checks; bilingual Broadcom TechDocs help box). Multi-agent audit corrections (TechDocs VCF 9.1): VCF Automation /29 reworded to "4 node IPs (3 active + 1 buffer for redeployment)"; NSX Manager VIP reframed as VCF IP Allocation Workbook best practice (removed unverifiable internal reference); vSAN Stretched Cluster/vMSC L2/L3 requirement reversal fixed (VM Management Network mandatory L2, vSAN VMkernel L2/L3) + two-tier Witness latency (KB417356); VKS "5 consecutive IPs" softened to "5 IPs, recommended contiguous block" with separate workload/AVI/ingress-egress/pod CIDR note |
+| v1.5.1 | Jun 2026 | Multi-agent 9.1 audit (TechDocs re-verification): 5th Day-0 FQDN (License Server, in Mgmt VM Network); /28→/27 reworded as Day-N scale-out ceiling (Log Mgmt, Real-time Metrics, replicas) instead of a hard threshold; Real-time Metrics reclassified as Day-2 via Build/Lifecycle (not automatic); VCF Operations for Networks cert-SAN FQDN/IP note; AVI Controller cluster VIP renamed "Avi Load Balancer"; new Info validation rule recommending /27 for Services Runtime when Log Management is enabled |
 | v1.5.0 | Jun 2026 | Bilingual FR/EN: language toggle in header, localStorage persistence, `translations` object with ~120 keys, all UI/engine strings switch language (topology, fleet, platform, appliances, VLANs, validation) |
 | v1.4.0 | Jun 2026 | TechDocs 9.1 corrections (14 fixes, agent-reviewed): NSX VIP mandatory Simple mode; VCF Automation dedicated FQDN + /29 always 5 IPs; Identity Broker 9.1 = 1 external IP (Services Runtime service, no VM); Log Management 9.1 (1 FQDN VIP + 6 IPs CIDR); Real-time Metrics 9.1 documented; /28→/27 guidance; HA IB hidden 9.1; Remote Collectors → Cloud Proxies 9.x |
 | v1.3.0 | Jun 2026 | VCF 9.0/9.1 dual support: VCF version selector; VCF Management Services 4 FQDNs + /28-/27 block + CIDR 198.18.0.0/15; Shared VLAN / Dedicated VLAN models; Cloud Proxy + License Server appliances; auth fully commented out (free access) |
