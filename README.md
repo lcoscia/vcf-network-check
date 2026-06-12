@@ -1,4 +1,4 @@
-# VCF 9 Network Planner — v1.6.0
+# VCF 9 Network Planner — v1.6.1
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` directly in a browser.
 
@@ -20,12 +20,12 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 ### VCF 9.0 / 9.1 dual support
 
 #### VCF 9.1
-- **VCF Management Services** — 5 mandatory Day-0 FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker, License Server) + IP block /28–/27 (License Server stays in the Management VM Network, outside the dedicated block)
-- **2 network models**: VCF Management Shared VLAN Network Model (Day 0) / VCF Management Dedicated VLAN Network Model (Day 2 via API)
-- **VCF Automation (cloud-native)**: 1 dedicated FQDN (endpoint/VIP) + /29 block (5 IPs: 4 node IPs — 3 active + 1 buffer for redeployment) — no separate VA VMs
-- **Identity Broker**: containerized service in Services Runtime — 1 external IP/FQDN, HA native
-- **Log Management** (Day-N): Aria Operations for Logs 8.18 integrated in Management Services — 1 FQDN + 6 IPs (internal CIDR)
-- **Real-time Metrics** (Day-N): new 9.x component — 0 FQDN + 6 IPs (internal CIDR 198.18.0.0/15)
+- **VCF Management Services** — 4 mandatory Day-0 FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker) + Services Runtime IP block /28 min (12 IPs) – /27 max (30 IPs); Identity Broker's IP is allocated from this block (not additional). License Server is a separate component (1 FQDN, IP in the Management VM Network, outside the Services Runtime block)
+- **2 network models**: VCF Management Shared VLAN Network Model (Day 0) / VCF Management Dedicated VLAN Network Model (Day 2 via fleet lifecycle API)
+- **VCF Automation (cloud-native)**: 1 dedicated FQDN (endpoint/VIP) + 1 dedicated VCF Services Runtime FQDN + separate /29 block (5 IPs: 3 node IPs + 2 buffer for redeploy/rolling updates) — independent from the Services Runtime block, defaults to the Management VM Network (dedicated VLAN via fleet lifecycle API) — no separate VA VMs
+- **Identity Broker**: containerized service in Services Runtime — 1 FQDN, IP allocated from the Services Runtime block, HA native (no separate VM/VIP)
+- **Log Management** (Day-N): Aria Operations for Logs 8.18 integrated in Management Services — 1 FQDN (LB endpoint) + 6 base IPs + 2 IPs per additional replica, all from the Services Runtime block
+- **Real-time Metrics** (Day-N): new 9.x component — 0 FQDN + 6 IPs, from the Services Runtime block (internal CIDR 198.18.0.0/15)
 - **NSX Manager VIP**: reserved in all modes including Simple (VCF IP Allocation Workbook best practice for non-disruptive future HA scale-out)
 - **Cloud Proxy**: replaces Remote Collectors in 9.x — 1 FQDN per VCF instance
 
@@ -45,8 +45,8 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 
 ### VCF 9.x design rules (per Broadcom TechDocs)
 - NSX Manager VIP reserved in all modes (VCF IP Allocation Workbook best practice for non-disruptive future HA scale-out)
-- VCF Services Runtime: /28 min (12 IPs) — /27 recommended when Log Management + Real-time Metrics deployed
-- VCF Automation /29 block (5 IPs: 4 node IPs — 3 active + 1 buffer for redeployment) independent from Services Runtime node block
+- VCF Services Runtime: /28 min (12 IPs) — /27 max (30 IPs), recommended ceiling for Day-N scale-out (Log Management, Real-time Metrics, additional replicas). Identity Broker's IP, and Day-N Log Management/Real-time Metrics IPs, are allocated from this block
+- VCF Automation /29 block (5 IPs: 3 node IPs + 2 buffer for redeploy/rolling updates) independent from the Services Runtime block — defaults to the Management VM Network, dedicated VLAN via fleet lifecycle API
 - vSAN Stretched Cluster prerequisites: VM Management Network mandatory L2-stretched across both sites; vSAN VMkernel network L2 or L3 (only Witness link needs independent routing); Witness latency two-tier (≤10 hosts/site <200ms RTT, 11-15 hosts/site <100ms RTT), 10 Gbps
 - Fleet Network routing — collectors always in Management VM Network
 - VKS Infrastructure VLAN: 5 IPs — recommended contiguous block; 3 control plane + 1 floating + 1 patching; workload network/AVI VIP pool/ingress-egress CIDR/pod CIDR are separate additional requirements
@@ -93,6 +93,7 @@ No configuration required. Authentication is disabled — the tool is accessible
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.6.1 | Jun 2026 | Multi-agent 9.1 audit corrections (TechDocs re-verification, IP/FQDN model): VCF Management Services = 4 Day-0 FQDNs (Fleet, Instance, Services Runtime, Identity Broker) — License Server is a separate component (1 FQDN, Mgmt VM Network); Identity Broker IP now allocated from the Services Runtime block (no separate VIP/IP, no longer double-counted); Log Management 9.1 IPs (6 base + 2/replica) now allocated from the Services Runtime block, removed from Mgmt VM Network/Fleet VLAN counts and VIP list; VCF Automation 9.1 corrected to 1 dedicated FQDN + 1 dedicated Services Runtime FQDN + /29 (3 node IPs + 2 buffer for redeploy/rolling updates), defaults to Management VM Network, independent from the Services Runtime block; new Info validation rule on the Automation /29 block separation; updated bilingual FR/EN help boxes (fleet, platform, logs, automation, identity broker) and appliance/VIP notes accordingly |
 | v1.6.0 | Jun 2026 | New "Consolidated / 3-Node vSAN ESA (Compact)" scenario (Management + VI Workload Domains share a 3-host vSAN ESA cluster, resource-pool isolation; 3-host minimum, 4 recommended for N+1; reworked validation engine + scenario-specific checks; bilingual Broadcom TechDocs help box). Multi-agent audit corrections (TechDocs VCF 9.1): VCF Automation /29 reworded to "4 node IPs (3 active + 1 buffer for redeployment)"; NSX Manager VIP reframed as VCF IP Allocation Workbook best practice (removed unverifiable internal reference); vSAN Stretched Cluster/vMSC L2/L3 requirement reversal fixed (VM Management Network mandatory L2, vSAN VMkernel L2/L3) + two-tier Witness latency (KB417356); VKS "5 consecutive IPs" softened to "5 IPs, recommended contiguous block" with separate workload/AVI/ingress-egress/pod CIDR note |
 | v1.5.1 | Jun 2026 | Multi-agent 9.1 audit (TechDocs re-verification): 5th Day-0 FQDN (License Server, in Mgmt VM Network); /28→/27 reworded as Day-N scale-out ceiling (Log Mgmt, Real-time Metrics, replicas) instead of a hard threshold; Real-time Metrics reclassified as Day-2 via Build/Lifecycle (not automatic); VCF Operations for Networks cert-SAN FQDN/IP note; AVI Controller cluster VIP renamed "Avi Load Balancer"; new Info validation rule recommending /27 for Services Runtime when Log Management is enabled |
 | v1.5.0 | Jun 2026 | Bilingual FR/EN: language toggle in header, localStorage persistence, `translations` object with ~120 keys, all UI/engine strings switch language (topology, fleet, platform, appliances, VLANs, validation) |
