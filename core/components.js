@@ -1,7 +1,7 @@
 // Pure calculation: derives per-component IP/FQDN totals for the current project configuration
 // from the static COMPONENT_REFERENCE table.
 
-import { COMPONENT_REFERENCE } from './reference.js';
+import { COMPONENT_REFERENCE } from './reference.js?v=1.7.2';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 

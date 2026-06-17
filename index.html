@@ -1488,7 +1488,7 @@
             <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9 Network Planner</div>
             <div style="font-size:14px;color:#a8c4de;margin-bottom:18px;">Architecture Edition — Pre-Deployment Network Planning Tool</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.7.1</span>
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.7.2</span>
               <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;">Jun 2026</span>
               <span style="background:rgba(39,174,96,0.3);border:1px solid rgba(39,174,96,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#7fffb8;font-weight:700;">VMware Cloud Foundation 9</span>
             </div>
@@ -1524,6 +1524,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.7.2</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.172')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.7.1</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
@@ -1622,7 +1627,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js';
+import * as Core from './core/index.js?v=1.7.2';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());

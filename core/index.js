@@ -1,13 +1,15 @@
 // Barrel module: re-exports every Core symbol from a single entry point. No logic here.
+// Each specifier carries a ?v= cache-busting query so a version bump forces a fresh fetch
+// of every engine file, instead of relying on users to hard-refresh after a deploy.
 
-export * from './data.js';
-export * from './reference.js';
-export * from './sizing.js';
-export * from './vlan.js';
-export * from './appliances.js';
-export * from './vips.js';
-export * from './summary.js';
-export * from './validation.js';
-export * from './excel.js';
-export * from './i18n.js';
-export * from './components.js';
+export * from './data.js?v=1.7.2';
+export * from './reference.js?v=1.7.2';
+export * from './sizing.js?v=1.7.2';
+export * from './vlan.js?v=1.7.2';
+export * from './appliances.js?v=1.7.2';
+export * from './vips.js?v=1.7.2';
+export * from './summary.js?v=1.7.2';
+export * from './validation.js?v=1.7.2';
+export * from './excel.js?v=1.7.2';
+export * from './i18n.js?v=1.7.2';
+export * from './components.js?v=1.7.2';
