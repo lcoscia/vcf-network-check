@@ -1406,6 +1406,7 @@
           <h2 class="sec-title">VCF Components — IP &amp; FQDN Requirements</h2>
         </div>
         <p class="field-note tw-mb-4">Click a component to see how many IPs and FQDNs it needs for the current project configuration. Reference figures sourced from VCF 9.1 IP/FQDN prerequisites.</p>
+        <p class="field-note tw-mb-4">Per VCF 9.1 design guidance, each Workload Domain is its own Layer-2 network domain / network pool: ESXi management, vMotion, vSAN and NSX Host TEP IPs for a workload domain are <strong>not</strong> drawn from the Management Domain's VLANs. The figures below are shown per domain accordingly — see the <code>Dedicated VLANs</code> option per workload domain on the VLAN Design tab.</p>
 
         <div class="tw-grid tw-grid-cols-1 lg:tw-grid-cols-3 tw-gap-4">
           <!-- LEFT/CENTER: domain-grouped card grid -->
@@ -1414,14 +1415,14 @@
             <section>
               <h3 class="tw-text-sm tw-font-semibold tw-text-slate-600 tw-mb-2">Management Domain</h3>
               <div class="tw-grid tw-grid-cols-2 md:tw-grid-cols-3 tw-gap-3">
-                <template x-for="c in componentData.components.filter(c => c.scope !== 'per-edge-cluster' || managementDomain.nsxEdgeDeployed)" :key="'mgmt-'+c.id">
+                <template x-for="row in mgmtComponentRows" :key="'mgmt-'+row.id">
                   <button type="button"
                           class="tw-rounded-lg tw-border tw-p-3 tw-text-left tw-transition-colors"
-                          :class="selectedComponentKey===c.id ? 'tw-border-blue-500 tw-ring-2 tw-ring-blue-300 tw-bg-blue-50' : 'tw-border-slate-300 tw-bg-white hover:tw-border-blue-400'"
-                          @click="selectedComponentKey=c.id">
-                    <div class="tw-text-sm tw-font-medium tw-text-slate-800" x-text="c.label"></div>
-                    <div class="tw-text-xs tw-text-slate-500" x-text="c.units + ' unit(s)'"></div>
-                    <div class="tw-text-xs tw-font-semibold" :class="c.present ? 'tw-text-emerald-600' : 'tw-text-slate-400'" x-text="c.totalIps + ' IPs · ' + c.totalFqdns + ' FQDNs'"></div>
+                          :class="isSelected(row.id,'Management Domain') ? 'tw-border-blue-500 tw-ring-2 tw-ring-blue-300 tw-bg-blue-50' : 'tw-border-slate-300 tw-bg-white hover:tw-border-blue-400'"
+                          @click="selectComponent(row.id,'Management Domain')">
+                    <div class="tw-text-sm tw-font-medium tw-text-slate-800" x-text="row.label"></div>
+                    <div class="tw-text-xs tw-text-slate-500" x-text="row.units + ' unit(s)'"></div>
+                    <div class="tw-text-xs tw-font-semibold" :class="row.present ? 'tw-text-emerald-600' : 'tw-text-slate-400'" x-text="row.totalIps + ' IPs · ' + row.totalFqdns + ' FQDNs'"></div>
                   </button>
                 </template>
               </div>
@@ -1431,13 +1432,14 @@
               <section>
                 <h3 class="tw-text-sm tw-font-semibold tw-text-slate-600 tw-mb-2" x-text="wld.domainName + ' (Workload Domain)'"></h3>
                 <div class="tw-grid tw-grid-cols-2 md:tw-grid-cols-3 tw-gap-3">
-                  <template x-for="cid in ['vcenter','nsx-manager','nsx-edge','esxi-host','avi-se','vks-supervisor']" :key="wld.id+'-'+cid">
-                    <button type="button" x-show="componentData.components.find(c=>c.id===cid)?.present"
+                  <template x-for="row in wldComponentRows(wld.domainName)" :key="wld.id+'-'+row.id">
+                    <button type="button"
                             class="tw-rounded-lg tw-border tw-p-3 tw-text-left tw-transition-colors"
-                            :class="selectedComponentKey===cid ? 'tw-border-blue-500 tw-ring-2 tw-ring-blue-300 tw-bg-blue-50' : 'tw-border-slate-300 tw-bg-white hover:tw-border-blue-400'"
-                            @click="selectedComponentKey=cid">
-                      <div class="tw-text-sm tw-font-medium tw-text-slate-800" x-text="componentData.components.find(c=>c.id===cid)?.label"></div>
-                      <div class="tw-text-xs tw-text-slate-500" x-text="'shared across domains — see panel'"></div>
+                            :class="isSelected(row.id,wld.domainName) ? 'tw-border-blue-500 tw-ring-2 tw-ring-blue-300 tw-bg-blue-50' : 'tw-border-slate-300 tw-bg-white hover:tw-border-blue-400'"
+                            @click="selectComponent(row.id,wld.domainName)">
+                      <div class="tw-text-sm tw-font-medium tw-text-slate-800" x-text="row.label"></div>
+                      <div class="tw-text-xs tw-text-slate-500" x-text="row.units + ' unit(s)'"></div>
+                      <div class="tw-text-xs tw-font-semibold" :class="row.present ? 'tw-text-emerald-600' : 'tw-text-slate-400'" x-text="row.totalIps + ' IPs · ' + row.totalFqdns + ' FQDNs'"></div>
                     </button>
                   </template>
                 </div>
@@ -1453,10 +1455,11 @@
                 <div>
                   <h4 class="tw-text-lg tw-font-semibold tw-text-slate-800" x-text="selectedComponent.label"></h4>
                   <dl class="tw-mt-2 tw-text-sm tw-space-y-1">
+                    <div x-show="selectedComponent.domain"><dt class="tw-inline tw-text-slate-500">Domain: </dt><dd class="tw-inline" x-text="selectedComponent.domain"></dd></div>
                     <div><dt class="tw-inline tw-text-slate-500">Scope: </dt><dd class="tw-inline" x-text="selectedComponent.scope"></dd></div>
                     <div><dt class="tw-inline tw-text-slate-500">IPs / unit: </dt><dd class="tw-inline" x-text="selectedComponent.ipsPerUnit"></dd></div>
                     <div><dt class="tw-inline tw-text-slate-500">FQDNs / unit: </dt><dd class="tw-inline" x-text="selectedComponent.fqdnsPerUnit"></dd></div>
-                    <div><dt class="tw-inline tw-text-slate-500">Units (this project): </dt><dd class="tw-inline" x-text="selectedComponent.units"></dd></div>
+                    <div><dt class="tw-inline tw-text-slate-500">Units (this domain): </dt><dd class="tw-inline" x-text="selectedComponent.units"></dd></div>
                     <div class="tw-pt-2 tw-font-medium"><dt class="tw-inline">Total: </dt><dd class="tw-inline" x-text="selectedComponent.totalIps + ' IPs / ' + selectedComponent.totalFqdns + ' FQDNs'"></dd></div>
                   </dl>
                   <p class="tw-mt-2 tw-text-xs tw-text-slate-500" x-text="selectedComponent.notes"></p>
@@ -1485,7 +1488,7 @@
             <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9 Network Planner</div>
             <div style="font-size:14px;color:#a8c4de;margin-bottom:18px;">Architecture Edition — Pre-Deployment Network Planning Tool</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.7.0</span>
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.7.1</span>
               <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;">Jun 2026</span>
               <span style="background:rgba(39,174,96,0.3);border:1px solid rgba(39,174,96,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#7fffb8;font-weight:700;">VMware Cloud Foundation 9</span>
             </div>
@@ -1521,6 +1524,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.7.1</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.171')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.7.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
@@ -1679,8 +1687,36 @@ function vcfApp(){
     vlans:[],appliances:[],vips:[],validationMessages:[],domainSummaries:[],
     componentData:{components:[],totalIps:0,totalFqdns:0},
     selectedComponentKey:null,
+    // Resolves a component to the figures for one domain. If the component has a perDomain
+    // breakdown (per-domain/per-host/per-edge-cluster scope), returns that domain's own entry
+    // (or null if this domain doesn't carry the component). Otherwise (mgmt-domain/per-site
+    // scope — genuinely global, e.g. SDDC Manager) returns the project-wide aggregate.
+    componentRow(id,domain){
+      const c=this.componentData.components.find(x=>x.id===id);
+      if(!c)return null;
+      if(c.perDomain){
+        const d=c.perDomain.find(p=>p.domain===domain);
+        if(!d)return null;
+        return {...c,domain,units:d.units,totalIps:d.totalIps,totalFqdns:d.totalFqdns,present:d.units>0};
+      }
+      return {...c,domain:null};
+    },
+    get mgmtComponentRows(){
+      return this.componentData.components.map(c=>this.componentRow(c.id,'Management Domain')).filter(Boolean);
+    },
+    wldComponentRows(domainName){
+      return ['vcenter','nsx-manager','nsx-edge','esxi-host','avi-se','vks-supervisor']
+        .map(id=>this.componentRow(id,domainName)).filter(Boolean);
+    },
+    selectComponent(id,domain){
+      this.selectedComponentKey={id,domain};
+    },
+    isSelected(id,domain){
+      return !!this.selectedComponentKey && this.selectedComponentKey.id===id && this.selectedComponentKey.domain===domain;
+    },
     get selectedComponent(){
-      return this.componentData.components.find(c=>c.id===this.selectedComponentKey) || null;
+      if(!this.selectedComponentKey)return null;
+      return this.componentRow(this.selectedComponentKey.id,this.selectedComponentKey.domain);
     },
     toastMsg:'',toastVisible:false,
 

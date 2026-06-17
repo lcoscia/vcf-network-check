@@ -3,9 +3,22 @@
 
 import { COMPONENT_REFERENCE } from './reference.js';
 
+const MGMT_DOMAIN_LABEL = 'Management Domain';
+
 function ref(id) { return COMPONENT_REFERENCE.find(c => c.id === id); }
 
-// Each rule returns { units, totalIps, totalFqdns } derived from project/mgmt/workloadDomains.
+function sumPerDomain(perDomain) {
+  return {
+    units: perDomain.reduce((s, d) => s + d.units, 0),
+    totalIps: perDomain.reduce((s, d) => s + d.totalIps, 0),
+    totalFqdns: perDomain.reduce((s, d) => s + d.totalFqdns, 0),
+  };
+}
+
+// Each rule returns { units, totalIps, totalFqdns, perDomain? } derived from project/mgmt/workloadDomains.
+// perDomain (when present) is [{ domain, units, totalIps, totalFqdns }] — one entry per domain that
+// actually carries this component, since each domain (Management + each Workload Domain) is its own
+// VLAN/network pool in VCF and IP requirements should not be conflated across domains.
 const RULES = {
   'vcf-mgmt-services'(mgmt) {
     const r = ref('vcf-mgmt-services');
@@ -22,29 +35,40 @@ const RULES = {
   },
   'vcenter'(mgmt, workloadDomains) {
     const r = ref('vcenter');
-    const units = 1 + workloadDomains.length;
-    return { units, totalIps: units * r.ipsPerUnit, totalFqdns: units * r.fqdnsPerUnit };
+    const perDomain = [
+      { domain: MGMT_DOMAIN_LABEL, units: 1, totalIps: r.ipsPerUnit, totalFqdns: r.fqdnsPerUnit },
+      ...workloadDomains.map(w => ({ domain: w.domainName, units: 1, totalIps: r.ipsPerUnit, totalFqdns: r.fqdnsPerUnit })),
+    ];
+    return { ...sumPerDomain(perDomain), perDomain };
   },
   'nsx-manager'(mgmt, workloadDomains) {
     const mgmtNodes = (mgmt.nsxManagerMode === 'clustered' ? 3 : 1) + 1;
     const wlds = workloadDomains.filter(w => w.nsxEnabled && w.nsxManagerMode !== 'shared');
-    const wldNodes = wlds.reduce((s, w) => s + (w.nsxManagerMode === 'clustered' ? 3 : 1) + 1, 0);
-    const units = 1 + wlds.length;
-    const totalIps = mgmtNodes + wldNodes;
-    return { units, totalIps, totalFqdns: totalIps };
+    const perDomain = [
+      { domain: MGMT_DOMAIN_LABEL, units: 1, totalIps: mgmtNodes, totalFqdns: mgmtNodes },
+      ...wlds.map(w => {
+        const nodes = (w.nsxManagerMode === 'clustered' ? 3 : 1) + 1;
+        return { domain: w.domainName, units: 1, totalIps: nodes, totalFqdns: nodes };
+      }),
+    ];
+    return { ...sumPerDomain(perDomain), perDomain };
   },
   'nsx-edge'(mgmt, workloadDomains) {
-    const mgmtUnits = mgmt.nsxEdgeDeployed ? 1 : 0;
-    const mgmtIps = mgmt.nsxEdgeDeployed ? mgmt.nsxEdgeNodeCount : 0;
     const wlds = workloadDomains.filter(w => w.edgeRequired);
-    const wldIps = wlds.reduce((s, w) => s + w.edgeNodeCount, 0);
-    const units = mgmtUnits + wlds.length;
-    const totalIps = mgmtIps + wldIps;
-    return { units, totalIps, totalFqdns: totalIps };
+    const perDomain = [
+      ...(mgmt.nsxEdgeDeployed ? [{ domain: MGMT_DOMAIN_LABEL, units: 1, totalIps: mgmt.nsxEdgeNodeCount, totalFqdns: mgmt.nsxEdgeNodeCount }] : []),
+      ...wlds.map(w => ({ domain: w.domainName, units: 1, totalIps: w.edgeNodeCount, totalFqdns: w.edgeNodeCount })),
+    ];
+    return { ...sumPerDomain(perDomain), perDomain };
   },
   'esxi-host'(mgmt, workloadDomains) {
-    const units = mgmt.hostCount + workloadDomains.reduce((s, w) => s + w.hostCount, 0);
-    return { units, totalIps: units, totalFqdns: units };
+    // Each domain is its own VLAN/network pool (see core/vlan.js, wld.dedicatedVLANs) —
+    // ESXi management VMK IPs for a workload domain are not drawn from the management domain's pool.
+    const perDomain = [
+      { domain: MGMT_DOMAIN_LABEL, units: mgmt.hostCount, totalIps: mgmt.hostCount, totalFqdns: mgmt.hostCount },
+      ...workloadDomains.map(w => ({ domain: w.domainName, units: w.hostCount, totalIps: w.hostCount, totalFqdns: w.hostCount })),
+    ];
+    return { ...sumPerDomain(perDomain), perDomain };
   },
   'vcf-operations'(mgmt) {
     const enabled = !!mgmt.vcfOperations?.enabled;
@@ -67,17 +91,24 @@ const RULES = {
     const units = mgmt.aviDeployed ? 1 : 0;
     return { units, totalIps: units * r.ipsPerUnit, totalFqdns: units * r.fqdnsPerUnit };
   },
-  'avi-se'(mgmt) {
-    // Single shared SE pool per Avi deployment (not per-WLD) — matches the pptx reference design,
-    // which models Service Engines as one shared infrastructure pool, not one per workload domain.
+  'avi-se'(mgmt, workloadDomains) {
+    // Avi Service Engines are deployed per workload domain (own dedicated VIP network/VLAN —
+    // see core/vlan.js 'AVI VIP Network' and the avi-se-* appliances in core/appliances.js).
+    // Only the Controller cluster is centralized in the Management Domain (see 'avi-controller').
     const r = ref('avi-se');
-    const units = mgmt.aviDeployed ? 1 : 0;
-    return { units, totalIps: units * r.ipsPerUnit, totalFqdns: 0 };
+    const wlds = workloadDomains.filter(w => w.aviEnabled);
+    const perDomain = wlds.map(w => ({ domain: w.domainName, units: 1, totalIps: r.ipsPerUnit, totalFqdns: 0 }));
+    return { ...sumPerDomain(perDomain), perDomain };
   },
-  'vks-supervisor'(mgmt, workloadDomains) {
+  'vks-supervisor'(mgmt, workloadDomains, project) {
     const r = ref('vks-supervisor');
-    const units = (mgmt.vksEnabled ? 1 : 0) + workloadDomains.filter(w => w.vksEnabled).length;
-    return { units, totalIps: units * r.ipsPerUnit, totalFqdns: units * r.fqdnsPerUnit };
+    const wlds = workloadDomains.filter(w => w.vksEnabled);
+    const mgmtVks = mgmt.vksEnabled || project?.scenario === 'vcf-automation-vks';
+    const perDomain = [
+      ...(mgmtVks ? [{ domain: MGMT_DOMAIN_LABEL, units: 1, totalIps: r.ipsPerUnit, totalFqdns: r.fqdnsPerUnit }] : []),
+      ...wlds.map(w => ({ domain: w.domainName, units: 1, totalIps: r.ipsPerUnit, totalFqdns: r.fqdnsPerUnit })),
+    ];
+    return { ...sumPerDomain(perDomain), perDomain };
   },
 };
 
@@ -85,18 +116,19 @@ const RULES = {
  * @param {object} project - global project settings.
  * @param {object} mgmt - managementDomain state.
  * @param {object[]} workloadDomains - array of workload domain objects.
- * @returns {{components: Array<{id:string,label:string,scope:string,ipsPerUnit:number,fqdnsPerUnit:number,units:number,totalIps:number,totalFqdns:number,present:boolean,notes:string}>, totalIps:number, totalFqdns:number}}
+ * @returns {{components: Array<{id:string,label:string,scope:string,ipsPerUnit:number,fqdnsPerUnit:number,units:number,totalIps:number,totalFqdns:number,present:boolean,notes:string,perDomain?:Array}>, totalIps:number, totalFqdns:number}}
  */
 export function computeComponentRequirements(project, mgmt, workloadDomains) {
   const components = COMPONENT_REFERENCE.map(r => {
     const rule = RULES[r.id];
-    const { units, totalIps, totalFqdns } = rule(mgmt, workloadDomains, project);
+    const { units, totalIps, totalFqdns, perDomain } = rule(mgmt, workloadDomains, project);
     return {
       id: r.id, label: r.label, scope: r.scope,
       ipsPerUnit: r.ipsPerUnit, fqdnsPerUnit: r.fqdnsPerUnit,
       units, totalIps, totalFqdns,
       present: units > 0,
       notes: r.notes,
+      ...(perDomain ? { perDomain } : {}),
     };
   });
   return {

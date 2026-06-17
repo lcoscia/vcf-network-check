@@ -21,6 +21,6 @@ export const COMPONENT_REFERENCE = [
   { id:'ops-collector',     label:'Operations Collector',          scope:'per-site',         ipsPerUnit:1,  fqdnsPerUnit:1, notes:'Per remote site / remote data collector' },
   { id:'vcf-automation',    label:'VCF Automation',                scope:'mgmt-domain',      ipsPerUnit:7,  fqdnsPerUnit:2, notes:'Runtime + VIP FQDNs' },
   { id:'avi-controller',    label:'Avi LB Controller Cluster',     scope:'mgmt-domain',      ipsPerUnit:4,  fqdnsPerUnit:4, notes:'3 controllers + 1 cluster VIP' },
-  { id:'avi-se',            label:'Avi Service Engines',           scope:'mgmt-domain',      ipsPerUnit:16, fqdnsPerUnit:0, notes:'/28 pool, ~14 usable, no FQDNs' },
+  { id:'avi-se',            label:'Avi Service Engines',           scope:'per-domain',       ipsPerUnit:16, fqdnsPerUnit:0, notes:'One /28 SE pool (~14 usable) per workload domain with Avi enabled, no FQDNs' },
   { id:'vks-supervisor',    label:'vSphere Supervisor / VKS',      scope:'per-domain',       ipsPerUnit:5,  fqdnsPerUnit:1, notes:'Control plane IPs + 1 API endpoint FQDN' },
 ];
