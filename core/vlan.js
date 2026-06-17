@@ -1,6 +1,6 @@
 // Pure VLAN domain logic: builds management/workload VLAN lists and derives helper lookups.
 
-import { recommendCIDR } from './sizing.js?v=1.7.2';
+import { recommendCIDR } from './sizing.js?v=1.8.0';
 
 // ── VLAN ENGINE ─────────────────────────────────────────────────
 let _vlanId=0;

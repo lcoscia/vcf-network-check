@@ -139,6 +139,13 @@
     .app-header-left { display: flex; align-items: center; gap: 14px; }
     .app-header-brand { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
     .app-header-project { font-size: 12px; color: #a8c4de; }
+    .header-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 20px; padding: 2px 9px; color: white; white-space: nowrap;
+    }
+    .header-badge-beta { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #fde68a; }
+    .header-badge-vcf { background: rgba(255,255,255,0.08); color: #a8c4de; }
     .app-header-right { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a8c4de; }
     .header-user { font-size: 12px; color: #a8c4de; padding: 0 8px; }
     .header-btn {
@@ -506,6 +513,9 @@
   <header class="app-header">
     <div class="app-header-left">
       <span class="app-header-brand">VCF 9 Network Planner</span>
+      <span class="header-badge" x-text="'v' + appVersion"></span>
+      <span class="header-badge header-badge-beta" :title="t('header.beta_tooltip')">BETA</span>
+      <span class="header-badge header-badge-vcf" x-show="project.vcfVersion" x-text="'VCF ' + project.vcfVersion"></span>
       <span class="app-header-project" x-text="project.projectName ? '— ' + project.projectName : ''"></span>
     </div>
     <!-- AUTH DISABLED — décommenter pour réactiver user/logout dans le header
@@ -1488,8 +1498,9 @@
             <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9 Network Planner</div>
             <div style="font-size:14px;color:#a8c4de;margin-bottom:18px;">Architecture Edition — Pre-Deployment Network Planning Tool</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">v1.7.2</span>
+              <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;" x-text="'v' + appVersion"></span>
               <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;">Jun 2026</span>
+              <span style="background:rgba(245,158,11,0.25);border:1px solid rgba(245,158,11,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#fde68a;font-weight:700;" :title="t('header.beta_tooltip')">BETA</span>
               <span style="background:rgba(39,174,96,0.3);border:1px solid rgba(39,174,96,0.5);border-radius:20px;padding:4px 14px;font-size:12px;color:#7fffb8;font-weight:700;">VMware Cloud Foundation 9</span>
             </div>
           </div>
@@ -1499,6 +1510,12 @@
             <div style="font-size:12px;color:#a8c4de;margin-top:3px;">Senior VMware Cloud Foundation Architect</div>
           </div>
         </div>
+      </div>
+
+      <!-- Disclaimer -->
+      <div class="card" style="border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.06);margin-bottom:20px;">
+        <h2 class="sec-title" style="margin-bottom:8px;color:#92620a;">Disclaimer</h2>
+        <p style="font-size:13px;color:#6b4a0a;margin:0;">This tool is a community conversion of the official Broadcom workbook. Always cross-check values against the official VCF 9.1 documentation before deployment.</p>
       </div>
 
       <div class="g2">
@@ -1524,6 +1541,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.8.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.180')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.7.2</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
@@ -1627,7 +1649,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.7.2';
+import * as Core from './core/index.js?v=1.8.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1668,6 +1690,7 @@ function vcfApp(){
     },
 
     // App state
+    appVersion:'1.8.0',
     activeTab:'overview',
     get tabs() {
       return [
