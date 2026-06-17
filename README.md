@@ -1,6 +1,6 @@
-# VCF 9 Network Planner — v1.6.1
+# VCF 9 Network Planner — v1.7.0
 
-Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` directly in a browser.
+Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
 **Available in French and English** — toggle FR / EN in the header. Language persists across sessions (localStorage).
 
@@ -16,6 +16,7 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 - **VIPs** — virtual IP allocation with IP prefix pre-fill from VLAN CIDRs
 - **Validation** — architectural rules with Blocker / Warning / Info severity
 - **Export / Import** — Excel workbook (5 sheets) + JSON save/restore
+- **VCF Components** — clickable card grid grouped by domain (Management + each Workload Domain); click a component (SDDC Manager, vCenter, NSX Manager/Edge, ESXi, VCF Operations/Automation, Avi, VKS…) to see its scope, IPs/unit, FQDNs/unit, and the totals computed dynamically from the current project configuration
 
 ### VCF 9.0 / 9.1 dual support
 
@@ -71,20 +72,45 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 
 ```bash
 git clone https://github.com/lcoscia/vcf-network-check.git
-cd vcf-network-check/vcf-planner-html
-open index.html   # or serve with any static HTTP server
+cd vcf-network-check
+python3 -m http.server 8000
+# then open http://localhost:8000/index.html
 ```
 
 No configuration required. Authentication is disabled — the tool is accessible directly.
+
+> `index.html` loads its business logic via real ES modules (`<script type="module">`), so it must be served over HTTP(S) — Chrome blocks ES module imports over `file://`. A static server (`python3 -m http.server`, VS Code Live Server, etc.) is required; Firefox is more permissive but a server is still the supported path.
+
+## Architecture
+
+All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/`window` coupling — each module is independently testable and reusable outside the browser UI (e.g. a future MCP server or CLI):
+
+| File | Role |
+|---|---|
+| `core/index.js` | Barrel — re-exports every Core symbol, no logic |
+| `core/data.js` | Static constants: CIDR sizing table, default project/domain templates |
+| `core/reference.js` | ID/domain helpers, default workload-domain factory, VCF-component IP/FQDN reference table |
+| `core/sizing.js` | CIDR recommendation logic |
+| `core/vlan.js` | VLAN list derivation (Management + Workload Domains) |
+| `core/appliances.js` | Appliance inventory derivation |
+| `core/vips.js` | VIP inventory derivation |
+| `core/summary.js` | Per-domain summary aggregation |
+| `core/validation.js` | Architectural validation engine |
+| `core/excel.js` | Excel export data shaping (takes the `XLSX` library as a parameter) |
+| `core/i18n.js` | FR/EN translation dictionary + pure translator |
+| `core/components.js` | Per-component IP/FQDN requirement calculation (VCF Components tab) |
+
+`index.html` is a thin UI layer: HTML markup + Alpine.js, with a single `<script type="module">` that imports `core/index.js` and calls `Core.*` from the Alpine component. Tailwind is loaded via CDN with a `tw-` prefix (used only by the VCF Components tab) so it can never collide with the pre-existing custom CSS design system.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | Vanilla HTML5 + Alpine.js v3 |
-| Styling | Custom CSS — VCF-DD Design System |
+| Architecture | Pure ES modules in `core/` + thin UI layer (`index.html`) |
+| Styling | Custom CSS — VCF-DD Design System + Tailwind CDN (`tw-` prefix) |
 | Excel Export | SheetJS (xlsx.full.min.js) |
-| Runtime | Browser-only, no build step |
+| Runtime | Browser-only, no build step (served via static HTTP server) |
 | Compatibility | Chrome, Edge, Firefox, Safari |
 
 > Authentication (Supabase + EmailJS) is fully commented out in the source and can be re-enabled by searching for `AUTH DISABLED` markers.
@@ -93,6 +119,7 @@ No configuration required. Authentication is disabled — the tool is accessible
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.7.0 | Jun 2026 | Architectural refactor: all business logic (VLANs, appliances, VIPs, validation, Excel export, i18n) moved into pure ES modules under `core/` (testable in isolation, reusable outside the UI — e.g. a future MCP server/CLI); `index.html` becomes a thin UI/Alpine layer importing `core/index.js` via `<script type="module">`; added Tailwind CDN (`tw-` prefix to avoid collisions with the existing CSS design system). New **VCF Components** tab: clickable component grid grouped by domain, showing IPs/FQDNs required per VCF component, computed dynamically from the project configuration and based on the VCF 9.1 IP/FQDN prerequisites reference figures |
 | v1.6.1 | Jun 2026 | Multi-agent 9.1 audit corrections (TechDocs re-verification, IP/FQDN model): VCF Management Services = 4 Day-0 FQDNs (Fleet, Instance, Services Runtime, Identity Broker) — License Server is a separate component (1 FQDN, Mgmt VM Network); Identity Broker IP now allocated from the Services Runtime block (no separate VIP/IP, no longer double-counted); Log Management 9.1 IPs (6 base + 2/replica) now allocated from the Services Runtime block, removed from Mgmt VM Network/Fleet VLAN counts and VIP list; VCF Automation 9.1 corrected to 1 dedicated FQDN + 1 dedicated Services Runtime FQDN + /29 (3 node IPs + 2 buffer for redeploy/rolling updates), defaults to Management VM Network, independent from the Services Runtime block; new Info validation rule on the Automation /29 block separation; updated bilingual FR/EN help boxes (fleet, platform, logs, automation, identity broker) and appliance/VIP notes accordingly |
 | v1.6.0 | Jun 2026 | New "Consolidated / 3-Node vSAN ESA (Compact)" scenario (Management + VI Workload Domains share a 3-host vSAN ESA cluster, resource-pool isolation; 3-host minimum, 4 recommended for N+1; reworked validation engine + scenario-specific checks; bilingual Broadcom TechDocs help box). Multi-agent audit corrections (TechDocs VCF 9.1): VCF Automation /29 reworded to "4 node IPs (3 active + 1 buffer for redeployment)"; NSX Manager VIP reframed as VCF IP Allocation Workbook best practice (removed unverifiable internal reference); vSAN Stretched Cluster/vMSC L2/L3 requirement reversal fixed (VM Management Network mandatory L2, vSAN VMkernel L2/L3) + two-tier Witness latency (KB417356); VKS "5 consecutive IPs" softened to "5 IPs, recommended contiguous block" with separate workload/AVI/ingress-egress/pod CIDR note |
 | v1.5.1 | Jun 2026 | Multi-agent 9.1 audit (TechDocs re-verification): 5th Day-0 FQDN (License Server, in Mgmt VM Network); /28→/27 reworded as Day-N scale-out ceiling (Log Mgmt, Real-time Metrics, replicas) instead of a hard threshold; Real-time Metrics reclassified as Day-2 via Build/Lifecycle (not automatic); VCF Operations for Networks cert-SAN FQDN/IP note; AVI Controller cluster VIP renamed "Avi Load Balancer"; new Info validation rule recommending /27 for Services Runtime when Log Management is enabled |
