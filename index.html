@@ -643,10 +643,21 @@
       <div class="card">
         <h2 class="sec-title">Basic Configuration</h2>
         <div class="g4 mt12">
-          <div class="field"><label>Host Count</label>
+          <div class="field" x-show="managementDomain.topologyMode==='single-site'||managementDomain.topologyMode==='partially-stretched'"><label>Host Count</label>
             <input class="input" type="number" min="3" x-model.number="managementDomain.hostCount" />
             <span class="field-note" x-text="t('ui.hostcount_note')"></span>
           </div>
+          <template x-if="managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched'">
+            <div class="field">
+              <label x-text="t('az.host_count_label_short')">AZ1 / AZ2 Host Count</label>
+              <div class="flex-center gap12">
+                <input class="input" type="number" min="1" x-model.number="managementDomain.az1HostCount" @input="managementDomain.hostCount=managementDomain.az1HostCount+managementDomain.az2HostCount" />
+                <input class="input" type="number" min="1" x-model.number="managementDomain.az2HostCount" @input="managementDomain.hostCount=managementDomain.az1HostCount+managementDomain.az2HostCount" />
+              </div>
+              <span class="field-note" x-text="t('az.symmetry_note',{total:managementDomain.hostCount})"></span>
+              <span class="field-note" style="color:var(--red-accent)" x-show="managementDomain.az1HostCount!==managementDomain.az2HostCount" x-text="t('az.symmetry_warn')"></span>
+            </div>
+          </template>
           <div class="field">
             <label>Topology Mode</label>
             <select class="select" x-model="managementDomain.topologyMode">
@@ -684,6 +695,20 @@
           <div class="help-desc mt8" x-html="t('l2.help')"></div>
         </div>
       </div>
+
+      <template x-if="managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched'">
+        <div class="card">
+          <h2 class="sec-title" x-text="t('witness.section_title')">vSAN Witness</h2>
+          <div class="mt12">
+            <label class="check-row">
+              <input type="checkbox" x-model="managementDomain.witnessDedicatedVsanVmk" />
+              <span x-text="managementDomain.witnessDedicatedVsanVmk ? t('witness.dedicated_vmk_label') : t('witness.shared_vmk_label')"></span>
+            </label>
+            <div class="field-note" x-text="t('witness.alloc_summary',{n: managementDomain.witnessDedicatedVsanVmk ? 2 : 1})"></div>
+            <div class="help-desc mt8" x-html="t('witness.help')"></div>
+          </div>
+        </div>
+      </template>
 
       <div class="card">
         <h2 class="sec-title">NSX Configuration</h2>
@@ -1546,6 +1571,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.10.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1100')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.9.1</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.191')"></td>
@@ -1663,7 +1693,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.9.1';
+import * as Core from './core/index.js?v=1.10.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1704,7 +1734,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.9.1',
+    appVersion:'1.10.0',
     activeTab:'overview',
     get tabs() {
       return [

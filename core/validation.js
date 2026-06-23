@@ -21,6 +21,13 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k){
     if(!mgmt.layer2AdjacencyConfirmed)msgs.push(mkMsg('blocker','bring-up',domain,t('val.vsan_l2_block'),t('val.vsan_l2_res')));
   }
   if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,'Stretched topology (vMSC): ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
+  if(mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched'){
+    if(mgmt.az1HostCount<1||mgmt.az2HostCount<1) msgs.push(mkMsg('blocker','bring-up',domain,'Each Availability Zone must have at least 1 host.','Set AZ1/AZ2 host counts to 1 or more.'));
+    else if(mgmt.az1HostCount!==mgmt.az2HostCount) msgs.push(mkMsg('blocker','bring-up',domain,`AZ1 (${mgmt.az1HostCount}) and AZ2 (${mgmt.az2HostCount}) host counts differ. vSAN Stretched Cluster requires equal host counts per site for proper failover.`,'Set AZ1 host count equal to AZ2 host count.'));
+    const perSite=mgmt.az1HostCount;
+    const tier=perSite<=10?'<200ms RTT':perSite<=15?'<100ms RTT':'exceeds the documented 15-host/site tier';
+    msgs.push(mkMsg('info','bring-up',domain,`Witness latency tier for ${perSite} hosts/site: ${tier} required between each AZ and the vSAN Witness (min 10 Gbps between AZ1 and AZ2).`,'Confirm the WAN/L3 link to the Witness meets this RTT.'));
+  }
   if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,t('val.overlay_block'),t('val.overlay_res')));
   if((mgmt.vksEnabled||project.scenario==='vcf-automation-vks')&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario',domain,'VKS enabled but NSX Edge not deployed.','Deploy NSX Edge or confirm overlay from WLD NSX.'));
   if(mgmt.aviDeployed&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('info','scenario',domain,'AVI enabled but NSX Edge not deployed. Verify data plane connectivity.','Verify AVI SE network design.'));

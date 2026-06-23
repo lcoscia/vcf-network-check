@@ -20,6 +20,15 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   apps.push(mkApp('sddc-manager-01','SDDC Manager',domain,'Management VM Network','Management VM Network',true,false,true,'Primary SDDC Manager.'));
   apps.push(mkApp('vcenter-mgmt-01','vCenter Server',domain,'Management VM Network','Management VM Network',true,false,true,'Management Domain vCenter.'));
 
+  if(mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched'){
+    if(mgmt.witnessDedicatedVsanVmk){
+      apps.push(mkApp('vsan-witness-mgmt','vSAN Witness Appliance (vmk0 — Management)',domain,'vSAN Witness Traffic — Witness Appliance','vSAN Witness Traffic — Witness Appliance',true,false,true,'Witness Host management interface. Independent 3rd site — not part of AZ1/AZ2 host count.'));
+      apps.push(mkApp('vsan-witness-vsan','vSAN Witness Appliance (vmk1 — vSAN Witness Traffic)',domain,'vSAN Witness Traffic — Witness Appliance','vSAN Witness Traffic — Witness Appliance',true,false,true,'Dedicated witness traffic interface (vmk1). Requires independent L3 path to both AZ1 and AZ2.'));
+    } else {
+      apps.push(mkApp('vsan-witness-mgmt','vSAN Witness Appliance',domain,'vSAN Witness Traffic — Witness Appliance','vSAN Witness Traffic — Witness Appliance',true,false,true,'Witness Host — shared vmk0 for management + witness traffic. Independent 3rd site, not part of AZ1/AZ2 host count.'));
+    }
+  }
+
   const nsxCount=mgmt.nsxManagerMode==='clustered'?3:1;
   for(let i=1;i<=nsxCount;i++) apps.push(mkApp(`nsx-manager-mgmt-0${i}`,'NSX Manager',domain,'Management VM Network','Management VM Network',true,i===1&&mgmt.nsxManagerMode==='clustered',true,`NSX Manager node ${i} of ${nsxCount}.`));
   // C14: VIP NSX Manager réservée dans tous les modes (Simple + HA) pour permettre un futur scale-out HA sans ré-IP — bonne pratique VCF IP Allocation Workbook (Broadcom TechDocs VCF 9.1)

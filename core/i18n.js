@@ -17,6 +17,16 @@ export const translations = {
     'ui.hostcount_note': 'Min 3 = minimum technique vSAN ESA/OSA (Architecture Consolidated / VCF Edge) ; 4 recommandé pour la résilience N+1 (Broadcom TechDocs VCF 9.1).',
     // TEP
     'ui.tep_note': 'Min 2 recommandé (TEP HA actif-actif)',
+    // AZ1/AZ2 (Stretched Cluster)
+    'az.host_count_label_short': 'Hôtes AZ1 / AZ2',
+    'az.symmetry_note': 'Total : {total} hôtes. Broadcom exige un nombre d\'hôtes identique sur AZ1 et AZ2 (symétrie obligatoire pour le failover).',
+    'az.symmetry_warn': 'AZ1 et AZ2 ont des nombres d\'hôtes différents — non conforme aux prérequis Broadcom.',
+    // vSAN Witness
+    'witness.section_title': 'vSAN Witness',
+    'witness.dedicated_vmk_label': 'vmk1 dédié pour le trafic Witness vSAN (2 IPs)',
+    'witness.shared_vmk_label': 'vmk0 partagé management + Witness (1 IP — défaut Broadcom)',
+    'witness.alloc_summary': 'Allocation : {n} IP/FQDN pour l\'appliance Witness.',
+    'witness.help': 'Le Witness est une entité à part — pas un 3ème site symétrique à AZ1/AZ2 (pas d\'hôtes ESXi à dimensionner). Par défaut, le management et le trafic witness vSAN partagent le même VMkernel (vmk0, 1 IP). Le lien entre chaque AZ et le Witness doit être routé en L3 indépendant (contrairement au lien AZ1↔AZ2, qui peut être L2 ou L3).',
     // Storage
     'storage.nfs_opt': 'NFS (stockage primaire NFS)',
     'storage.nfs_note': 'NFS : VLAN NFS généré à la place de vSAN. <strong>L2 obligatoire</strong> entre hôtes ESXi et serveur NFS.',
@@ -118,6 +128,7 @@ export const translations = {
     // Header
     'header.beta_tooltip': 'Version Beta — vérifiez toujours les valeurs avec la documentation officielle Broadcom VCF 9.1 avant tout déploiement.',
     // About - version history
+    'ver.1100': `Modélisation complète d'AZ1, AZ2 et du Witness pour le Management Domain en vSAN Stretched Cluster (audit ayant confirmé qu'AZ2 n'avait aucune représentation distincte) : nouveaux champs <strong>AZ1 / AZ2 Host Count</strong> remplaçant le champ unique en mode Stretched (avec synchronisation automatique du total) ; les lignes VLAN ESXi Management, vMotion, vSAN et NSX Host TEP sont désormais dédoublées par AZ ; nouvelle section <strong>vSAN Witness</strong> avec choix entre vmk0 partagé (1 IP, défaut Broadcom) ou vmk1 dédié (2 IPs), reflété dans une ligne VLAN et une appliance dédiées, présentées comme une entité à part — pas un 3ème site symétrique. Nouvelles règles de validation : blocker si AZ1 ≠ AZ2 (symétrie obligatoire pour le failover) ou si un AZ a 0 hôte, et message info sur le palier de latence Witness applicable. Aucun changement de comportement en mode Single Site / Partially Stretched.`,
     'ver.191': `Audit multi-agent des prérequis IP/FQDN par rapport à la documentation officielle Broadcom VCF 9.1, suivi de corrections ciblées : <strong>NSX Edge Nodes</strong> corrigé de 2 à 1 IP/FQDN par nœud (la table de référence ne correspondait pas au calcul réel du code, qui ne comptait déjà que l'IP de management — TEP et sous-réseaux d'uplink sont comptés séparément via les pools VLAN dédiés) ; <strong>SSP</strong> recalé sur le minimum documenté par Broadcom de 4 workers (au lieu de 5-10 supposés), avec les chiffres exacts de pool (Node Pool 13 IPs, Service Pool 7 IPs — total 21 IPs inchangé) et correction du nom de FQDN « SSP Ingress » → « SSP Instance » ; <strong>License Hub</strong> : confirmation que le nombre de FQDN (1) reste une hypothèse non documentée par Broadcom, et clarification pour écarter une confusion avec les FQDN de SSP. Aucun changement de valeur pour License Hub.`,
     'ver.190': `Ajout de deux composants VCF 9.1 manquants à l'onglet <strong>VCF Components</strong> : <strong>SSP (Security Services Platform)</strong> — la plateforme qui héberge vDefend (NDR, prévention des malwares, security intelligence), 1:1:1 avec un cluster NSX Manager (1 installeur SSPI + instance SSP : 3 contrôleurs + 5-10 workers, ~21 IPs et 3 FQDN par instance), activable par case à cocher au niveau Management Domain et par Workload Domain ; et <strong>License Hub (vDefend + Avi)</strong> — service distinct du License Server existant, dédié aux abonnements vDefend/Avi, déployé une fois par Fleet (9 IPs, 1 FQDN), activé automatiquement dès que SSP ou Avi est utilisé. Les deux composants sont également intégrés au tableau d'allocation détaillé par appliance. Renommage de l'application en « VCF 9.1 Network Planner ».`,
     'ver.180': `Bannière d'en-tête : affiche désormais la version de l'app, un badge <strong>BETA</strong> (avec rappel de vérifier les valeurs avec la documentation officielle Broadcom VCF 9.1) et la version VCF sélectionnée (9.0/9.1, mise à jour en direct dès qu'elle change dans l'onglet Overview). Ajout d'un encart <strong>Disclaimer</strong> en haut de l'onglet About : « Cet outil est une conversion communautaire du workbook officiel Broadcom. Vérifiez toujours les valeurs avec la documentation officielle VCF 9.1 avant tout déploiement. »`,
@@ -178,6 +189,16 @@ export const translations = {
     'ui.hostcount_note': 'Min 3 = vSAN ESA/OSA technical minimum (Consolidated Architecture / VCF Edge); 4 recommended for N+1 resilience (Broadcom TechDocs VCF 9.1).',
     // TEP
     'ui.tep_note': 'Min 2 recommended (TEP active-active HA)',
+    // AZ1/AZ2 (Stretched Cluster)
+    'az.host_count_label_short': 'AZ1 / AZ2 Host Count',
+    'az.symmetry_note': 'Total: {total} hosts. Broadcom requires an identical host count on AZ1 and AZ2 (symmetry mandatory for failover).',
+    'az.symmetry_warn': 'AZ1 and AZ2 have different host counts — not compliant with Broadcom prerequisites.',
+    // vSAN Witness
+    'witness.section_title': 'vSAN Witness',
+    'witness.dedicated_vmk_label': 'Dedicated vmk1 for vSAN Witness traffic (2 IPs)',
+    'witness.shared_vmk_label': 'Shared vmk0 for management + Witness traffic (1 IP — Broadcom default)',
+    'witness.alloc_summary': 'Allocation: {n} IP/FQDN for the Witness appliance.',
+    'witness.help': 'The Witness is a distinct entity — not a 3rd site symmetric to AZ1/AZ2 (no ESXi hosts to size). By default, management and vSAN witness traffic share the same VMkernel (vmk0, 1 IP). The link between each AZ and the Witness must use independent L3 routing (unlike the AZ1↔AZ2 link, which can be L2 or L3).',
     // Storage
     'storage.nfs_opt': 'NFS (primary NFS storage)',
     'storage.nfs_note': 'NFS: NFS VLAN generated instead of vSAN. <strong>L2 mandatory</strong> between ESXi hosts and NFS server.',
@@ -279,6 +300,7 @@ export const translations = {
     // Header
     'header.beta_tooltip': 'Beta release — always cross-check values against the official Broadcom VCF 9.1 documentation before any deployment.',
     // About - version history
+    'ver.1100': `Full modeling of AZ1, AZ2, and the Witness for the Management Domain in vSAN Stretched Cluster (an audit confirmed AZ2 had no distinct representation at all): new <strong>AZ1 / AZ2 Host Count</strong> fields replace the single host count field in Stretched mode (with automatic total syncing); the ESXi Management, vMotion, vSAN, and NSX Host TEP VLAN rows are now split per AZ; new <strong>vSAN Witness</strong> section with a choice between shared vmk0 (1 IP, Broadcom default) or dedicated vmk1 (2 IPs), reflected in a dedicated VLAN row and appliance, presented as a distinct entity — not a symmetric 3rd site. New validation rules: blocker if AZ1 ≠ AZ2 (symmetry mandatory for failover) or if either AZ has 0 hosts, plus an info message on the applicable Witness latency tier. No behavior change in Single Site / Partially Stretched mode.`,
     'ver.191': `Multi-agent audit of IP/FQDN prerequisites against official Broadcom VCF 9.1 documentation, followed by targeted corrections: <strong>NSX Edge Nodes</strong> corrected from 2 to 1 IP/FQDN per node (the reference table didn't match the actual code calculation, which already counted only the management IP — TEP and uplink subnets are counted separately via dedicated VLAN pools); <strong>SSP</strong> recalibrated to Broadcom's documented minimum of 4 workers (instead of the assumed 5-10), with exact pool figures (Node Pool 13 IPs, Service Pool 7 IPs — total of 21 IPs unchanged) and an FQDN name fix: "SSP Ingress" → "SSP Instance"; <strong>License Hub</strong>: confirmed the FQDN count (1) remains an undocumented assumption by Broadcom, with wording clarified to rule out a mix-up with SSP's FQDNs. No value change for License Hub.`,
     'ver.190': `Added two missing VCF 9.1 components to the <strong>VCF Components</strong> tab: <strong>SSP (Security Services Platform)</strong> — the platform hosting vDefend (NDR, malware prevention, security intelligence), 1:1:1 with an NSX Manager cluster (1 SSPI installer + SSP instance: 3 controllers + 5-10 workers, ~21 IPs and 3 FQDNs per instance), toggled via a checkbox at Management Domain level and per Workload Domain; and <strong>License Hub (vDefend + Avi)</strong> — a service distinct from the existing License Server, dedicated to vDefend/Avi subscription licensing, deployed once per Fleet (9 IPs, 1 FQDN), auto-enabled as soon as SSP or Avi is in use. Both components are also reflected in the detailed per-appliance allocation table. App renamed to "VCF 9.1 Network Planner".`,
     'ver.180': `Header banner: now shows the app version, a <strong>BETA</strong> badge (with a reminder to verify values against the official Broadcom VCF 9.1 documentation), and the selected VCF version (9.0/9.1, updates live as soon as it changes on the Overview tab). Added a <strong>Disclaimer</strong> box at the top of the About tab: "This tool is a community conversion of the official Broadcom workbook. Always cross-check values against the official VCF 9.1 documentation before deployment."`,
