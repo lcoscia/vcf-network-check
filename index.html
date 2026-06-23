@@ -1546,6 +1546,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.9.1</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.191')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.9.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.190')"></td>
@@ -1658,7 +1663,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.9.0';
+import * as Core from './core/index.js?v=1.9.1';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1699,7 +1704,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.9.0',
+    appVersion:'1.9.1',
     activeTab:'overview',
     get tabs() {
       return [

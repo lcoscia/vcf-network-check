@@ -43,8 +43,8 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
 
   if(mgmt.sspEnabled){
     apps.push(mkApp('ssp-installer-01','SSP Installer (SSPI)',domain,'Management VM Network','Management VM Network',true,false,true,'Security Services Platform Installer appliance.'));
-    apps.push(mkApp('ssp-node-pool','SSP Node Pool (3 controllers + workers)',domain,'SSP Network','SSP Network',true,false,false,'Pool of 10-15 IPs depending on worker count (5-10) — not itemized IP by IP.'));
-    apps.push(mkApp('ssp-service-pool','SSP Service IP Pool',domain,'SSP Network','SSP Network',true,true,true,'Contiguous pool of 6-8 IPs: SSP Ingress (NSX metrics) + SSP Messaging (flow data).'));
+    apps.push(mkApp('ssp-node-pool','SSP Node Pool (3 controllers + workers)',domain,'SSP Network','SSP Network',true,false,false,'Pool of 13 IPs (3 controllers + minimum 4 workers, per Broadcom\'s documented minimum) — not itemized IP by IP.'));
+    apps.push(mkApp('ssp-service-pool','SSP Service IP Pool',domain,'SSP Network','SSP Network',true,true,true,'Contiguous pool of 7 IPs: SSP Instance (NSX metrics ingestion) + SSP Messaging (flow data).'));
   }
   if(mgmt.sspEnabled||mgmt.aviDeployed){
     apps.push(mkApp('license-hub-controller','License Hub Controller',domain,'Management VM Network','Management VM Network',true,false,true,'Licenses vDefend + Avi subscriptions — deployed once per Fleet.'));
@@ -158,8 +158,8 @@ export function buildWorkloadAppliances(wld,t=k=>k){
   }
   if(wld.vksEnabled) apps.push(mkApp(`vks-supervisor-${domain.toLowerCase()}`,'VKS Supervisor',domain,'VKS Infrastructure','VKS Infrastructure',true,false,true,`VKS Supervisor for ${domain}.`));
   if(wld.sspEnabled&&wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
-    apps.push(mkApp(`ssp-node-pool-${domain.toLowerCase()}`,'SSP Node Pool (3 controllers + workers)',domain,'SSP Network','SSP Network',true,false,false,`Pool of 10-15 IPs for ${domain} depending on worker count.`));
-    apps.push(mkApp(`ssp-service-pool-${domain.toLowerCase()}`,'SSP Service IP Pool',domain,'SSP Network','SSP Network',true,true,true,`Contiguous pool of 6-8 IPs for ${domain}.`));
+    apps.push(mkApp(`ssp-node-pool-${domain.toLowerCase()}`,'SSP Node Pool (3 controllers + workers)',domain,'SSP Network','SSP Network',true,false,false,`Pool of 13 IPs for ${domain} (3 controllers + minimum 4 workers).`));
+    apps.push(mkApp(`ssp-service-pool-${domain.toLowerCase()}`,'SSP Service IP Pool',domain,'SSP Network','SSP Network',true,true,true,`Contiguous pool of 7 IPs for ${domain}.`));
   }
   wld.additionalServices.forEach(svc=>{
     const sVLAN=svc.requiresDedicatedVLAN?`${svc.name} Network`:'VM / Application Network';
