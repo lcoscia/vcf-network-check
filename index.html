@@ -651,7 +651,7 @@
             <div class="field">
               <label x-text="t('az.host_count_label_short')">AZ1 / AZ2 Host Count</label>
               <div class="flex-center gap12">
-                <input class="input" type="number" min="1" x-model.number="managementDomain.az1HostCount" @input="managementDomain.hostCount=managementDomain.az1HostCount+managementDomain.az2HostCount" />
+                <input class="input" type="number" min="1" x-model.number="managementDomain.az1HostCount" @input="managementDomain.az2HostCount=managementDomain.az1HostCount; managementDomain.hostCount=managementDomain.az1HostCount+managementDomain.az2HostCount" />
                 <input class="input" type="number" min="1" x-model.number="managementDomain.az2HostCount" @input="managementDomain.hostCount=managementDomain.az1HostCount+managementDomain.az2HostCount" />
               </div>
               <span class="field-note" x-text="t('az.symmetry_note',{total:managementDomain.hostCount})"></span>
@@ -1571,6 +1571,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.10.1</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1101')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.10.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1100')"></td>
@@ -1693,7 +1698,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.10.0';
+import * as Core from './core/index.js?v=1.10.1';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1734,7 +1739,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.10.0',
+    appVersion:'1.10.1',
     activeTab:'overview',
     get tabs() {
       return [
