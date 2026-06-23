@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.10.1
+# VCF 9.1 Network Planner — v1.11.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -44,7 +44,7 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 ### Network models
 - **4 Fleet/Platform network models**: Shared Management VM Network, Dedicated Fleet VLAN, NSX VLAN Segment, NSX Overlay Segment (Edge required)
 - **Storage types**: vSAN ESA (VCF 9 default), vSAN OSA, NFS, VMFS
-- **Topology modes**: Single-Site, vSAN Stretched Cluster (Broadcom prerequisites), Stretched vMSC, Partially Stretched. In Stretched mode, the Management Domain is modeled as **AZ1 + AZ2 + a distinct vSAN Witness**: explicit AZ1/AZ2 host count fields (with mandatory symmetry validation), per-AZ VLAN rows (ESXi Management, vMotion, vSAN, NSX Host TEP), and a dedicated Witness VLAN/appliance (1 IP by default — shared vmk0 — or 2 IPs with a dedicated vmk1, user-selectable)
+- **Topology modes**: Single-Site, vSAN Stretched Cluster (Broadcom prerequisites), Stretched vMSC, Partially Stretched — available for **both the Management Domain and each Workload Domain independently**. In Stretched mode, a domain is modeled as **AZ1 + AZ2 + a distinct vSAN Witness**: explicit AZ1/AZ2 host count fields (AZ1→AZ2 auto-sync, with mandatory symmetry validation), per-AZ VLAN rows (ESXi Management, vMotion, vSAN, NSX Host TEP), and a dedicated Witness VLAN/appliance (1 IP by default — shared vmk0 — or 2 IPs with a dedicated vmk1, user-selectable). Each stretched Workload Domain gets its own independent Witness, never shared with the Management Domain or other Workload Domains
 
 ### VCF 9.x design rules (per Broadcom TechDocs)
 - NSX Manager VIP reserved in all modes (VCF IP Allocation Workbook best practice for non-disruptive future HA scale-out)
@@ -121,6 +121,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.11.0 | Jun 2026 | Extended AZ1/AZ2/Witness modeling to Workload Domains (previously only available for the Management Domain): any Workload Domain can now be configured as a vSAN Stretched Cluster, with its own AZ1/AZ2 Host Count fields (AZ1→AZ2 auto-sync), per-AZ VLAN rows (ESXi Management, vMotion, vSAN, NSX Host TEP), and its own independent Witness (shared vmk0 or dedicated vmk1) — not shared with the Management Domain or other Workload Domains. New per-domain validation rules (AZ1/AZ2 symmetry blocker, min-1-host-per-AZ blocker, Witness latency tier info). No behavior change in Single Site / Partially Stretched mode |
 | v1.10.1 | Jun 2026 | Reduced friction on AZ1/AZ2 input (Stretched Cluster): the AZ1 Host Count field now auto-syncs AZ2 to the same value (symmetry by default, per Broadcom's requirement), while AZ2 remains freely editable afterward to test an intentionally asymmetric setup — the existing AZ1/AZ2 symmetry blocker remains the safety net |
 | v1.10.0 | Jun 2026 | Full modeling of AZ1, AZ2, and the Witness for the Management Domain in vSAN Stretched Cluster (an audit confirmed AZ2 had no distinct representation): new AZ1/AZ2 Host Count fields replace the single host count field in Stretched mode (auto-synced total); ESXi Management, vMotion, vSAN, and NSX Host TEP VLAN rows now split per AZ; new vSAN Witness section/VLAN/appliance with a shared-vmk0 (1 IP, default) vs dedicated-vmk1 (2 IPs) choice, modeled as a distinct entity rather than a symmetric 3rd site; new validation rules (AZ1/AZ2 symmetry blocker, min-1-host-per-AZ blocker, Witness latency tier info). No behavior change in Single Site / Partially Stretched mode |
 | v1.9.1 | Jun 2026 | Multi-agent audit of IP/FQDN prerequisites against official Broadcom VCF 9.1 documentation, followed by targeted corrections: **NSX Edge Nodes** corrected from 2 to 1 IP/FQDN per node (reference table didn't match the actual code calculation, which already counted only the management IP — TEP/uplink subnets are counted separately via dedicated VLAN pools); **SSP** recalibrated to Broadcom's documented minimum of 4 workers (instead of the assumed 5-10), with exact pool figures (Node Pool 13 IPs, Service Pool 7 IPs — total of 21 IPs unchanged) and an FQDN name fix ("SSP Ingress" → "SSP Instance"); **License Hub**: confirmed the FQDN count (1) remains an undocumented Broadcom assumption, wording clarified to rule out a mix-up with SSP's FQDNs (no value change) |

@@ -3,7 +3,7 @@
 export function newId(){return 'id-'+Math.random().toString(36).slice(2);}
 
 export function defaultWorkloadDomain(index){
-  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],storageType:'vsan-esa',sspEnabled:false,notes:''};
+  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],storageType:'vsan-esa',sspEnabled:false,topologyMode:'single-site',az1HostCount:2,az2HostCount:2,witnessDedicatedVsanVmk:false,notes:''};
 }
 
 // Baseline per-component IP/FQDN figures sourced from VCF91-PrequisIP-FQDN.pptx (reference design:

@@ -1048,9 +1048,29 @@
           </div>
           <div class="wld-card-body">
             <div class="g4 mb12">
-              <div class="field"><label>Host Count</label>
+              <div class="field" x-show="workloadDomains[wi].topologyMode==='single-site'||workloadDomains[wi].topologyMode==='partially-stretched'"><label>Host Count</label>
                 <input class="input" type="number" min="2" x-model.number="workloadDomains[wi].hostCount" />
                 <span class="field-note" x-text="t('wld.host_note')"></span>
+              </div>
+              <template x-if="workloadDomains[wi].topologyMode==='vsan-stretched'||workloadDomains[wi].topologyMode==='stretched'">
+                <div class="field">
+                  <label x-text="t('az.host_count_label_short')">AZ1 / AZ2 Host Count</label>
+                  <div class="flex-center gap12">
+                    <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].az1HostCount" @input="workloadDomains[wi].az2HostCount=workloadDomains[wi].az1HostCount; workloadDomains[wi].hostCount=workloadDomains[wi].az1HostCount+workloadDomains[wi].az2HostCount" />
+                    <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].az2HostCount" @input="workloadDomains[wi].hostCount=workloadDomains[wi].az1HostCount+workloadDomains[wi].az2HostCount" />
+                  </div>
+                  <span class="field-note" x-text="t('az.symmetry_note',{total:workloadDomains[wi].hostCount})"></span>
+                  <span class="field-note" style="color:var(--red-accent)" x-show="workloadDomains[wi].az1HostCount!==workloadDomains[wi].az2HostCount" x-text="t('az.symmetry_warn')"></span>
+                </div>
+              </template>
+              <div class="field">
+                <label>Topology Mode</label>
+                <select class="select" x-model="workloadDomains[wi].topologyMode">
+                  <option value="single-site">Single Site</option>
+                  <option value="vsan-stretched" x-text="t('topo.vsan_opt')"></option>
+                  <option value="stretched" x-text="t('topo.vmsc_opt')"></option>
+                  <option value="partially-stretched">Partially Stretched</option>
+                </select>
               </div>
               <div class="field">
                 <label>Domain Role</label>
@@ -1110,6 +1130,19 @@
                 </div>
               </div>
             </div>
+
+            <!-- vSAN Witness (Stretched Cluster) -->
+            <template x-if="workloadDomains[wi].topologyMode==='vsan-stretched'||workloadDomains[wi].topologyMode==='stretched'">
+              <div class="nest mt12">
+                <div class="nest-title" x-text="t('witness.section_title')">vSAN Witness</div>
+                <label class="check-row">
+                  <input type="checkbox" x-model="workloadDomains[wi].witnessDedicatedVsanVmk" />
+                  <span x-text="workloadDomains[wi].witnessDedicatedVsanVmk ? t('witness.dedicated_vmk_label') : t('witness.shared_vmk_label')"></span>
+                </label>
+                <div class="field-note" x-text="t('witness.alloc_summary',{n: workloadDomains[wi].witnessDedicatedVsanVmk ? 2 : 1})"></div>
+                <div class="help-desc mt8" x-html="t('witness.help')"></div>
+              </div>
+            </template>
 
             <!-- VKS VPCs -->
             <div x-show="workloadDomains[wi].vksEnabled" class="nest mt12">
@@ -1571,6 +1604,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.11.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1110')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.10.1</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1101')"></td>
@@ -1698,7 +1736,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.10.1';
+import * as Core from './core/index.js?v=1.11.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1739,7 +1777,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.10.1',
+    appVersion:'1.11.0',
     activeTab:'overview',
     get tabs() {
       return [

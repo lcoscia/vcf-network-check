@@ -51,6 +51,15 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k){
     if(wld.vksEnabled&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','scenario',d,`"${d}": VKS enabled but NSX not enabled.`,'Enable NSX.'));
     if(wld.edgeRequired&&wld.edgeNodeCount<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": only 1 Edge node. Min 2 recommended.`,'Increase Edge count.'));
     if(wld.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
+    if(wld.topologyMode==='vsan-stretched') msgs.push(mkMsg('warning','bring-up',d,t('val.vsan_warn'),t('val.vsan_warn_res')));
+    if(wld.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',d,'Stretched topology (vMSC): ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
+    if(wld.topologyMode==='vsan-stretched'||wld.topologyMode==='stretched'){
+      if(wld.az1HostCount<1||wld.az2HostCount<1) msgs.push(mkMsg('blocker','bring-up',d,`"${d}": each Availability Zone must have at least 1 host.`,'Set AZ1/AZ2 host counts to 1 or more.'));
+      else if(wld.az1HostCount!==wld.az2HostCount) msgs.push(mkMsg('blocker','bring-up',d,`"${d}": AZ1 (${wld.az1HostCount}) and AZ2 (${wld.az2HostCount}) host counts differ. vSAN Stretched Cluster requires equal host counts per site for proper failover.`,'Set AZ1 host count equal to AZ2 host count.'));
+      const perSite=wld.az1HostCount;
+      const tier=perSite<=10?'<200ms RTT':perSite<=15?'<100ms RTT':'exceeds the documented 15-host/site tier';
+      msgs.push(mkMsg('info','bring-up',d,`"${d}": Witness latency tier for ${perSite} hosts/site: ${tier} required between each AZ and the vSAN Witness (min 10 Gbps between AZ1 and AZ2).`,'Confirm the WAN/L3 link to the Witness meets this RTT.'));
+    }
   });
 
   const domains=[...new Set(vlans.map(v=>v.domain))];

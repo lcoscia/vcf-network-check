@@ -153,6 +153,16 @@ export function buildWorkloadAppliances(wld,t=k=>k){
   const apps=[];
   const domain=wld.domainName;
   apps.push(mkApp(`vcenter-${domain.toLowerCase()}-01`,'vCenter Server',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,`vCenter for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
+
+  if(wld.topologyMode==='vsan-stretched'||wld.topologyMode==='stretched'){
+    if(wld.witnessDedicatedVsanVmk){
+      apps.push(mkApp(`vsan-witness-${domain.toLowerCase()}-mgmt`,'vSAN Witness Appliance (vmk0 — Management)',domain,'vSAN Witness Traffic — Witness Appliance','vSAN Witness Traffic — Witness Appliance',true,false,true,`Witness Host management interface for ${domain}. Independent 3rd site — not part of AZ1/AZ2 host count.`));
+      apps.push(mkApp(`vsan-witness-${domain.toLowerCase()}-vsan`,'vSAN Witness Appliance (vmk1 — vSAN Witness Traffic)',domain,'vSAN Witness Traffic — Witness Appliance','vSAN Witness Traffic — Witness Appliance',true,false,true,`Dedicated witness traffic interface (vmk1) for ${domain}. Requires independent L3 path to both AZ1 and AZ2.`));
+    } else {
+      apps.push(mkApp(`vsan-witness-${domain.toLowerCase()}`,'vSAN Witness Appliance',domain,'vSAN Witness Traffic — Witness Appliance','vSAN Witness Traffic — Witness Appliance',true,false,true,`Witness Host for ${domain} — shared vmk0 for management + witness traffic. Independent 3rd site, not part of AZ1/AZ2 host count.`));
+    }
+  }
+
   if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
     const nc=wld.nsxManagerMode==='clustered'?3:1;
     for(let i=1;i<=nc;i++) apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-0${i}`,'NSX Manager',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,`NSX Mgr ${i}/${nc} for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
