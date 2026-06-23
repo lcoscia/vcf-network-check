@@ -1,4 +1,4 @@
-# VCF 9 Network Planner — v1.8.0
+# VCF 9.1 Network Planner — v1.9.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -16,7 +16,7 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 - **VIPs** — virtual IP allocation with IP prefix pre-fill from VLAN CIDRs
 - **Validation** — architectural rules with Blocker / Warning / Info severity
 - **Export / Import** — Excel workbook (5 sheets) + JSON save/restore
-- **VCF Components** — clickable card grid grouped by domain (Management + each Workload Domain); click a component (SDDC Manager, vCenter, NSX Manager/Edge, ESXi, VCF Operations/Automation, Avi, VKS…) to see its scope, IPs/unit, FQDNs/unit, and the totals computed dynamically from the current project configuration
+- **VCF Components** — clickable card grid grouped by domain (Management + each Workload Domain); click a component (SDDC Manager, vCenter, NSX Manager/Edge, ESXi, VCF Operations/Automation, Avi, VKS, **SSP**, **License Hub**…) to see its scope, IPs/unit, FQDNs/unit, and the totals computed dynamically from the current project configuration
 
 ### VCF 9.0 / 9.1 dual support
 
@@ -29,6 +29,8 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 - **Real-time Metrics** (Day-N): new 9.x component — 0 FQDN + 6 IPs, from the Services Runtime block (internal CIDR 198.18.0.0/15)
 - **NSX Manager VIP**: reserved in all modes including Simple (VCF IP Allocation Workbook best practice for non-disruptive future HA scale-out)
 - **Cloud Proxy**: replaces Remote Collectors in 9.x — 1 FQDN per VCF instance
+- **SSP (Security Services Platform)**: hosts vDefend (NDR, malware prevention, security intelligence) — 1:1:1 with an NSX Manager cluster; 1 SSPI installer + SSP instance (3 controllers + 5-10 workers); ~21 IPs / 3 FQDNs per instance (SSPI, SSP Ingress, SSP Messaging); opt-in toggle at Management Domain level and per Workload Domain; domains on a shared NSX Manager cluster are not double-counted
+- **License Hub (vDefend + Avi)**: distinct from License Server — manages vDefend/Avi subscription licensing (up to 120 endpoints); deployed once per Fleet (1 Controller + 1 Worker + 1 Installer = 9 IPs, 1 FQDN); auto-enabled as soon as SSP or Avi is in use
 
 #### VCF 9.0
 - Fleet Appliance (1 FQDN), classic platform service VM architecture
@@ -119,6 +121,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.9.0 | Jun 2026 | Added two missing VCF 9.1 components to the VCF Components tab: **SSP (Security Services Platform)** (vDefend host, 1:1:1 with an NSX Manager cluster, ~21 IPs/3 FQDNs per instance, opt-in toggle at Management Domain and per Workload Domain, no double-count on shared NSX clusters) and **License Hub (vDefend + Avi)** (distinct from License Server, 9 IPs/1 FQDN, deployed once per Fleet, auto-enabled when SSP or Avi is in use). Both components are also reflected in the detailed per-appliance allocation table (`core/appliances.js`). App renamed from "VCF 9 Network Planner" to "**VCF 9.1 Network Planner**" across the UI (title, header, About, footer) |
 | v1.8.0 | Jun 2026 | Header banner now shows the app version, a **BETA** badge (tooltip reminding to cross-check values against the official Broadcom VCF 9.1 documentation), and the currently selected VCF version (9.0/9.1), updating live as soon as it's changed on the Overview tab. Added a **Disclaimer** box at the top of the About tab: "This tool is a community conversion of the official Broadcom workbook. Always cross-check values against the official VCF 9.1 documentation before deployment." |
 | v1.7.2 | Jun 2026 | Deploy reliability fix: every internal ES module import (`core/index.js` and each `core/*.js` file) now carries a `?v=1.7.2` cache-busting query string, forcing the browser to fetch fresh JS on every release instead of risking a stale cached module after a deploy (the HTML updates immediately, but JS modules served by the GitHub Pages CDN could stay cached for up to 10 minutes, causing "I tested it and it's still broken" reports right after shipping a fix). The v1.7.1 per-domain ESXi/vCenter/NSX/VKS/Avi breakdown on the VCF Components tab was re-verified live in production with Playwright and confirmed working correctly — this release is infra-only, no logic change |
 | v1.7.1 | Jun 2026 | VCF Components tab corrected to match VCF 9.1 network design (Broadcom TechDocs): each Workload Domain is its own Layer-2 network domain/network pool, so ESXi host, vCenter, NSX Manager/Edge and VKS Supervisor figures are now broken down **per domain** (Management Domain + each Workload Domain) instead of one global total shared across all domains; fixed Avi Service Engines to be driven by each workload domain's own "Avi enabled" flag (per-domain dedicated SE pool, consistent with the VLAN Design/Appliances tabs) instead of the management-domain Avi Controller flag; clicking a card now shows the selected domain in the detail panel |

@@ -1,5 +1,5 @@
 // Pure CIDR-sizing calculations for VLAN subnets.
-import { CIDR_TABLE, GATEWAY_SPARE } from './data.js?v=1.8.0';
+import { CIDR_TABLE, GATEWAY_SPARE } from './data.js?v=1.9.0';
 
 export function recommendCIDR(requiredIPs, bufferEnabled=true, bufferPercent=20) {
   const withOverhead = requiredIPs + GATEWAY_SPARE;

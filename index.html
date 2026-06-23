@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VCF 9 Network Planner</title>
+  <title>VCF 9.1 Network Planner</title>
   <!-- ══ AUTH DISABLED — décommenter pour réactiver l'authentification Supabase ══
   <script>
     window.APP_CONFIG = {
@@ -479,7 +479,7 @@
     <div class="access-req-header">
       <span style="font-size:22px;">📧</span>
       <div>
-        <h2>Request VCF 9 Network Planner Access</h2>
+        <h2>Request VCF 9.1 Network Planner Access</h2>
         <p>Your request will be sent to the administrator for approval.</p>
       </div>
       <button onclick="document.getElementById('access-req-overlay').classList.remove('open')"
@@ -493,7 +493,7 @@
       <div class="access-req-field"><label>Company / Organization</label><input type="text" id="req-company" placeholder="ACME Corp"></div>
       <div class="access-req-field">
         <label>Reason for Access</label>
-        <textarea id="req-reason" rows="3" placeholder="Describe why you need access to the VCF 9 Network Planner…"></textarea>
+        <textarea id="req-reason" rows="3" placeholder="Describe why you need access to the VCF 9.1 Network Planner…"></textarea>
       </div>
       <p id="req-status" class="access-req-status"></p>
     </div>
@@ -512,7 +512,7 @@
   <!-- Header -->
   <header class="app-header">
     <div class="app-header-left">
-      <span class="app-header-brand">VCF 9 Network Planner</span>
+      <span class="app-header-brand">VCF 9.1 Network Planner</span>
       <span class="header-badge" x-text="'v' + appVersion"></span>
       <span class="header-badge header-badge-beta" :title="t('header.beta_tooltip')">BETA</span>
       <span class="header-badge header-badge-vcf" x-show="project.vcfVersion" x-text="'VCF ' + project.vcfVersion"></span>
@@ -702,6 +702,9 @@
           </div>
           <div class="field" style="justify-content:flex-end;padding-bottom:2px">
             <label class="check-row"><input type="checkbox" x-model="managementDomain.aviDeployed" /> AVI / NSX ALB Deployed</label>
+          </div>
+          <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+            <label class="check-row"><input type="checkbox" x-model="managementDomain.sspEnabled" /> SSP / vDefend Enabled</label>
           </div>
         </div>
       </div>
@@ -1059,6 +1062,7 @@
               <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].nsxEnabled" /> NSX Enabled</label>
               <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].aviEnabled" /> AVI / NSX ALB</label>
               <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].vksEnabled" /> VKS Enabled</label>
+              <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].sspEnabled" /> SSP / vDefend</label>
             </div>
 
             <!-- NSX sub-options -->
@@ -1495,7 +1499,7 @@
       <div class="card" style="background:linear-gradient(135deg,var(--blue-dark) 0%,var(--blue-mid) 100%);border:none;color:white;padding:32px 36px;margin-bottom:20px;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px;">
           <div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9 Network Planner</div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;">VCF 9.1 Network Planner</div>
             <div style="font-size:14px;color:#a8c4de;margin-bottom:18px;">Architecture Edition — Pre-Deployment Network Planning Tool</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
               <span style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;" x-text="'v' + appVersion"></span>
@@ -1524,7 +1528,7 @@
         <div class="card">
           <h2 class="sec-title" style="margin-bottom:14px;">Purpose</h2>
           <p class="text-sm text-muted" style="margin-bottom:10px;">
-            The VCF 9 Network Planner automates the pre-deployment network design process for VMware Cloud Foundation 9 deployments. It replaces manual spreadsheet workflows with a single, self-consistent planning document.
+            The VCF 9.1 Network Planner automates the pre-deployment network design process for VMware Cloud Foundation 9 deployments. It replaces manual spreadsheet workflows with a single, self-consistent planning document.
           </p>
           <p class="text-sm text-muted">
             From a handful of configuration choices, the tool derives the complete set of VLANs, appliance IP allocations, VIPs, and runs architectural validation — ready for export to Excel or JSON.
@@ -1541,6 +1545,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.9.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.190')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.8.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
@@ -1638,7 +1647,7 @@
 
       <!-- Footer note -->
       <div style="text-align:center;padding:16px;font-size:11px;color:var(--text-muted);">
-        VCF 9 Network Planner &nbsp;·&nbsp; Designed for VMware Cloud Foundation 9 pre-deployment architecture &nbsp;·&nbsp; © 2026 Leonardo Coscia
+        VCF 9.1 Network Planner &nbsp;·&nbsp; Designed for VMware Cloud Foundation 9 pre-deployment architecture &nbsp;·&nbsp; © 2026 Leonardo Coscia
       </div>
     </div>
 
@@ -1649,7 +1658,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.8.0';
+import * as Core from './core/index.js?v=1.9.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1690,7 +1699,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.8.0',
+    appVersion:'1.9.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -1733,7 +1742,7 @@ function vcfApp(){
       return this.componentData.components.map(c=>this.componentRow(c.id,'Management Domain')).filter(Boolean);
     },
     wldComponentRows(domainName){
-      return ['vcenter','nsx-manager','nsx-edge','esxi-host','avi-se','vks-supervisor']
+      return ['vcenter','nsx-manager','nsx-edge','esxi-host','avi-se','vks-supervisor','ssp']
         .map(id=>this.componentRow(id,domainName)).filter(Boolean);
     },
     selectComponent(id,domain){

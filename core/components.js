@@ -1,7 +1,7 @@
 // Pure calculation: derives per-component IP/FQDN totals for the current project configuration
 // from the static COMPONENT_REFERENCE table.
 
-import { COMPONENT_REFERENCE } from './reference.js?v=1.8.0';
+import { COMPONENT_REFERENCE } from './reference.js?v=1.9.0';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 
@@ -109,6 +109,26 @@ const RULES = {
       ...wlds.map(w => ({ domain: w.domainName, units: 1, totalIps: r.ipsPerUnit, totalFqdns: r.fqdnsPerUnit })),
     ];
     return { ...sumPerDomain(perDomain), perDomain };
+  },
+  'ssp'(mgmt, workloadDomains) {
+    // 1:1:1 with an NSX Manager cluster — mirrors RULES['nsx-manager']'s shared-cluster
+    // exclusion so domains on a shared NSX Manager (reusing another domain's SSP instance)
+    // are not double-counted.
+    const r = ref('ssp');
+    const wlds = workloadDomains.filter(w => w.sspEnabled && w.nsxEnabled && w.nsxManagerMode !== 'shared');
+    const mgmtSsp = mgmt.sspEnabled ? 1 : 0;
+    const perDomain = [
+      { domain: MGMT_DOMAIN_LABEL, units: mgmtSsp, totalIps: mgmtSsp * r.ipsPerUnit, totalFqdns: mgmtSsp * r.fqdnsPerUnit },
+      ...wlds.map(w => ({ domain: w.domainName, units: 1, totalIps: r.ipsPerUnit, totalFqdns: r.fqdnsPerUnit })),
+    ];
+    return { ...sumPerDomain(perDomain), perDomain };
+  },
+  'license-hub'(mgmt, workloadDomains) {
+    const r = ref('license-hub');
+    const anySsp = !!mgmt.sspEnabled || workloadDomains.some(w => w.sspEnabled);
+    const anyAvi = !!mgmt.aviDeployed || workloadDomains.some(w => w.aviEnabled);
+    const units = (anySsp || anyAvi) ? 1 : 0;
+    return { units, totalIps: units * r.ipsPerUnit, totalFqdns: units * r.fqdnsPerUnit };
   },
 };
 

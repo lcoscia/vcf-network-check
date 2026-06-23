@@ -41,6 +41,17 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
     apps.push(mkApp('avi-cluster-vip','AVI Cluster VIP',domain,'Management VM Network','Management VM Network',true,false,true,'AVI Controller cluster VIP.'));
   }
 
+  if(mgmt.sspEnabled){
+    apps.push(mkApp('ssp-installer-01','SSP Installer (SSPI)',domain,'Management VM Network','Management VM Network',true,false,true,'Security Services Platform Installer appliance.'));
+    apps.push(mkApp('ssp-node-pool','SSP Node Pool (3 controllers + workers)',domain,'SSP Network','SSP Network',true,false,false,'Pool of 10-15 IPs depending on worker count (5-10) — not itemized IP by IP.'));
+    apps.push(mkApp('ssp-service-pool','SSP Service IP Pool',domain,'SSP Network','SSP Network',true,true,true,'Contiguous pool of 6-8 IPs: SSP Ingress (NSX metrics) + SSP Messaging (flow data).'));
+  }
+  if(mgmt.sspEnabled||mgmt.aviDeployed){
+    apps.push(mkApp('license-hub-controller','License Hub Controller',domain,'Management VM Network','Management VM Network',true,false,true,'Licenses vDefend + Avi subscriptions — deployed once per Fleet.'));
+    apps.push(mkApp('license-hub-worker','License Hub Worker',domain,'Management VM Network','Management VM Network',true,false,false,'Worker node of the License Hub cluster.'));
+    apps.push(mkApp('license-hub-installer','License Hub Installer',domain,'Management VM Network','Management VM Network',true,false,true,'Temporary installer — IP from a subnet with L2/L3 connectivity to the License Hub pool.'));
+  }
+
   if(mgmt.vcfOperations.enabled){
     const opsVLAN=platVLAN(mgmt.vcfOperations.requiresDedicatedVLAN,'VCF Operations Network');
     const nc=mgmt.vcfOperations.mode==='enterprise'?3:1;
@@ -146,6 +157,10 @@ export function buildWorkloadAppliances(wld,t=k=>k){
     apps.push(mkApp(`avi-se-${domain.toLowerCase()}-02`,'AVI Service Engine',domain,'AVI VIP Network','AVI VIP Network',true,false,false,'AVI SE pair for HA.'));
   }
   if(wld.vksEnabled) apps.push(mkApp(`vks-supervisor-${domain.toLowerCase()}`,'VKS Supervisor',domain,'VKS Infrastructure','VKS Infrastructure',true,false,true,`VKS Supervisor for ${domain}.`));
+  if(wld.sspEnabled&&wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
+    apps.push(mkApp(`ssp-node-pool-${domain.toLowerCase()}`,'SSP Node Pool (3 controllers + workers)',domain,'SSP Network','SSP Network',true,false,false,`Pool of 10-15 IPs for ${domain} depending on worker count.`));
+    apps.push(mkApp(`ssp-service-pool-${domain.toLowerCase()}`,'SSP Service IP Pool',domain,'SSP Network','SSP Network',true,true,true,`Contiguous pool of 6-8 IPs for ${domain}.`));
+  }
   wld.additionalServices.forEach(svc=>{
     const sVLAN=svc.requiresDedicatedVLAN?`${svc.name} Network`:'VM / Application Network';
     for(let i=1;i<=svc.applianceCount;i++) apps.push(mkApp(`${svc.name.toLowerCase().replace(/\s/g,'-')}-${domain.toLowerCase()}-0${i}`,svc.name,domain,sVLAN,sVLAN,true,false,true,svc.notes||''));

@@ -3,7 +3,7 @@
 export function newId(){return 'id-'+Math.random().toString(36).slice(2);}
 
 export function defaultWorkloadDomain(index){
-  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],storageType:'vsan-esa',notes:''};
+  return {id:newId(),domainName:`WLD-${String(index).padStart(2,'0')}`,hostCount:3,nsxEnabled:true,nsxManagerMode:'standalone',edgeRequired:false,edgeNodeCount:2,vksEnabled:false,aviEnabled:false,domainRole:'standard-vi',tepInterfacesPerHost:2,dedicatedVLANs:true,sharedEdgeUplinks:false,serviceNetworksRequired:false,additionalServices:[],vksVPCs:[],storageType:'vsan-esa',sspEnabled:false,notes:''};
 }
 
 // Baseline per-component IP/FQDN figures sourced from VCF91-PrequisIP-FQDN.pptx (reference design:
@@ -23,4 +23,6 @@ export const COMPONENT_REFERENCE = [
   { id:'avi-controller',    label:'Avi LB Controller Cluster',     scope:'mgmt-domain',      ipsPerUnit:4,  fqdnsPerUnit:4, notes:'3 controllers + 1 cluster VIP' },
   { id:'avi-se',            label:'Avi Service Engines',           scope:'per-domain',       ipsPerUnit:16, fqdnsPerUnit:0, notes:'One /28 SE pool (~14 usable) per workload domain with Avi enabled, no FQDNs' },
   { id:'vks-supervisor',    label:'vSphere Supervisor / VKS',      scope:'per-domain',       ipsPerUnit:5,  fqdnsPerUnit:1, notes:'Control plane IPs + 1 API endpoint FQDN' },
+  { id:'ssp',               label:'Security Services Platform (SSP)', scope:'per-domain',    ipsPerUnit:21, fqdnsPerUnit:3, notes:'1 SSPI installer (1 IP) + SSP instance: 3 controllers + 5-10 workers (Node IP Pool 10-15 IPs) + contiguous Service IP Pool 6-8 IPs. 1:1:1 with an NSX Manager cluster — shown per-domain as a simplification; domains on shared NSX (nsxManagerMode=shared) reuse another domain\'s SSP and are not double-counted. 3 FQDNs: SSPI, SSP Ingress, SSP Messaging.' },
+  { id:'license-hub',       label:'License Hub (vDefend + Avi)',   scope:'mgmt-domain',      ipsPerUnit:9,  fqdnsPerUnit:1, notes:'Deployed once per VCF Fleet, in the first instance\'s management domain. 1 Controller + 1 Worker (Node Pool 4 + Service Pool 4) + 1 Installer = 9 IPs. Licenses vDefend (NSX/SSP) and Avi subscriptions, up to 120 endpoints. FQDN count not documented by Broadcom — assumed 1 (installer).' },
 ];
