@@ -38,8 +38,8 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
 
   const nsxCount=mgmt.nsxManagerMode==='clustered'?3:1;
   for(let i=1;i<=nsxCount;i++) apps.push(mkApp(`nsx-manager-mgmt-0${i}`,'NSX Manager',domain,'Management VM Network','Management VM Network',true,i===1&&mgmt.nsxManagerMode==='clustered',true,`NSX Manager node ${i} of ${nsxCount}.`));
-  // C14: VIP NSX Manager réservée dans tous les modes (Simple + HA) pour permettre un futur scale-out HA sans ré-IP — bonne pratique VCF IP Allocation Workbook (Broadcom TechDocs VCF 9.1)
-  apps.push(mkApp('nsx-vip-mgmt','NSX Manager VIP',domain,'Management VM Network','Management VM Network',true,false,true,mgmt.nsxManagerMode==='clustered'?'NSX Manager cluster VIP — HA mode.':t('app.nsx_vip_simple')));
+  // C14: VIP NSX Manager réservée dans tous les modes (Simple + HA) pour permettre un futur scale-out HA sans ré-IP — bonne pratique VCF IP Allocation Workbook (Broadcom TechDocs VCF 9.1).
+  // Cette règle métier est désormais documentée et implémentée uniquement dans core/vips.js (buildManagementVIPs) — aucun code dupliqué ici.
 
   if(is91){
     apps.push(mkApp('fleet-01','Fleet Appliance (VCF 9.1)',domain,fleetVLAN,fleetVLAN,true,false,true,t('app.fleet_91',{placement:mgmt.fleetPlacement})));
@@ -54,7 +54,6 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   }
   if(mgmt.aviDeployed){
     for(let i=1;i<=3;i++) apps.push(mkApp(`avi-controller-0${i}`,'AVI Controller',domain,'Management VM Network','Management VM Network',true,i===1,true,`AVI Controller node ${i} of 3.`));
-    apps.push(mkApp('avi-cluster-vip','AVI Cluster VIP',domain,'Management VM Network','Management VM Network',true,false,true,'AVI Controller cluster VIP.'));
   }
 
   if(mgmt.sspEnabled){
@@ -72,7 +71,6 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
     const opsVLAN=platVLAN(mgmt.vcfOperations.requiresDedicatedVLAN,'VCF Operations Network');
     const nc=mgmt.vcfOperations.mode==='enterprise'?3:1;
     for(let i=1;i<=nc;i++) apps.push(mkApp(`vcf-ops-${String(i).padStart(2,'0')}`,nc===1?'VCF Operations Node':i===1?'VCF Operations Master Node':'VCF Operations Replica Node',domain,opsVLAN,opsVLAN,true,false,true,`VCF Operations node ${i}${nc>1?' of '+nc:''}.`));
-    if(mgmt.vcfOperations.mode==='enterprise') apps.push(mkApp('vcf-ops-vip','VCF Operations Cluster VIP',domain,opsVLAN,opsVLAN,true,false,true,'Cluster VIP for VCF Operations enterprise mode.'));
     if(!is91) for(let r=1;r<=mgmt.vcfOperations.remoteCollectorCount;r++) apps.push(mkApp(`vcf-ops-rc-${String(r).padStart(2,'0')}`,'VCF Operations Remote Collector',domain,'Management VM Network','Management VM Network',true,false,true,t('app.rc_note',{r})));
     if(is91&&mgmt.vcfOperations.cloudProxyEnabled) apps.push(mkApp('vcf-ops-cloud-proxy-01','VCF Operations Cloud Proxy',domain,'Management VM Network','Management VM Network',true,false,true,t('app.cloud_proxy')));
     // License Server is deployed along with VCF Operations — it follows VCF Operations' VLAN (Day-2 overlay
@@ -91,8 +89,6 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
       apps.push(mkApp('vcf-logs-master-01','VCF Ops for Logs Master',domain,lVLAN,lVLAN,true,false,true,'Master node.'));
       if(mgmt.vcfOperationsForLogs.mode==='clustered'){
         for(let w=1;w<=mgmt.vcfOperationsForLogs.workerCount;w++) apps.push(mkApp(`vcf-logs-worker-${String(w).padStart(2,'0')}`,'VCF Ops for Logs Worker',domain,lVLAN,lVLAN,true,false,true,`Worker node ${w}.`));
-        apps.push(mkApp('vcf-logs-ui-vip','VCF Ops for Logs UI VIP',domain,lVLAN,lVLAN,true,false,true,'UI/API access VIP.'));
-        if(mgmt.vcfOperationsForLogs.integratedLBVIP) apps.push(mkApp('vcf-logs-ilb-vip','VCF Ops for Logs ILB VIP',domain,lVLAN,lVLAN,true,false,true,'ILB VIP for syslog/CFAPI. All log sources must use this VIP.'));
       }
     }
   }
@@ -116,7 +112,6 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
       if(mgmt.vcfAutomation.orchestratorMode==='standalone'){
         const vrc=mgmt.vcfAutomation.orchestratorNodeCount;
         for(let r=1;r<=vrc;r++) apps.push(mkApp(`vcf-vro-${String(r).padStart(2,'0')}`,'VCF Operations Orchestrator (vRO)',domain,aVLAN,aVLAN,true,false,true,`vRO node ${r} of ${vrc} — VM appliance (encore VM-based en 9.1).`));
-        if(vrc>1) apps.push(mkApp('vcf-vro-vip','VCF Operations Orchestrator VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for vRO HA.'));
       }
     } else {
       // VCF 9.0 — VA nodes classiques
@@ -125,11 +120,9 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
         const isUpgrade=mgmt.vcfAutomation.mode==='clustered'&&v===4;
         apps.push(mkApp(`vcf-auto-va-${String(v).padStart(2,'0')}`,isUpgrade?'VCF Automation VA (upgrade/patching)':mgmt.vcfAutomation.mode==='clustered'?`VCF Automation VA (node ${v} of 3 active)`:'VCF Automation VA',domain,aVLAN,aVLAN,true,false,true,isUpgrade?'Node 4: reserved for upgrade/patching.':`VA node ${v}.`));
       }
-      if(mgmt.vcfAutomation.mode==='clustered') apps.push(mkApp('vcf-auto-vip','VCF Automation Cluster VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for HA deployment (3 active + 1 upgrade node).'));
       if(mgmt.vcfAutomation.orchestratorMode==='standalone'){
         const vrc=mgmt.vcfAutomation.orchestratorNodeCount;
         for(let r=1;r<=vrc;r++) apps.push(mkApp(`vcf-vro-${String(r).padStart(2,'0')}`,'VCF Automation Orchestrator (vRO)',domain,aVLAN,aVLAN,true,false,true,`Standalone vRO node ${r} of ${vrc}.`));
-        if(vrc>1) apps.push(mkApp('vcf-vro-vip','VCF Automation Orchestrator VIP',domain,aVLAN,aVLAN,true,false,true,'Cluster VIP for standalone vRO HA.'));
       }
     }
   }
@@ -146,7 +139,6 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
       const ibVLAN=mgmt.vcfIdentityBroker.requiresDedicatedVLAN?'VCF Identity Broker Network':'Management VM Network';
       const ibc=mgmt.vcfIdentityBroker.haEnabled?3:1;
       for(let b=1;b<=ibc;b++) apps.push(mkApp(`vcf-identity-broker-${String(b).padStart(2,'0')}`,mgmt.vcfIdentityBroker.haEnabled?`VCF Identity Broker (node ${b} of ${ibc})`:'VCF Identity Broker',domain,ibVLAN,ibVLAN,true,false,true,`Identity Broker appliance ${b}.`));
-      if(mgmt.vcfIdentityBroker.haEnabled) apps.push(mkApp('vcf-identity-broker-vip','VCF Identity Broker HA VIP',domain,ibVLAN,ibVLAN,true,false,true,'HA VIP for Identity Broker cluster.'));
     }
   }
 
@@ -155,7 +147,6 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   mgmt.additionalServices.forEach(svc=>{
     const sVLAN=svc.requiresDedicatedVLAN?`${svc.name} Network`:'Management VM Network';
     for(let i=1;i<=svc.applianceCount;i++) apps.push(mkApp(`${svc.name.toLowerCase().replace(/\s/g,'-')}-0${i}`,svc.name,domain,sVLAN,sVLAN,true,false,true,svc.notes||`Appliance ${i}.`));
-    if(svc.requiresVIP&&svc.vipCount>0) for(let v=1;v<=svc.vipCount;v++) apps.push(mkApp(`${svc.name.toLowerCase().replace(/\s/g,'-')}-vip-0${v}`,`${svc.name} VIP`,domain,sVLAN,sVLAN,true,false,true,`VIP for ${svc.name}.`));
   });
 
   return apps;
@@ -178,7 +169,6 @@ export function buildWorkloadAppliances(wld,t=k=>k){
   if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
     const nc=wld.nsxManagerMode==='clustered'?3:1;
     for(let i=1;i<=nc;i++) apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-0${i}`,'NSX Manager',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,`NSX Mgr ${i}/${nc} for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
-    apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-vip`,'NSX Manager VIP',domain,'Management Domain — Mgmt VM Net','Management VM Network',true,false,true,wld.nsxManagerMode==='clustered'?`NSX Manager cluster VIP for ${domain}.`:`NSX Manager VIP for ${domain} (reserved for future scale-out).`));
   }
   if(wld.nsxEnabled&&wld.edgeRequired){
     for(let i=1;i<=wld.edgeNodeCount;i++) apps.push(mkApp(`nsx-edge-${domain.toLowerCase()}-0${i}`,'NSX Edge Node',domain,'VM / Application Network','VM / Application Network',true,false,true,`Edge node ${i}: eth0→VM/App Net, TEP→Edge TEP, fp-eth0/1→Uplink 1/2.`));

@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.13.1
+# VCF 9.1 Network Planner — v1.13.2
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -121,6 +121,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.13.2 | Jul 2026 | Removed 11 duplicate entries from the Appliances tab: cluster VIPs (NSX Manager, AVI Cluster, VCF Operations, VCF Ops for Logs UI/ILB, VCF Operations Orchestrator, VCF Automation Cluster, VCF Automation Orchestrator, VCF Identity Broker HA, additional-service VIPs, workload-domain NSX Manager VIP) were incorrectly listed both in the Appliances tab and in the dedicated VIPs tab (and duplicated in the Excel export). A VIP is a floating IP on an already-counted cluster, not a dedicated VM — these lines now live only in the VIPs tab (single source of truth: `core/vips.js`). Dashboard Appliances counter drops by ~11 rows; VIP totals unchanged |
 | v1.13.1 | Jul 2026 | The "VCF Management Services — Network Model" dropdown labels (Management Domain, VCF 9.1) now match Broadcom's official model names word-for-word (e.g. "VCF Management Dedicated VLAN and NSX Overlay Segment Network Model"), per the Broadcom TechDocs "Fleet Level Component Backing Networking Models" page, instead of shortened in-house labels |
 | v1.13.0 | Jul 2026 | Fixed the VCF Management Services network model (VCF 9.1): fully aligned with the 4 official models documented by Broadcom (Shared VLAN / Dedicated VLAN / Dedicated VLAN + NSX Overlay Segment / Dedicated VLAN + NSX Stretched Overlay Segment). The "NSX VLAN Segment" mode, which does not correspond to any official 9.1 model, is removed from new 9.1 projects (kept as legacy for existing projects, still available in 9.0). In NSX Overlay Segment mode, Fleet Appliance / VCF Mgmt Services Instance / VCF Services Runtime / Identity Broker now correctly stay on the dedicated VLAN (Day-0), while VCF Operations, VCF Automation and License Server correctly move to the overlay segment (Day-2), per Broadcom documentation — fixes a gap where all these components incorrectly shared a single VLAN. New validation rules (stretched/L2 consistency, Federation reminder, legacy model warning) |
 | v1.12.0 | Jul 2026 | New Feedback button in the header, opens a pre-filled GitHub issue (title, app version, current tab, VCF version, user-agent) in a new tab — no data is sent without explicit user confirmation on GitHub |
