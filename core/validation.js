@@ -29,6 +29,18 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k){
     msgs.push(mkMsg('info','bring-up',domain,`Witness latency tier for ${perSite} hosts/site: ${tier} required between each AZ and the vSAN Witness (min 10 Gbps between AZ1 and AZ2).`,'Confirm the WAN/L3 link to the Witness meets this RTT.'));
   }
   if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,t('val.overlay_block'),t('val.overlay_res')));
+  // Model 4 (Dedicated VLAN + NSX Stretched Overlay Segment): fleetPlacement==='nsx-overlay-segment' combined with
+  // a stretched topologyMode. The dedicated VLAN (Fleet/Instance/Services Runtime/Identity Broker, Day-0) must be
+  // physically stretched at L2 between AZ1/AZ2 — this is independent of NSX Federation, which only covers the
+  // overlay segment. See core/vlan.js for the AZ1/AZ2 dedicated-VLAN row duplication in this mode.
+  const isModel4=mgmt.fleetPlacement==='nsx-overlay-segment'&&(mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched');
+  if(isModel4){
+    if(!mgmt.layer2AdjacencyConfirmed) msgs.push(mkMsg('blocker','vlan',domain,t('val.stretched_l2_block'),t('val.stretched_l2_res')));
+    msgs.push(mkMsg('info','vlan',domain,t('val.overlay_federation_info')));
+  }
+  // "NSX VLAN Segment" is not one of the 4 officially documented VCF 9.1 network models — kept only for backward
+  // compatibility with existing 9.1 projects that already selected it before the option was removed from the select.
+  if(project.vcfVersion==='9.1'&&mgmt.fleetPlacement==='nsx-vlan-segment') msgs.push(mkMsg('warning','vlan',domain,t('val.legacy_nsxvlan_warn'),t('val.legacy_nsxvlan_warn_res')));
   if((mgmt.vksEnabled||project.scenario==='vcf-automation-vks')&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario',domain,'VKS enabled but NSX Edge not deployed.','Deploy NSX Edge or confirm overlay from WLD NSX.'));
   if(mgmt.aviDeployed&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('info','scenario',domain,'AVI enabled but NSX Edge not deployed. Verify data plane connectivity.','Verify AVI SE network design.'));
   if(mgmt.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',domain,'TEP interfaces per host < 2. Recommend 2 for TEP HA.','Set TEP to 2+.'));

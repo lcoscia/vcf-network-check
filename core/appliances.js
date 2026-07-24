@@ -13,9 +13,16 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   const domain='Management Domain';
   const is91=project.vcfVersion==='9.1';
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
-  const _fvn=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
-  const fleetVLAN=fleetDedicated?_fvn:'Management VM Network';
-  function platVLAN(req,name){if(req)return name;return fleetDedicated?_fvn:'Management VM Network';}
+  const isOverlayModel=mgmt.fleetPlacement==='nsx-overlay-segment';
+  // Broadcom VCF 9.1 official Dedicated VLAN + NSX Overlay Segment model: Fleet Appliance / VCF Mgmt Services
+  // Instance / VCF Services Runtime / Identity Broker are Day-0 components and always resolve to the dedicated
+  // VLAN — NEVER the overlay segment, regardless of fleetPlacement. Mirrors core/vlan.js and core/vips.js.
+  const dedicatedVLANName=isOverlayModel?'VCF Management Dedicated VLAN':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
+  // VCF Operations / VCF Automation / License Server / VCF Operations for Networks are Day-2 components that move
+  // to the overlay segment in nsx-overlay-segment mode.
+  const overlayVLANName='Fleet NSX Overlay Segment';
+  const fleetVLAN=fleetDedicated?dedicatedVLANName:'Management VM Network';
+  function platVLAN(req,name){if(req)return name;if(!fleetDedicated)return 'Management VM Network';return isOverlayModel?overlayVLANName:dedicatedVLANName;}
 
   apps.push(mkApp('sddc-manager-01','SDDC Manager',domain,'Management VM Network','Management VM Network',true,false,true,'Primary SDDC Manager.'));
   apps.push(mkApp('vcenter-mgmt-01','vCenter Server',domain,'Management VM Network','Management VM Network',true,false,true,'Management Domain vCenter.'));
@@ -68,7 +75,9 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
     if(mgmt.vcfOperations.mode==='enterprise') apps.push(mkApp('vcf-ops-vip','VCF Operations Cluster VIP',domain,opsVLAN,opsVLAN,true,false,true,'Cluster VIP for VCF Operations enterprise mode.'));
     if(!is91) for(let r=1;r<=mgmt.vcfOperations.remoteCollectorCount;r++) apps.push(mkApp(`vcf-ops-rc-${String(r).padStart(2,'0')}`,'VCF Operations Remote Collector',domain,'Management VM Network','Management VM Network',true,false,true,t('app.rc_note',{r})));
     if(is91&&mgmt.vcfOperations.cloudProxyEnabled) apps.push(mkApp('vcf-ops-cloud-proxy-01','VCF Operations Cloud Proxy',domain,'Management VM Network','Management VM Network',true,false,true,t('app.cloud_proxy')));
-    if(mgmt.vcfOperations.licenseServerEnabled) apps.push(mkApp('vcf-license-server-01','VCF License Server',domain,'Management VM Network','Management VM Network',true,false,true,t('app.license_server')));
+    // License Server is deployed along with VCF Operations — it follows VCF Operations' VLAN (Day-2 overlay
+    // segment in nsx-overlay-segment mode when VCF Operations has no explicit dedicated VLAN of its own).
+    if(mgmt.vcfOperations.licenseServerEnabled) apps.push(mkApp('vcf-license-server-01','VCF License Server',domain,opsVLAN,opsVLAN,true,false,true,t('app.license_server')));
   }
 
   if(mgmt.vcfOperationsForLogs.enabled){
@@ -95,8 +104,11 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   }
 
   if(mgmt.vcfAutomation.enabled){
-    // 9.1: VCF Automation /29 (5 IPs) defaults to the Management VM Network regardless of the Fleet/Runtime placement; a dedicated VLAN is only possible via the VCF Operations fleet lifecycle API ; 9.0 = platform-services placement
-    const aVLAN=is91?(mgmt.vcfAutomation.requiresDedicatedVLAN?'VCF Automation Network':'Management VM Network'):platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
+    // 9.1: VCF Automation /29 (5 IPs) defaults to the Management VM Network regardless of the Fleet/Runtime placement,
+    // EXCEPT in nsx-overlay-segment mode, where — per Broadcom's official Dedicated VLAN + NSX Overlay Segment model —
+    // VCF Automation is a Day-2 component that defaults to the overlay segment instead ; a dedicated VLAN is still
+    // possible via the VCF Operations fleet lifecycle API ; 9.0 = platform-services placement (unchanged)
+    const aVLAN=is91?(mgmt.vcfAutomation.requiresDedicatedVLAN?'VCF Automation Network':(isOverlayModel?overlayVLANName:'Management VM Network')):platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
     if(is91){
       // 9.1: 1 dedicated Automation FQDN (endpoint/VIP) + 1 dedicated VCF Services Runtime FQDN. Nodes (/29 block) without individual DNS.
       apps.push(mkApp('vcf-automation-01','VCF Automation',domain,aVLAN,aVLAN,true,false,true,t('app.auto_91')));

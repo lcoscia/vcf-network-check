@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.12.0
+# VCF 9.1 Network Planner — v1.13.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -121,6 +121,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.13.0 | Jul 2026 | Fixed the VCF Management Services network model (VCF 9.1): fully aligned with the 4 official models documented by Broadcom (Shared VLAN / Dedicated VLAN / Dedicated VLAN + NSX Overlay Segment / Dedicated VLAN + NSX Stretched Overlay Segment). The "NSX VLAN Segment" mode, which does not correspond to any official 9.1 model, is removed from new 9.1 projects (kept as legacy for existing projects, still available in 9.0). In NSX Overlay Segment mode, Fleet Appliance / VCF Mgmt Services Instance / VCF Services Runtime / Identity Broker now correctly stay on the dedicated VLAN (Day-0), while VCF Operations, VCF Automation and License Server correctly move to the overlay segment (Day-2), per Broadcom documentation — fixes a gap where all these components incorrectly shared a single VLAN. New validation rules (stretched/L2 consistency, Federation reminder, legacy model warning) |
 | v1.12.0 | Jul 2026 | New Feedback button in the header, opens a pre-filled GitHub issue (title, app version, current tab, VCF version, user-agent) in a new tab — no data is sent without explicit user confirmation on GitHub |
 | v1.11.1 | Jul 2026 | Fix: Remote Collector and Cloud Proxy (VCF Operations) never appeared without one another in the export — Remote Collector is a vestige of Aria Operations ≤8.15, deprecated since 8.16 and absent from VCF 9.x. Remote Collector is now restricted to VCF 9.0 (legacy), Cloud Proxy exclusively to VCF 9.1, per Broadcom documentation; UI fields and appliance/validation notes updated accordingly |
 | v1.11.0 | Jun 2026 | Extended AZ1/AZ2/Witness modeling to Workload Domains (previously only available for the Management Domain): any Workload Domain can now be configured as a vSAN Stretched Cluster, with its own AZ1/AZ2 Host Count fields (AZ1→AZ2 auto-sync), per-AZ VLAN rows (ESXi Management, vMotion, vSAN, NSX Host TEP), and its own independent Witness (shared vmk0 or dedicated vmk1) — not shared with the Management Domain or other Workload Domains. New per-domain validation rules (AZ1/AZ2 symmetry blocker, min-1-host-per-AZ blocker, Witness latency tier info). No behavior change in Single Site / Partially Stretched mode |

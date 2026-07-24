@@ -17,8 +17,15 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const domain='Management Domain';
   const is91=project.vcfVersion==='9.1';
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
-  const fleetVLANName=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
-  const fleetVLANType=mgmt.fleetPlacement==='nsx-overlay-segment'?'overlay':mgmt.fleetPlacement==='nsx-vlan-segment'?'service':'fleet';
+  const isOverlayModel=mgmt.fleetPlacement==='nsx-overlay-segment';
+  // Broadcom VCF 9.1 official network models: in the NSX Overlay Segment model (Model 3/4), Fleet/Instance/Services
+  // Runtime/Identity Broker stay on the Day-0 dedicated VLAN — only Ops/Automation/Networks/License Server move to
+  // the Day-2 overlay segment (see core/appliances.js, core/vips.js for the mirrored resolution).
+  const dedicatedVLANName=isOverlayModel?'VCF Management Dedicated VLAN':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
+  const overlayVLANName='Fleet NSX Overlay Segment';
+  // Legacy name kept for the shared (non-split) VLAN row generated in dedicated-fleet-vlan / nsx-vlan-segment modes.
+  const fleetVLANName=dedicatedVLANName;
+  const fleetVLANType=mgmt.fleetPlacement==='nsx-vlan-segment'?'service':'fleet';
   const isStretched=mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched';
 
   if(isStretched){
@@ -108,19 +115,53 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   if(fleetDedicated){
     let fleetIPs=is91?14:1;
     const fleetNotes=is91?['Fleet appliance (1 IP)','Instance component (1 IP)','Services Runtime nodes /28 min (12 IPs) — incl. Identity Broker']:['1 Fleet appliance (Simple mode)'];
-    if(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN){const n=mgmt.vcfOperations.mode==='enterprise'?4:1;fleetIPs+=n;fleetNotes.push(`VCF Ops: ${n} IPs`);}
-    // 9.1: Log Management (6 base IPs +2/replica, Day-N) is allocated from this Services Runtime block — not added on top of the /28-/27 sizing ; 9.0 = master+workers
+    // Broadcom VCF 9.1 official Dedicated VLAN + NSX Overlay Segment model: VCF Operations / VCF Automation (9.0) /
+    // VCF Operations for Networks are Day-2 components that move to the overlay segment — Fleet/Instance/Services
+    // Runtime/Identity Broker (above) stay on the Day-0 dedicated VLAN. For the other 3 placement modes (no overlay
+    // layer), everything below is aggregated onto the single shared VLAN row exactly as before.
+    let overlayIPs=0;
+    const overlayNotes=[];
+    if(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN){
+      const n=mgmt.vcfOperations.mode==='enterprise'?4:1;
+      if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Ops: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Ops: ${n} IPs`);}
+    }
+    // 9.1: Log Management (6 base IPs +2/replica, Day-N) is allocated from the Services Runtime block itself — it
+    // stays with Fleet/Instance/Runtime (dedicated VLAN) even in overlay mode, it does not move to the overlay
+    // segment ; 9.0 = master+workers architecture, counted like the other platform services below.
     if(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){
       if(is91){fleetNotes.push('Log Management (Day-N): 6 IPs +2/replica, within this block');}
-      else{const n=mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1;fleetIPs+=n;fleetNotes.push(`VCF Logs: ${n} IPs`);}
+      else{
+        const n=mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1;
+        if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Logs: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Logs: ${n} IPs`);}
+      }
     }
-    if(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN){fleetIPs+=mgmt.vcfOperationsForNetworks.platformNodeCount;fleetNotes.push(`VCF Nets: ${mgmt.vcfOperationsForNetworks.platformNodeCount} IPs`);}
+    if(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN){
+      const n=mgmt.vcfOperationsForNetworks.platformNodeCount;
+      if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Nets: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Nets: ${n} IPs`);}
+    }
     // 9.1: VCF Automation /29 (5 IPs) is a separate block from Services Runtime, counted in Management VM Network (see mgmtVMNotes) — not mixed into this block ; 9.0 = VA nodes counted here
-    if(!is91&&mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){const n=(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);fleetIPs+=n;fleetNotes.push(`VCF Auto: ${n} IPs`);}
+    if(!is91&&mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){
+      const n=(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);
+      if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Auto: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Auto: ${n} IPs`);}
+    }
     fleetNotes.push('Collectors always in Mgmt VM Network');
-    // NSX Overlay Segment: no physical VLAN ID — overlay segment (Geneve encapsulation)
-    const fleetNote2=mgmt.fleetPlacement==='nsx-overlay-segment'?t('vlan.fleet_note_overlay'):mgmt.fleetPlacement==='nsx-vlan-segment'?t('vlan.fleet_note_vlan'):'';
-    vlans.push(makeVLAN(domain,fleetVLANName,fleetVLANType,`${fleetVLANName} — Fleet appliance + platform service nodes`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | ')+fleetNote2,buf,bufPct));
+    if(isOverlayModel){
+      overlayNotes.push('Collectors always in Mgmt VM Network');
+      if(isStretched){
+        // Model 4 (Dedicated VLAN + NSX Stretched Overlay Segment): the dedicated VLAN is a Day-0 physical L2
+        // network — it must be stretched between AZ1/AZ2 like ESXi Management/vMotion/vSAN/NSX Host TEP above.
+        vlans.push(makeVLAN(domain,`${dedicatedVLANName} — AZ1`,'fleet',`${dedicatedVLANName} — Fleet/Instance/Services Runtime (Day-0, Availability Zone 1)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | '),buf,bufPct));
+        vlans.push(makeVLAN(domain,`${dedicatedVLANName} — AZ2`,'fleet',`${dedicatedVLANName} — Fleet/Instance/Services Runtime (Day-0, Availability Zone 2)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | '),buf,bufPct));
+      } else {
+        vlans.push(makeVLAN(domain,dedicatedVLANName,'fleet',`${dedicatedVLANName} — Fleet appliance + Instance + Services Runtime (Day-0)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | '),buf,bufPct));
+      }
+      // The overlay segment itself is never duplicated AZ1/AZ2 — it is a single NSX Federation-stretched segment.
+      const overlayNote2=t('vlan.fleet_note_overlay')+(isStretched?` — ${t('vlan.overlay_federation_note')}`:'');
+      vlans.push(makeVLAN(domain,overlayVLANName,'overlay',`${overlayVLANName} — VCF Operations/Automation/Networks (Day-2)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',overlayIPs,overlayNotes.join(' | ')+overlayNote2,buf,bufPct));
+    } else {
+      const fleetNote2=mgmt.fleetPlacement==='nsx-vlan-segment'?t('vlan.fleet_note_vlan'):'';
+      vlans.push(makeVLAN(domain,fleetVLANName,fleetVLANType,`${fleetVLANName} — Fleet appliance + platform service nodes`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | ')+fleetNote2,buf,bufPct));
+    }
   }
 
   if(mgmt.aviDeployed)vlans.push(makeVLAN(domain,'AVI Management','avi','AVI SE management','AVI load balancer management','scenario-driven','dedicated',4,'AVI SE management IPs',buf,bufPct));

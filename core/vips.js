@@ -13,9 +13,13 @@ export function buildManagementVIPs(mgmt,project){
   const domain='Management Domain';
   const is91=project.vcfVersion==='9.1';
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
-  const _fvn=mgmt.fleetPlacement==='nsx-overlay-segment'?'Fleet NSX Overlay Segment':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
-  const fleetVLAN=fleetDedicated?_fvn:'Management VM Network';
-  function platVLAN(req,name){if(req)return name;return fleetDedicated?_fvn:'Management VM Network';}
+  const isOverlayModel=mgmt.fleetPlacement==='nsx-overlay-segment';
+  // Mirrors core/vlan.js and core/appliances.js: Fleet VIP / Log Management VIP (Day-0) always resolve to the
+  // dedicated VLAN, never the overlay segment, regardless of fleetPlacement.
+  const dedicatedVLANName=isOverlayModel?'VCF Management Dedicated VLAN':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
+  const overlayVLANName='Fleet NSX Overlay Segment';
+  const fleetVLAN=fleetDedicated?dedicatedVLANName:'Management VM Network';
+  function platVLAN(req,name){if(req)return name;if(!fleetDedicated)return 'Management VM Network';return isOverlayModel?overlayVLANName:dedicatedVLANName;}
 
   vips.push(mkVIP('NSX Manager VIP','NSX Manager',domain,'Management VM Network',mgmt.nsxManagerMode==='clustered'?'Cluster VIP for NSX Manager 3-node cluster.':'Standalone NSX Manager — VIP reserved for future scale-out.'));
   vips.push(mkVIP('Fleet VIP','Fleet',domain,fleetVLAN,mgmt.fleetMode==='clustered'?'Fleet HA cluster VIP.':'Fleet standalone VIP. Reserved for DNS stability.'));
@@ -33,8 +37,10 @@ export function buildManagementVIPs(mgmt,project){
   }
   if(mgmt.vcfOperationsForNetworks.enabled){const v=platVLAN(mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN,'VCF Operations for Networks Network');vips.push(mkVIP('VCF Operations for Networks VIP','VCF Operations for Networks',domain,v,'VIP for VCF Ops for Networks UI/API.'));}
   if(mgmt.vcfAutomation.enabled){
-    // 9.1: /29 (5 IPs) block defaults to Management VM Network — independent from the Services Runtime block
-    const v=is91?(mgmt.vcfAutomation.requiresDedicatedVLAN?'VCF Automation Network':'Management VM Network'):platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
+    // 9.1: /29 (5 IPs) block defaults to Management VM Network — independent from the Services Runtime block —
+    // EXCEPT in nsx-overlay-segment mode, where VCF Automation is a Day-2 component that defaults to the overlay
+    // segment instead (mirrors core/appliances.js).
+    const v=is91?(mgmt.vcfAutomation.requiresDedicatedVLAN?'VCF Automation Network':(isOverlayModel?overlayVLANName:'Management VM Network')):platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
     vips.push(mkVIP('VCF Automation VIP','VCF Automation',domain,v,is91?'VCF Automation 9.1 endpoint (FQDN = VIP). /29 block (5 IPs): 3 IPs assigned to nodes + 2 IPs buffer for redeploy/rolling updates.':(mgmt.vcfAutomation.mode==='clustered'?'Cluster VIP for VCF Automation HA (3 active + 1 upgrade node).':'Standalone VCF Automation VIP.')));
     if(mgmt.vcfAutomation.orchestratorMode==='standalone') vips.push(mkVIP('VCF Automation Orchestrator (vRO) VIP','VCF Automation Orchestrator (vRO)',domain,v,mgmt.vcfAutomation.orchestratorNodeCount>1?'Cluster VIP for standalone vRO HA cluster.':'Standalone vRO VIP — reserved for DNS.'));
   }

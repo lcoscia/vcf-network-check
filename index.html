@@ -754,8 +754,8 @@
             <select x-show="project.vcfVersion==='9.1'" class="select" x-model="managementDomain.fleetPlacement">
               <option value="shared-mgmt-vlan" x-text="t('fleet.shared_opt_91')"></option>
               <option value="dedicated-fleet-vlan" x-text="t('fleet.dedicated_opt_91')"></option>
-              <option value="nsx-vlan-segment" x-text="t('fleet.nsxvlan_opt_91')"></option>
               <option value="nsx-overlay-segment" x-text="t('fleet.nsxoverlay_opt_91')"></option>
+              <option x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" value="nsx-vlan-segment" x-text="t('fleet.nsxvlan_legacy_91')"></option>
             </select>
           </div>
 
@@ -774,11 +774,20 @@
           <!-- Dedicated VLAN — VCF 9.1 (C8) -->
           <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan' && project.vcfVersion==='9.1'" class="help-desc mt8" x-html="t('fleet.dedicated_desc_91')"></div>
 
-          <!-- NSX VLAN Segment (identique 9.0 et 9.1) -->
-          <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" class="help-desc mt8" x-html="t('fleet.nsxvlan_desc')"></div>
+          <!-- NSX VLAN Segment — VCF 9.0 (modèle de déploiement légitime en 9.0) -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment' && project.vcfVersion==='9.0'" class="help-desc mt8" x-html="t('fleet.nsxvlan_desc_90')"></div>
 
-          <!-- NSX Overlay Segment (identique 9.0 et 9.1) -->
-          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment'" class="help-desc mt8" x-html="t('fleet.nsxoverlay_desc')"></div>
+          <!-- NSX VLAN Segment — VCF 9.1 legacy (non proposé pour les nouveaux projets, conservé pour compat) -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment' && project.vcfVersion==='9.1'" class="infobox yellow mt8" x-html="t('val.legacy_nsxvlan_warn')"></div>
+
+          <!-- NSX Overlay Segment — VCF 9.0 -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && project.vcfVersion==='9.0'" class="help-desc mt8" x-html="t('fleet.nsxoverlay_desc_90')"></div>
+
+          <!-- NSX Overlay Segment — VCF 9.1, Modèle 3 (non stretché) -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && project.vcfVersion==='9.1' && !(managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched')" class="help-desc mt8" x-html="t('fleet.nsxoverlay_desc_91')"></div>
+
+          <!-- NSX Overlay Segment — VCF 9.1, Modèle 4 (Dedicated VLAN + NSX Stretched Overlay Segment) -->
+          <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && project.vcfVersion==='9.1' && (managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched')" class="help-desc mt8" x-html="t('fleet.stretchedoverlay_desc_91')"></div>
 
           <!-- Warning: NSX Overlay requires Edge -->
           <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && !managementDomain.nsxEdgeDeployed" class="infobox yellow mt8" x-html="t('fleet.overlay_warn')"></div>
@@ -872,11 +881,20 @@
         <div x-show="managementDomain.fleetPlacement==='dedicated-fleet-vlan'" style="margin-top:6px;padding:6px 10px;background:#fff8e1;border-radius:4px;">
           📌 Current model: <strong x-text="project.vcfVersion==='9.1' ? t('platform.dedicated_lbl_91') : t('platform.dedicated_lbl_90')"></strong> — <span x-text="project.vcfVersion==='9.1' ? t('platform.dedicated_desc_91') : t('platform.dedicated_desc_90')"></span>
         </div>
-        <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment'" style="margin-top:6px;padding:6px 10px;background:#e8f8f0;border-radius:4px;">
+        <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment' && project.vcfVersion==='9.0'" style="margin-top:6px;padding:6px 10px;background:#e8f8f0;border-radius:4px;">
           📌 Current model: <strong>NSX VLAN Segment</strong> — <span x-text="t('platform.nsxvlan_desc')"></span>
         </div>
-        <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment'" style="margin-top:6px;padding:6px 10px;background:#e8f0fe;border-radius:4px;">
+        <div x-show="managementDomain.fleetPlacement==='nsx-vlan-segment' && project.vcfVersion==='9.1'" style="margin-top:6px;padding:6px 10px;background:#fff3cd;border-radius:4px;">
+          📌 Current model: <strong x-text="t('fleet.nsxvlan_legacy_91')"></strong> — <span x-text="t('val.legacy_nsxvlan_warn')"></span>
+        </div>
+        <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && project.vcfVersion==='9.0'" style="margin-top:6px;padding:6px 10px;background:#e8f0fe;border-radius:4px;">
           📌 Current model: <strong>NSX Overlay Segment</strong> — <span x-text="t('platform.nsxoverlay_desc')"></span>
+        </div>
+        <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && project.vcfVersion==='9.1' && !(managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched')" style="margin-top:6px;padding:6px 10px;background:#e8f0fe;border-radius:4px;">
+          📌 Current model: <strong x-text="t('platform.nsxoverlay_lbl_91')"></strong> — <span x-text="t('platform.nsxoverlay_desc_91')"></span>
+        </div>
+        <div x-show="managementDomain.fleetPlacement==='nsx-overlay-segment' && project.vcfVersion==='9.1' && (managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched')" style="margin-top:6px;padding:6px 10px;background:#e8f0fe;border-radius:4px;">
+          📌 Current model: <strong x-text="t('platform.stretchedoverlay_lbl_91')"></strong> — <span x-text="t('platform.stretchedoverlay_desc_91')"></span>
         </div>
       </div>
 
@@ -1612,6 +1630,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.13.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1130')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.12.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1120')"></td>
@@ -1754,7 +1777,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.12.0';
+import * as Core from './core/index.js?v=1.13.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1795,7 +1818,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.12.0',
+    appVersion:'1.13.0',
     activeTab:'overview',
     get tabs() {
       return [
