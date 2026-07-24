@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.13.3
+# VCF 9.1 Network Planner — v1.14.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -121,6 +121,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.14.0 | Jul 2026 | VLAN Design tab: new "Range Start" field on every VLAN row and an "↳ Auto-fill" button that sequentially pre-fills the IP addresses of the appliances in that block (matching domain + VLAN), never overwriting an IP already entered manually. VCF Automation finally gets its own dedicated VLAN row in 9.1 when the "dedicated VLAN" option is checked (previously invisibly aggregated into "Management VM Network"). New validation rules: a warning when the declared range start IP falls outside the row's CIDR, and an info message when the number of static-IP appliances in the block exceeds its planned capacity |
 | v1.13.3 | Jul 2026 | Appliances/VIPs tabs: discreet badge on empty IP/FQDN fields (no alert color) and a "X/Y IP addresses filled" summary counter per table (Identity Broker Embedded excluded, its IP is disabled by design). New "FQDN Req." column in Appliances and a "→ VIP" indicator pointing cluster nodes to their VIP in the VIPs tab. Internal cleanup: removed the dead `hostingArea` field and hardcoded `'TBD'` VIP placeholders; the VIPs sheet in the Excel export now shows an empty cell instead of "TBD" when IP/FQDN is unset, consistent with the other sheets |
 | v1.13.2 | Jul 2026 | Removed 11 duplicate entries from the Appliances tab: cluster VIPs (NSX Manager, AVI Cluster, VCF Operations, VCF Ops for Logs UI/ILB, VCF Operations Orchestrator, VCF Automation Cluster, VCF Automation Orchestrator, VCF Identity Broker HA, additional-service VIPs, workload-domain NSX Manager VIP) were incorrectly listed both in the Appliances tab and in the dedicated VIPs tab (and duplicated in the Excel export). A VIP is a floating IP on an already-counted cluster, not a dedicated VM — these lines now live only in the VIPs tab (single source of truth: `core/vips.js`). Dashboard Appliances counter drops by ~11 rows; VIP totals unchanged |
 | v1.13.1 | Jul 2026 | The "VCF Management Services — Network Model" dropdown labels (Management Domain, VCF 9.1) now match Broadcom's official model names word-for-word (e.g. "VCF Management Dedicated VLAN and NSX Overlay Segment Network Model"), per the Broadcom TechDocs "Fleet Level Component Backing Networking Models" page, instead of shortened in-house labels |

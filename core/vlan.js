@@ -7,7 +7,7 @@ let _vlanId=0;
 export function resetVlanCounter(){_vlanId=0;}
 export function makeVLAN(domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,notes,bufferEnabled,bufferPercent){
   const rec=recommendCIDR(requiredIPs,bufferEnabled,bufferPercent);
-  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,vlanId:'',cidr:''};
+  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,vlanId:'',cidr:'',rangeStart:''};
 }
 
 export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) {
@@ -166,6 +166,19 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
 
   if(mgmt.aviDeployed)vlans.push(makeVLAN(domain,'AVI Management','avi','AVI SE management','AVI load balancer management','scenario-driven','dedicated',4,'AVI SE management IPs',buf,bufPct));
   if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks')vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 IPs (recommended as a contiguous block)','Kubernetes Supervisor control plane','scenario-driven','dedicated',5,'5 IPs (recommended contiguous block): 3 control plane VMs + 1 floating + 1 patching. Note: workload network, AVI VIP pool, ingress/egress CIDR and pod CIDR are separate additional requirements.',buf,bufPct));
+
+  // 9.1: VCF Automation gets its own dedicated VLAN row only when requiresDedicatedVLAN is explicitly checked —
+  // name MUST stay identical to the 'VCF Automation Network' string already used in core/appliances.js /
+  // core/vips.js, otherwise the appliance/VIP → VLAN join breaks silently. Default (unchecked) keeps the /29
+  // aggregated into Management VM Network (see autoInMgmtVM above) — no VLAN row generated in that case.
+  // TODO (future session): the other 4 services with a requiresDedicatedVLAN option (VCF Operations, Ops for
+  // Logs, Ops for Networks, Identity Broker) have the same gap — appliances.js computes a dedicated VLAN name
+  // for them too, but this file never generates a matching VLAN row. Out of scope for this chantier.
+  if(is91&&mgmt.vcfAutomation.enabled&&mgmt.vcfAutomation.requiresDedicatedVLAN){
+    const auto=mgmt.vcfAutomation;
+    const autoReqIPs=5+(auto.orchestratorMode==='standalone'?auto.orchestratorNodeCount+(auto.orchestratorNodeCount>1?1:0):0);
+    vlans.push(makeVLAN(domain,'VCF Automation Network','service','Dedicated network for VCF Automation','VCF Automation /29 block (+ standalone vRO nodes if applicable)','scenario-driven','dedicated',autoReqIPs,'5 IPs VCF Automation /29 (3 nodes + 2 buffer)'+(auto.orchestratorMode==='standalone'?` + ${auto.orchestratorNodeCount} vRO node(s)`:''),buf,bufPct));
+  }
 
   mgmt.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated network for ${svc.name}`,`Service VLAN: ${svc.name}`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||`${svc.applianceCount} appliances`,buf,bufPct)));
   return vlans;

@@ -1258,6 +1258,7 @@
               <th class="resizable" style="width:180px">VLAN Name</th>
               <th class="resizable" style="width:100px">VLAN ID</th>
               <th class="resizable" style="width:140px">CIDR</th>
+              <th class="resizable" style="width:170px">Range Start</th>
               <th class="resizable" style="width:80px">Req. IPs</th>
               <th class="resizable" style="width:90px">Rec. CIDR</th>
               <th class="resizable" style="width:90px">Mandatory</th>
@@ -1272,6 +1273,10 @@
                 <td class="font-bold" x-text="v.vlanName"></td>
                 <td><input class="input mono" style="width:80px" placeholder="e.g. 100" x-model="vlans[vi].vlanId" /></td>
                 <td><input class="input mono" style="width:130px" placeholder="10.0.0.0/24" x-model="vlans[vi].cidr" /></td>
+                <td style="white-space:nowrap">
+                  <input class="input mono" style="width:110px" placeholder="10.0.1.10" x-model="vlans[vi].rangeStart" />
+                  <button class="btn btn-secondary btn-sm" x-show="v.rangeStart" @click="autoFillFromRange(v)" :title="t('vlan.autofill_tooltip')">↳ Auto-fill</button>
+                </td>
                 <td class="text-center font-bold" x-text="v.requiredIPs"></td>
                 <td class="text-center tbl-mono" x-text="v.recommendedCIDR"></td>
                 <td>
@@ -1643,6 +1648,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.14.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1140')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.13.3</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1133')"></td>
@@ -1805,7 +1815,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.13.3';
+import * as Core from './core/index.js?v=1.14.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1846,7 +1856,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.13.3',
+    appVersion:'1.14.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -1925,7 +1935,7 @@ function vcfApp(){
       this.project.workloadDomainCount=this.workloadDomains.length;
 
       const vlanEdits={};
-      this.vlans.forEach(v=>{if(v.vlanId||v.cidr)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr};});
+      this.vlans.forEach(v=>{if(v.vlanId||v.cidr||v.rangeStart)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr,rangeStart:v.rangeStart};});
       const appEdits={};
       this.appliances.forEach(a=>{if(a.ipAddress||a.fqdn)appEdits[a.applianceName]={ipAddress:a.ipAddress,fqdn:a.fqdn};});
       const vipEdits={};
@@ -1945,7 +1955,7 @@ function vcfApp(){
       const wVips=this.workloadDomains.flatMap(w=>Core.buildWorkloadVIPs(w));
       this.vips=[...mVips,...wVips].map(v=>({...v,...(vipEdits[v.vipName]||{})}));
 
-      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,tFn);
+      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,tFn,this.appliances);
       this.domainSummaries=Core.buildDomainSummaries(this.project,this.managementDomain,this.workloadDomains,this.vlans,this.vips);
       this.componentData=Core.computeComponentRequirements(this.project,this.managementDomain,this.workloadDomains);
     },
@@ -2048,6 +2058,22 @@ function vcfApp(){
     // Returns network prefix (e.g. "10.0.1.") from the VLAN CIDR if filled in
     getVLANPrefix(appDomain, vlanName){
       return Core.getVLANPrefix(this.vlans, appDomain, vlanName);
+    },
+
+    // Sequentially pre-fills IPs for the appliances of this VLAN block from vlanRow.rangeStart — never overwrites
+    // an IP already entered manually, never touches VCF Identity Broker (Embedded) (IP disabled by design).
+    autoFillFromRange(vlanRow){
+      const {addresses,truncated}=Core.generateIPRange(vlanRow.rangeStart, 9999);
+      if(truncated){ this.showToast(this.t('vlan.autofill_invalid')); return; }
+      const targets=this.appliances.filter(a=>a.domain===vlanRow.domain && a.vlan===vlanRow.vlanName && !a.ipAddress && a.applianceType!=='VCF Identity Broker (Embedded)');
+      if(targets.length===0) return;
+      if(targets.length > addresses.length){
+        this.showToast(this.t('vlan.autofill_insufficient'));
+      }
+      targets.slice(0, addresses.length).forEach((a,i)=>{
+        const idx=this.appliances.findIndex(x=>x.id===a.id);
+        this.appliances[idx].ipAddress=addresses[i];
+      });
     },
 
     // Builds FQDN placeholder from appliance/VIP name + project suffix

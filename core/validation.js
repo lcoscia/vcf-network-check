@@ -1,10 +1,14 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
+import { ipInCidr } from './iprange.js';
+
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;
 export function mkMsg(severity,category,domain,message,resolution){return {id:`val-${++_valId}`,severity,category,domain,message,resolution};}
 
-export function runValidation(project,mgmt,workloads,vlans,t=k=>k){
+// `appliances` added as the last parameter (kept optional/defaulted to [] so existing single caller doesn't break
+// if it's ever omitted) — needed to count appliances per VLAN block for the IP-range rules below.
+export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[]){
   _valId=0;
   const msgs=[];
   const domain='Management Domain';
@@ -80,6 +84,15 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k){
     const e1=dv.some(v=>v.vlanType==='nsx-edge-uplink1'),e2=dv.some(v=>v.vlanType==='nsx-edge-uplink2');
     if(e1&&!e2) msgs.push(mkMsg('blocker','vlan',dom,`"${dom}": Edge Uplink 1 present but Uplink 2 missing.`,'Both uplinks are mandatory.'));
     if(e2&&!e1) msgs.push(mkMsg('blocker','vlan',dom,`"${dom}": Edge Uplink 2 present but Uplink 1 missing.`,'Both uplinks are mandatory.'));
+  });
+
+  // C6: IP range (rangeStart) rules — Chantier C, Auto-fill feature. Non-blocking: this app has no blocking rule
+  // on free-form appliance IP entry today, so these stay warning/info regardless of the range/CIDR mismatch.
+  vlans.forEach(v=>{
+    if(!v.rangeStart) return;
+    if(v.cidr&&ipInCidr(v.rangeStart,v.cidr)===false) msgs.push(mkMsg('warning','vlan',v.domain,t('val.range_outside_cidr',{vlan:v.vlanName,range:v.rangeStart,cidr:v.cidr}),t('val.range_outside_cidr_res')));
+    const need=appliances.filter(a=>a.domain===v.domain&&a.vlan===v.vlanName&&a.staticIPRequired===true).length;
+    if(need>v.requiredIPs) msgs.push(mkMsg('info','vlan',v.domain,t('val.range_insufficient',{vlan:v.vlanName,need,available:v.requiredIPs}),t('val.range_insufficient_res')));
   });
 
   if(project.scenario==='private-ai'){

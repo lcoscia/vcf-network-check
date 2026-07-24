@@ -139,6 +139,7 @@ export const translations = {
     'feedback.btn': 'Feedback',
     'feedback.tooltip': 'Signaler un problème ou une fonctionnalité manquante sur GitHub',
     // About - version history
+    'ver.1140': `Onglet VLAN Design : nouveau champ "Range Start" sur chaque ligne VLAN et bouton "↳ Auto-fill" qui pré-remplit séquentiellement les IP des appliances du bloc (domaine + VLAN correspondants), sans jamais écraser une IP déjà saisie manuellement. VCF Automation obtient enfin sa propre ligne VLAN dédiée en 9.1 lorsque l'option "VLAN dédié" est cochée (auparavant agrégée de façon invisible dans "Management VM Network"). Nouvelles règles de validation : avertissement si l'IP de départ déclarée est hors du CIDR renseigné sur la ligne, information si le nombre d'appliances à IP statique du bloc dépasse la capacité prévue.`,
     'ver.1133': `Onglets Appliances/VIPs : badge discret (bordure en pointillé, sans couleur d'alerte) sur les champs IP/FQDN vides et compteur de synthèse "X/Y IP addresses filled" en haut de chaque table (Identity Broker Embedded, dont l'IP est désactivée par nature, n'est jamais compté comme "manquant"). Nouvelle colonne "FQDN Req." dans l'onglet Appliances (ex. <code>ssp-node-pool</code>, <code>license-hub-worker</code> n'en nécessitent pas) et indicateur "→ VIP" en fin de nom pour les nœuds de cluster dont la VIP associée est désormais uniquement listée dans l'onglet VIPs (renvoi ajouté après le retrait des doublons en v1.13.2). Nettoyage interne : suppression du champ mort <code>hostingArea</code> (toujours dupliqué avec <code>vlan</code>, jamais affiché) sur les appliances et des placeholders <code>'TBD'</code> codés en dur sur les VIPs ; l'export Excel de la feuille VIPs affiche désormais une cellule vide au lieu de "TBD" quand l'IP/FQDN n'est pas renseignée, cohérent avec les 4 autres feuilles.`,
     'ver.1132': `Retrait de 11 doublons dans l'onglet Appliances : les VIP de cluster (NSX Manager, AVI Cluster, VCF Operations, VCF Ops for Logs UI/ILB, VCF Operations Orchestrator, VCF Automation Cluster, VCF Automation Orchestrator, VCF Identity Broker HA, VIP de services additionnels, NSX Manager VIP en Workload Domain) apparaissaient à tort à la fois dans l'onglet Appliances et dans l'onglet VIPs dédié (et donc en double dans l'export Excel). Une VIP est une IP flottante sur un cluster déjà comptabilisé séparément, pas une VM propre : ces 11 lignes ne sont désormais listées que dans l'onglet VIPs, leur emplacement correct (source de vérité unique : <code>core/vips.js</code>). Le compteur Appliances du dashboard diminue d'environ 11 lignes en conséquence ; les totaux VIPs sont inchangés, déjà calculés uniquement depuis l'onglet VIPs.`,
     'ver.1131': `Les libellés du menu déroulant "VCF Management Services — Network Model" (Management Domain, VCF 9.1) reprennent désormais mot pour mot les noms officiels des modèles Broadcom (ex. « VCF Management Dedicated VLAN and NSX Overlay Segment Network Model »), conformément à la page <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-1/design/vmware-cloud-foundation-concepts/fleet-level-component-backing-networking-models.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — Fleet Level Component Backing Networking Models</a>, au lieu de libellés raccourcis maison.`,
@@ -168,6 +169,9 @@ export const translations = {
     'vlan.fleet_note_overlay': ' — Segment NSX Overlay (pas de VLAN ID physique, encapsulation Geneve)',
     'vlan.fleet_note_vlan': ' — Segment NSX VLAN (VLAN transport zone NSX)',
     'vlan.overlay_federation_note': 'segment overlay fédéré nativement entre AZ1/AZ2 via NSX Federation (pas de duplication de ligne nécessaire)',
+    'vlan.autofill_tooltip': 'Pré-remplir séquentiellement les IP des appliances de ce bloc à partir de l\'IP de départ, sans écraser les IP déjà saisies manuellement.',
+    'vlan.autofill_invalid': 'IP de départ invalide — impossible de générer la plage.',
+    'vlan.autofill_insufficient': 'Plage insuffisante : certaines appliances du bloc n\'ont pas pu être remplies.',
     'vlan.collectors_always_mgmt': 'Collectors always in Mgmt VM Network',
     'app.nsx_vip_simple': 'NSX Manager VIP — Mode Simple. Réservée même en 1 node pour permettre un futur passage en cluster HA sans ré-adressage (bonne pratique VCF IP Allocation Workbook, Broadcom TechDocs VCF 9.1).',
     'app.fleet_91': 'VCF Management Services — Fleet component. 1 FQDN requis (minuscules). Placement: {placement}.',
@@ -199,6 +203,10 @@ export const translations = {
     'val.svcruntime_27_res': 'Prévoir un /27 pour le bloc VCF Services Runtime (Management VM Network ou VLAN dédié), ou confirmer le dimensionnement exact via Broadcom TechDocs avant déploiement.',
     'val.auto_block_info': 'VCF Automation (9.1) : le bloc /29 (5 IPs : 3 nodes + 2 buffer) est indépendant du bloc VCF Services Runtime (Fleet/Instance/Identity Broker) et n\'est pas comptabilisé dans son dimensionnement /28-/27.',
     'val.auto_block_res': 'Allouer un bloc /29 séparé pour VCF Automation — par défaut dans le Management VM Network (VLAN dédié possible via l\'API fleet lifecycle).',
+    'val.range_outside_cidr': 'VLAN "{vlan}" : l\'IP de départ de plage ({range}) est en dehors du CIDR déclaré ({cidr}).',
+    'val.range_outside_cidr_res': 'Corriger l\'IP de départ pour qu\'elle appartienne au CIDR, ou corriger le CIDR.',
+    'val.range_insufficient': 'VLAN "{vlan}" : {need} appliance(s) avec IP statique requise dépassent les {available} IPs prévues pour ce bloc.',
+    'val.range_insufficient_res': 'Étendre la plage/le bloc IP, ou déplacer certaines appliances vers un autre VLAN.',
   },
   en: {
     // Topology options
@@ -337,6 +345,7 @@ export const translations = {
     'header.beta_tooltip': 'Beta release — always cross-check values against the official Broadcom VCF 9.1 documentation before any deployment.',
     'feedback.btn': 'Feedback',
     'feedback.tooltip': 'Report an issue or missing feature on GitHub',
+    'ver.1140': `VLAN Design tab: new "Range Start" field on every VLAN row and an "↳ Auto-fill" button that sequentially pre-fills the IP addresses of the appliances in that block (matching domain + VLAN), never overwriting an IP already entered manually. VCF Automation finally gets its own dedicated VLAN row in 9.1 when the "dedicated VLAN" option is checked (previously invisibly aggregated into "Management VM Network"). New validation rules: a warning when the declared range start IP falls outside the row's CIDR, and an info message when the number of static-IP appliances in the block exceeds its planned capacity.`,
     'ver.1133': `Appliances/VIPs tabs: discreet badge (dashed border, no alert color) on empty IP/FQDN fields and a "X/Y IP addresses filled" summary counter at the top of each table (Identity Broker Embedded, whose IP is disabled by design, is never counted as "missing"). New "FQDN Req." column in the Appliances tab (e.g. <code>ssp-node-pool</code>, <code>license-hub-worker</code> don't require one) and a "→ VIP" indicator appended to the name of cluster nodes whose associated VIP is now listed only in the VIPs tab (a pointer added after duplicates were removed in v1.13.2). Internal cleanup: removed the dead <code>hostingArea</code> field (always a duplicate of <code>vlan</code>, never displayed) from appliances and the hardcoded <code>'TBD'</code> placeholders from VIPs; the VIPs sheet in the Excel export now shows an empty cell instead of "TBD" when the IP/FQDN is unset, consistent with the other 4 sheets.`,
     'ver.1132': `Removed 11 duplicate entries from the Appliances tab: cluster VIPs (NSX Manager, AVI Cluster, VCF Operations, VCF Ops for Logs UI/ILB, VCF Operations Orchestrator, VCF Automation Cluster, VCF Automation Orchestrator, VCF Identity Broker HA, additional-service VIPs, workload-domain NSX Manager VIP) were incorrectly listed in both the Appliances tab and the dedicated VIPs tab (and therefore duplicated in the Excel export). A VIP is a floating IP on a cluster that is already counted separately, not a dedicated VM: these 11 lines are now listed only in the VIPs tab, their correct location (single source of truth: <code>core/vips.js</code>). The dashboard's Appliances counter drops by roughly 11 rows accordingly; VIP totals are unchanged, since they were already computed from the VIPs tab alone.`,
     'ver.1131': `The "VCF Management Services — Network Model" dropdown labels (Management Domain, VCF 9.1) now match Broadcom's official model names word-for-word (e.g. "VCF Management Dedicated VLAN and NSX Overlay Segment Network Model"), per the <a href="https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-1/design/vmware-cloud-foundation-concepts/fleet-level-component-backing-networking-models.html" target="_blank" style="color:#1e6abf">Broadcom TechDocs — Fleet Level Component Backing Networking Models</a> page, instead of shortened in-house labels.`,
@@ -367,6 +376,9 @@ export const translations = {
     'vlan.fleet_note_overlay': ' — NSX Overlay Segment (no physical VLAN ID, Geneve encapsulation)',
     'vlan.fleet_note_vlan': ' — NSX VLAN Segment (NSX VLAN transport zone)',
     'vlan.overlay_federation_note': 'overlay segment natively federated between AZ1/AZ2 via NSX Federation (no row duplication needed)',
+    'vlan.autofill_tooltip': 'Sequentially pre-fill this block\'s appliance IPs starting from the range start, without overwriting IPs already entered manually.',
+    'vlan.autofill_invalid': 'Invalid range start IP — cannot generate the range.',
+    'vlan.autofill_insufficient': 'Insufficient range: some appliances in this block could not be filled.',
     'vlan.collectors_always_mgmt': 'Collectors always in Mgmt VM Network',
     'app.nsx_vip_simple': 'NSX Manager VIP — Simple mode. Reserved even with 1 node to allow a future non-disruptive switch to HA cluster mode (VCF IP Allocation Workbook best practice, Broadcom TechDocs VCF 9.1).',
     'app.fleet_91': 'VCF Management Services — Fleet component. 1 FQDN required (lowercase). Placement: {placement}.',
@@ -398,6 +410,10 @@ export const translations = {
     'val.svcruntime_27_res': 'Plan for a /27 on the VCF Services Runtime block (Management VM Network or dedicated VLAN), or confirm exact sizing via Broadcom TechDocs before deployment.',
     'val.auto_block_info': 'VCF Automation (9.1): the /29 block (5 IPs: 3 nodes + 2 buffer) is independent from the VCF Services Runtime block (Fleet/Instance/Identity Broker) and is not counted in its /28-/27 sizing.',
     'val.auto_block_res': 'Allocate a separate /29 block for VCF Automation — defaults to the Management VM Network (dedicated VLAN possible via the fleet lifecycle API).',
+    'val.range_outside_cidr': 'VLAN "{vlan}": the range start IP ({range}) is outside the declared CIDR ({cidr}).',
+    'val.range_outside_cidr_res': 'Fix the range start IP so it belongs to the CIDR, or fix the CIDR.',
+    'val.range_insufficient': 'VLAN "{vlan}": {need} appliance(s) requiring a static IP exceed the {available} IPs planned for this block.',
+    'val.range_insufficient_res': 'Extend the IP range/block, or move some appliances to another VLAN.',
   },
 };
 
