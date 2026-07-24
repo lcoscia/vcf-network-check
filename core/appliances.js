@@ -66,8 +66,8 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
     const nc=mgmt.vcfOperations.mode==='enterprise'?3:1;
     for(let i=1;i<=nc;i++) apps.push(mkApp(`vcf-ops-${String(i).padStart(2,'0')}`,nc===1?'VCF Operations Node':i===1?'VCF Operations Master Node':'VCF Operations Replica Node',domain,opsVLAN,opsVLAN,true,false,true,`VCF Operations node ${i}${nc>1?' of '+nc:''}.`));
     if(mgmt.vcfOperations.mode==='enterprise') apps.push(mkApp('vcf-ops-vip','VCF Operations Cluster VIP',domain,opsVLAN,opsVLAN,true,false,true,'Cluster VIP for VCF Operations enterprise mode.'));
-    for(let r=1;r<=mgmt.vcfOperations.remoteCollectorCount;r++) apps.push(mkApp(`vcf-ops-rc-${String(r).padStart(2,'0')}`,'VCF Operations Remote Collector',domain,'Management VM Network','Management VM Network',true,false,true,t('app.rc_note',{r})));
-    if(mgmt.vcfOperations.cloudProxyEnabled) apps.push(mkApp('vcf-ops-cloud-proxy-01','VCF Operations Cloud Proxy',domain,'Management VM Network','Management VM Network',true,false,true,t('app.cloud_proxy')));
+    if(!is91) for(let r=1;r<=mgmt.vcfOperations.remoteCollectorCount;r++) apps.push(mkApp(`vcf-ops-rc-${String(r).padStart(2,'0')}`,'VCF Operations Remote Collector',domain,'Management VM Network','Management VM Network',true,false,true,t('app.rc_note',{r})));
+    if(is91&&mgmt.vcfOperations.cloudProxyEnabled) apps.push(mkApp('vcf-ops-cloud-proxy-01','VCF Operations Cloud Proxy',domain,'Management VM Network','Management VM Network',true,false,true,t('app.cloud_proxy')));
     if(mgmt.vcfOperations.licenseServerEnabled) apps.push(mkApp('vcf-license-server-01','VCF License Server',domain,'Management VM Network','Management VM Network',true,false,true,t('app.license_server')));
   }
 

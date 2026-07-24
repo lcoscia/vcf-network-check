@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.11.0
+# VCF 9.1 Network Planner — v1.12.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -121,6 +121,8 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.12.0 | Jul 2026 | New Feedback button in the header, opens a pre-filled GitHub issue (title, app version, current tab, VCF version, user-agent) in a new tab — no data is sent without explicit user confirmation on GitHub |
+| v1.11.1 | Jul 2026 | Fix: Remote Collector and Cloud Proxy (VCF Operations) never appeared without one another in the export — Remote Collector is a vestige of Aria Operations ≤8.15, deprecated since 8.16 and absent from VCF 9.x. Remote Collector is now restricted to VCF 9.0 (legacy), Cloud Proxy exclusively to VCF 9.1, per Broadcom documentation; UI fields and appliance/validation notes updated accordingly |
 | v1.11.0 | Jun 2026 | Extended AZ1/AZ2/Witness modeling to Workload Domains (previously only available for the Management Domain): any Workload Domain can now be configured as a vSAN Stretched Cluster, with its own AZ1/AZ2 Host Count fields (AZ1→AZ2 auto-sync), per-AZ VLAN rows (ESXi Management, vMotion, vSAN, NSX Host TEP), and its own independent Witness (shared vmk0 or dedicated vmk1) — not shared with the Management Domain or other Workload Domains. New per-domain validation rules (AZ1/AZ2 symmetry blocker, min-1-host-per-AZ blocker, Witness latency tier info). No behavior change in Single Site / Partially Stretched mode |
 | v1.10.1 | Jun 2026 | Reduced friction on AZ1/AZ2 input (Stretched Cluster): the AZ1 Host Count field now auto-syncs AZ2 to the same value (symmetry by default, per Broadcom's requirement), while AZ2 remains freely editable afterward to test an intentionally asymmetric setup — the existing AZ1/AZ2 symmetry blocker remains the safety net |
 | v1.10.0 | Jun 2026 | Full modeling of AZ1, AZ2, and the Witness for the Management Domain in vSAN Stretched Cluster (an audit confirmed AZ2 had no distinct representation): new AZ1/AZ2 Host Count fields replace the single host count field in Stretched mode (auto-synced total); ESXi Management, vMotion, vSAN, and NSX Host TEP VLAN rows now split per AZ; new vSAN Witness section/VLAN/appliance with a shared-vmk0 (1 IP, default) vs dedicated-vmk1 (2 IPs) choice, modeled as a distinct entity rather than a symmetric 3rd site; new validation rules (AZ1/AZ2 symmetry blocker, min-1-host-per-AZ blocker, Witness latency tier info). No behavior change in Single Site / Partially Stretched mode |

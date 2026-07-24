@@ -525,6 +525,10 @@
     </div>
     -->
     <div class="app-header-right">
+      <button class="header-btn" style="display:flex;align-items:center;gap:5px;" @click="openFeedback()" :title="t('feedback.tooltip')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span x-text="t('feedback.btn')"></span>
+      </button>
       <div class="lang-toggle" @click="lang = lang==='fr' ? 'en' : 'fr'" title="Switch language / Changer de langue">
         <div class="toggle-pill">
           <span class="pill-opt" :class="{ active: lang==='fr' }">FR</span>
@@ -892,20 +896,24 @@
                 <option value="enterprise">Enterprise (Primary + Replica + Data node + VIP)</option>
               </select>
             </div>
-            <!-- C11: Remote Collectors → Cloud Proxies en 9.x -->
-            <div class="field">
-              <label x-text="project.vcfVersion==='9.1' ? t('ops.collectors_91') : t('ops.collectors_90')"></label>
+            <!-- C11: Remote Collector n'existe qu'en VCF 9.0 (legacy) ; Cloud Proxy est exclusif à VCF 9.1 -->
+            <div class="field" x-show="project.vcfVersion==='9.0'">
+              <label x-text="t('ops.collectors_90')"></label>
               <input class="input" type="number" min="0" x-model.number="managementDomain.vcfOperations.remoteCollectorCount" />
-              <span class="field-note" x-show="project.vcfVersion==='9.1'" x-text="t('ops.collectors_note_91')"></span>
-              <span class="field-note" x-show="project.vcfVersion==='9.0'" x-text="t('ops.collectors_note_90')"></span>
+              <span class="field-note" x-text="t('ops.collectors_note_90')"></span>
             </div>
             <div class="field">
               <label x-text="t('ops.additional')"></label>
-              <label class="check-row mb4">
-                <input type="checkbox" x-model="managementDomain.vcfOperations.cloudProxyEnabled" />
-                Cloud Proxy
-              </label>
-              <span class="field-note" style="margin-bottom:8px">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-ops-proxy.vcf.domain.local</span></span>
+              <template x-if="project.vcfVersion==='9.1'">
+                <div>
+                  <label class="check-row mb4">
+                    <input type="checkbox" x-model="managementDomain.vcfOperations.cloudProxyEnabled" />
+                    Cloud Proxy
+                  </label>
+                  <span class="field-note" x-text="t('ops.collectors_note_91')"></span>
+                  <span class="field-note" style="margin-bottom:8px">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-ops-proxy.vcf.domain.local</span></span>
+                </div>
+              </template>
               <label class="check-row mt4">
                 <input type="checkbox" x-model="managementDomain.vcfOperations.licenseServerEnabled" />
                 License Server
@@ -1604,6 +1612,16 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.12.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1120')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.11.1</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1111')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.11.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jun 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1110')"></td>
@@ -1736,7 +1754,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.11.0';
+import * as Core from './core/index.js?v=1.12.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1777,7 +1795,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.11.0',
+    appVersion:'1.12.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -1924,6 +1942,26 @@ function vcfApp(){
     */ // FIN AUTH DISABLED
 
     showToast(msg,ms=3000){this.toastMsg=msg;this.toastVisible=true;setTimeout(()=>this.toastVisible=false,ms);},
+
+    openFeedback(){
+      const tab=this.tabs.find(t=>t.id===this.activeTab);
+      const tabLabel=tab?tab.label:this.activeTab;
+      const title='[Feedback] ';
+      const body=[
+        '## Problem / missing feature','',
+        '<!-- Describe the problem you ran into, or the feature that is missing -->','',
+        '## Context','',
+        `- App version: v${this.appVersion}`,
+        `- Tab: ${tabLabel} (${this.activeTab})`,
+        `- VCF version: ${this.project.vcfVersion}`,
+        `- Browser: ${navigator.userAgent}`,'',
+      ].join('\n');
+      const url='https://github.com/lcoscia/vcf-network-check/issues/new'
+        +'?title='+encodeURIComponent(title)
+        +'&body='+encodeURIComponent(body)
+        +'&labels=feedback';
+      window.open(url,'_blank','noopener');
+    },
 
     addWorkloadDomain(){
       const idx=this.workloadDomains.length+1;
