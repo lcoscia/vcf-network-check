@@ -171,13 +171,63 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   // name MUST stay identical to the 'VCF Automation Network' string already used in core/appliances.js /
   // core/vips.js, otherwise the appliance/VIP → VLAN join breaks silently. Default (unchecked) keeps the /29
   // aggregated into Management VM Network (see autoInMgmtVM above) — no VLAN row generated in that case.
-  // TODO (future session): the other 4 services with a requiresDedicatedVLAN option (VCF Operations, Ops for
-  // Logs, Ops for Networks, Identity Broker) have the same gap — appliances.js computes a dedicated VLAN name
-  // for them too, but this file never generates a matching VLAN row. Out of scope for this chantier.
   if(is91&&mgmt.vcfAutomation.enabled&&mgmt.vcfAutomation.requiresDedicatedVLAN){
     const auto=mgmt.vcfAutomation;
     const autoReqIPs=5+(auto.orchestratorMode==='standalone'?auto.orchestratorNodeCount+(auto.orchestratorNodeCount>1?1:0):0);
     vlans.push(makeVLAN(domain,'VCF Automation Network','service','Dedicated network for VCF Automation','VCF Automation /29 block (+ standalone vRO nodes if applicable)','scenario-driven','dedicated',autoReqIPs,'5 IPs VCF Automation /29 (3 nodes + 2 buffer)'+(auto.orchestratorMode==='standalone'?` + ${auto.orchestratorNodeCount} vRO node(s)`:''),buf,bufPct));
+  }
+
+  // Same gap as VCF Automation above, now closed for the other 5 services whose appliances.js/vips.js already
+  // compute a dedicated VLAN name (VCF Operations, Ops for Logs [9.0 and 9.1], Ops for Networks, Identity
+  // Broker, SSP) but which core/vlan.js never turned into an actual VLAN row. Names below MUST stay byte-for-byte
+  // identical to the strings used in core/appliances.js / core/vips.js — verified by grep, not by inspection alone.
+  if(mgmt.vcfOperations.enabled&&mgmt.vcfOperations.requiresDedicatedVLAN){
+    const ops=mgmt.vcfOperations;
+    const nc=ops.mode==='enterprise'?3:1;
+    const licIP=ops.licenseServerEnabled?1:0;
+    // nc nodes (appliances.js) + License Server appliance, if enabled, follows the same VLAN (appliances.js) + 1
+    // VIP (vips.js generates 'VCF Operations VIP' unconditionally whenever VCF Operations is enabled).
+    const opsReqIPs=nc+licIP+1;
+    vlans.push(makeVLAN(domain,'VCF Operations Network','service','Dedicated network for VCF Operations','VCF Operations node(s) + License Server (if enabled) + VIP','scenario-driven','dedicated',opsReqIPs,`${nc} node(s)${licIP?' + License Server':''} + 1 VIP`,buf,bufPct));
+  }
+  if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){
+    const logs=mgmt.vcfOperationsForLogs;
+    if(is91){
+      // 9.1: appliances.js places a single 'vcf-log-mgmt-01' appliance on this VLAN when requiresDedicatedVLAN is
+      // checked, but vips.js keeps 'VCF Log Management VIP' unconditionally on the Fleet/Runtime VLAN (fleetVLAN) —
+      // it never follows this dedicated VLAN toggle (see vips.js comment: "IPs allocated from the VCF Services
+      // Runtime block"). requiredIPs therefore reflects only the single appliance actually routed here by the
+      // current code (1), not a theoretical VIP that never lands on this VLAN. Also a known sub-estimate versus
+      // the documented 6-base/+2-per-replica Log Management architecture, which the data model does not expose a
+      // replica count for — not invented here, only what the code actually generates.
+      vlans.push(makeVLAN(domain,'Log Management Network','service','Dedicated network for VCF Log Management (9.1)','VCF Log Management appliance — sub-estimated, see code comment','scenario-driven','dedicated',1,'1 IP: Log Management appliance (its VIP stays on the Fleet/Runtime VLAN, see vips.js)',buf,bufPct));
+    } else {
+      // 9.0: master + workers (if clustered) + UI VIP (unconditional) + ILB VIP (if clustered & integratedLBVIP).
+      const logsReqIPs=1+(logs.mode==='clustered'?logs.workerCount:0)+1+(logs.mode==='clustered'&&logs.integratedLBVIP?1:0);
+      vlans.push(makeVLAN(domain,'VCF Operations for Logs Network','service','Dedicated network for VCF Operations for Logs (9.0)','Master + workers (if clustered) + UI VIP + ILB VIP (if applicable)','scenario-driven','dedicated',logsReqIPs,`1 master${logs.mode==='clustered'?` + ${logs.workerCount} worker(s)`:''} + 1 UI VIP${logs.mode==='clustered'&&logs.integratedLBVIP?' + 1 ILB VIP':''}`,buf,bufPct));
+    }
+  }
+  if(mgmt.vcfOperationsForNetworks.enabled&&mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN){
+    const nets=mgmt.vcfOperationsForNetworks;
+    // platformNodeCount platform VMs (collectors always stay on Management VM Network, appliances.js) + 1 VIP
+    // (vips.js generates 'VCF Operations for Networks VIP' unconditionally whenever the service is enabled).
+    const netsReqIPs=nets.platformNodeCount+1;
+    vlans.push(makeVLAN(domain,'VCF Operations for Networks Network','service','Dedicated network for VCF Operations for Networks','Platform VM(s) + VIP (collectors stay on Management VM Network)','scenario-driven','dedicated',netsReqIPs,`${nets.platformNodeCount} platform VM(s) + 1 VIP`,buf,bufPct));
+  }
+  if(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&mgmt.vcfIdentityBroker.requiresDedicatedVLAN){
+    const ib=mgmt.vcfIdentityBroker;
+    // 9.1: single Services-Runtime-integrated appliance, no separate VIP (vips.js: !is91 guard). 9.0: HA-dependent
+    // appliance count (1 or 3) + 1 VIP (vips.js generates 'VCF Identity Broker VIP' unconditionally for 9.0 when
+    // mode==='appliance').
+    const ibReqIPs=is91?1:((ib.haEnabled?3:1)+1);
+    vlans.push(makeVLAN(domain,'VCF Identity Broker Network','service','Dedicated network for VCF Identity Broker',is91?'Identity Broker (Services Runtime-integrated, no separate VIP in 9.1)':'Identity Broker appliance(s) + VIP','scenario-driven','dedicated',ibReqIPs,is91?'1 IP: Identity Broker (no dedicated VIP in 9.1)':`${ib.haEnabled?3:1} appliance(s) + 1 VIP`,buf,bufPct));
+  }
+  if(mgmt.sspEnabled){
+    // SSP has no separate "dedicated VLAN" toggle — appliances.js always routes the SSP Node Pool (13 IPs: 3
+    // controllers + minimum 4 workers) and SSP Service IP Pool (7 IPs: Instance + Messaging) to 'SSP Network'
+    // whenever sspEnabled is true. No dedicated SSP VIP is generated by vips.js (grep-confirmed) — the two pool
+    // rows above already account for every IP consumed here.
+    vlans.push(makeVLAN(domain,'SSP Network','service','Dedicated network for Security Services Platform (SSP)','SSP Node Pool + SSP Service IP Pool','scenario-driven','dedicated',20,'13 IPs Node Pool (3 controllers + min. 4 workers) + 7 IPs Service Pool (Instance + Messaging)',buf,bufPct));
   }
 
   mgmt.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated network for ${svc.name}`,`Service VLAN: ${svc.name}`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||`${svc.applianceCount} appliances`,buf,bufPct)));
@@ -241,6 +291,11 @@ export function buildWorkloadVLANs(wld, project, t=k=>k) {
   }
   if(wld.aviEnabled)vlans.push(makeVLAN(domain,'AVI VIP Network','avi','AVI VIP pool','VIP pool for AVI load balancer services','scenario-driven','dedicated',32,'Adjust to service count',buf,bufPct));
   if(wld.vksEnabled)vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 IPs (recommended as a contiguous block)','Kubernetes Supervisor','scenario-driven','dedicated',5,'5 IPs (recommended contiguous block): 3 control plane + 1 floating + 1 patching. Note: workload network, AVI VIP pool, ingress/egress CIDR and pod CIDR are separate additional requirements.',buf,bufPct));
+  if(wld.sspEnabled&&wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
+    // Mirrors appliances.js buildWorkloadAppliances: SSP Node Pool (13 IPs) + SSP Service IP Pool (7 IPs) on
+    // 'SSP Network', gated on nsxEnabled && nsxManagerMode!=='shared'. No dedicated SSP VIP in vips.js.
+    vlans.push(makeVLAN(domain,'SSP Network','service','Dedicated network for Security Services Platform (SSP)','SSP Node Pool + SSP Service IP Pool','scenario-driven','dedicated',20,'13 IPs Node Pool (3 controllers + min. 4 workers) + 7 IPs Service Pool (Instance + Messaging)',buf,bufPct));
+  }
   wld.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated VLAN for ${svc.name}`,`Service VLAN`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||'',buf,bufPct)));
   return vlans;
 }

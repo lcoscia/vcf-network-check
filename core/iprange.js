@@ -20,6 +20,12 @@ export function generateIPRange(rangeStart, count){
   return {addresses,truncated:false};
 }
 
+export function computeRangeEnd(rangeStart, requiredIPs){
+  const start=ipToInt(rangeStart);
+  if(start===null||!requiredIPs||requiredIPs<=0) return '';
+  return intToIp(start+requiredIPs-1);
+}
+
 export function ipInCidr(ip, cidr){
   const m=/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/.exec((cidr||'').trim());
   if(!m) return null;

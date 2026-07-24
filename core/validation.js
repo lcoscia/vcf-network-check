@@ -6,6 +6,16 @@ import { ipInCidr } from './iprange.js';
 let _valId=0;
 export function mkMsg(severity,category,domain,message,resolution){return {id:`val-${++_valId}`,severity,category,domain,message,resolution};}
 
+// Anti-regression safety net: flags any appliance whose `vlan` name doesn't match any generated VLAN row.
+// Domain-agnostic by design, mirroring the fallback in getVLANPrefix (core/vlan.js): matches on vlanName only,
+// NOT on (domain, vlanName) — many Workload Domain appliances legitimately reference 'Management VM Network'
+// (a Management Domain row) while their own appliance.domain is the WLD name. Matching by domain too would
+// generate massive false positives on any install with Workload Domains.
+export function findOrphanApplianceVlans(vlans,appliances){
+  const vlanNames=new Set(vlans.map(v=>v.vlanName));
+  return appliances.filter(a=>a.vlan&&!vlanNames.has(a.vlan));
+}
+
 // `appliances` added as the last parameter (kept optional/defaulted to [] so existing single caller doesn't break
 // if it's ever omitted) — needed to count appliances per VLAN block for the IP-range rules below.
 export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[]){
@@ -93,6 +103,20 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
     if(v.cidr&&ipInCidr(v.rangeStart,v.cidr)===false) msgs.push(mkMsg('warning','vlan',v.domain,t('val.range_outside_cidr',{vlan:v.vlanName,range:v.rangeStart,cidr:v.cidr}),t('val.range_outside_cidr_res')));
     const need=appliances.filter(a=>a.domain===v.domain&&a.vlan===v.vlanName&&a.staticIPRequired===true).length;
     if(need>v.requiredIPs) msgs.push(mkMsg('info','vlan',v.domain,t('val.range_insufficient',{vlan:v.vlanName,need,available:v.requiredIPs}),t('val.range_insufficient_res')));
+  });
+
+  // Anti-regression: appliances referencing a VLAN name absent from any generated VLAN row (see findOrphanApplianceVlans
+  // above). Grouped by (domain, vlan) to avoid flooding the list when several appliances of the same block point to
+  // the same missing VLAN.
+  const orphanAppliances=findOrphanApplianceVlans(vlans,appliances);
+  const orphanGroups=new Map();
+  orphanAppliances.forEach(a=>{
+    const key=`${a.domain} ${a.vlan}`;
+    if(!orphanGroups.has(key))orphanGroups.set(key,{domain:a.domain,vlan:a.vlan,count:0});
+    orphanGroups.get(key).count++;
+  });
+  orphanGroups.forEach(({domain:d,vlan,count})=>{
+    msgs.push(mkMsg('warning','vlan',d,t('val.orphan_vlan',{vlan,count}),t('val.orphan_vlan_res')));
   });
 
   if(project.scenario==='private-ai'){

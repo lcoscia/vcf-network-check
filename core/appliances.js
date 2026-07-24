@@ -37,7 +37,7 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   }
 
   const nsxCount=mgmt.nsxManagerMode==='clustered'?3:1;
-  for(let i=1;i<=nsxCount;i++) apps.push(mkApp(`nsx-manager-mgmt-0${i}`,'NSX Manager',domain,'Management VM Network',true,i===1&&mgmt.nsxManagerMode==='clustered',true,`NSX Manager node ${i} of ${nsxCount}.`));
+  for(let i=1;i<=nsxCount;i++) apps.push(mkApp(`nsx-manager-mgmt-0${i}`,'NSX Manager',domain,'Management VM Network',true,i===1,true,`NSX Manager node ${i} of ${nsxCount}.`));
   // C14: VIP NSX Manager réservée dans tous les modes (Simple + HA) pour permettre un futur scale-out HA sans ré-IP — bonne pratique VCF IP Allocation Workbook (Broadcom TechDocs VCF 9.1).
   // Cette règle métier est désormais documentée et implémentée uniquement dans core/vips.js (buildManagementVIPs) — aucun code dupliqué ici.
 
@@ -168,7 +168,7 @@ export function buildWorkloadAppliances(wld,t=k=>k){
 
   if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
     const nc=wld.nsxManagerMode==='clustered'?3:1;
-    for(let i=1;i<=nc;i++) apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-0${i}`,'NSX Manager',domain,'Management VM Network',true,false,true,`NSX Mgr ${i}/${nc} for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
+    for(let i=1;i<=nc;i++) apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-0${i}`,'NSX Manager',domain,'Management VM Network',true,i===1,true,`NSX Mgr ${i}/${nc} for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
   }
   if(wld.nsxEnabled&&wld.edgeRequired){
     for(let i=1;i<=wld.edgeNodeCount;i++) apps.push(mkApp(`nsx-edge-${domain.toLowerCase()}-0${i}`,'NSX Edge Node',domain,'VM / Application Network',true,false,true,`Edge node ${i}: eth0→VM/App Net, TEP→Edge TEP, fp-eth0/1→Uplink 1/2.`));
