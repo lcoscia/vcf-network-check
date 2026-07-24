@@ -281,6 +281,8 @@
       box-shadow: none; background: white;
     }
     .tbl .input:focus { border-color: var(--blue-accent); }
+    .tbl .input.input-missing { border-style: dashed; border-color: var(--gray-border); background: #fbfcfe; }
+    .tbl .input.input-missing::placeholder { color: var(--text-muted); }
     .tbl-domain { font-weight: 600; color: var(--blue-accent); }
     .tbl-mono { font-family: 'Courier New', monospace; font-size: 11px; }
     .tbl-muted { color: var(--text-muted); font-size: 11px; }
@@ -1292,7 +1294,7 @@
     <div x-show="activeTab==='appliances'">
       <div class="flex-between mb8">
         <h2 class="sec-title" style="margin-bottom:0">Appliance Allocation</h2>
-        <span class="text-muted text-xs">Auto-generated — fill in IP addresses and FQDNs</span>
+        <span class="text-muted text-xs" x-text="appliancesIPCompletion.done + '/' + appliancesIPCompletion.total + ' IP addresses filled'"></span>
       </div>
       <!-- FQDN prefix banner -->
       <div class="card" style="padding:12px 16px;margin-bottom:12px" x-show="project.fqdnSuffix">
@@ -1315,13 +1317,17 @@
               <th class="resizable" style="width:140px">IP Address</th>
               <th class="resizable" style="width:210px">FQDN</th>
               <th class="resizable" style="width:70px">Static</th>
+              <th class="resizable" style="width:80px">FQDN Req.</th>
               <th>Notes</th>
             </tr>
           </thead>
           <tbody>
             <template x-for="(a, ai) in appliances" :key="a.id">
               <tr>
-                <td class="tbl-mono tbl-domain" x-text="a.applianceName"></td>
+                <td class="tbl-mono tbl-domain">
+                  <span x-text="a.applianceName"></span>
+                  <span class="text-muted text-xs" x-show="a.vipRequired" title="See VIPs tab for the cluster VIP"> → VIP</span>
+                </td>
                 <td x-text="a.applianceType"></td>
                 <td class="tbl-muted" x-text="a.domain"></td>
                 <td class="tbl-muted" x-text="a.vlan"></td>
@@ -1332,17 +1338,22 @@
                   </template>
                   <template x-if="a.applianceType!=='VCF Identity Broker (Embedded)'">
                     <input class="input mono" style="width:130px"
+                      :class="{'input-missing': !a.ipAddress}"
                       :placeholder="getVLANPrefix(a.domain, a.vlan) || 'TBD'"
                       x-model="appliances[ai].ipAddress" />
                   </template>
                 </td>
                 <td>
                   <input class="input mono" style="width:200px"
+                    :class="{'input-missing': !a.fqdn && a.applianceType!=='VCF Identity Broker (Embedded)'}"
                     :placeholder="buildFQDNPlaceholder(a.applianceName)"
                     x-model="appliances[ai].fqdn" />
                 </td>
                 <td class="text-center">
                   <span class="badge" :class="a.staticIPRequired ? 'badge-mandatory' : 'badge-optional'" x-text="a.staticIPRequired ? 'Yes' : 'No'"></span>
+                </td>
+                <td class="text-center">
+                  <span class="badge" :class="a.fqdnRequired ? 'badge-mandatory' : 'badge-optional'" x-text="a.fqdnRequired ? 'Yes' : 'No'"></span>
                 </td>
                 <td class="tbl-muted" x-text="a.notes"></td>
               </tr>
@@ -1358,7 +1369,7 @@
     <div x-show="activeTab==='vips'">
       <div class="flex-between mb8">
         <h2 class="sec-title" style="margin-bottom:0">Virtual IP (VIP) Allocation</h2>
-        <span class="text-muted text-xs">Auto-generated — fill in IP addresses and FQDNs</span>
+        <span class="text-muted text-xs" x-text="vipsIPCompletion.done + '/' + vipsIPCompletion.total + ' IP addresses filled'"></span>
       </div>
       <div class="infobox blue mb8" x-show="project.fqdnSuffix || vlans.some(v=>v.cidr)">
         <div class="text-xs">
@@ -1388,11 +1399,13 @@
                 <td class="tbl-muted" x-text="v.vlan"></td>
                 <td>
                   <input class="input mono" style="width:130px"
+                    :class="{'input-missing': !v.ipAddress}"
                     :placeholder="getVLANPrefix(v.domain, v.vlan) || 'TBD'"
                     x-model="vips[vi].ipAddress" />
                 </td>
                 <td>
                   <input class="input mono" style="width:200px"
+                    :class="{'input-missing': !v.fqdn}"
                     :placeholder="buildFQDNPlaceholder(v.vipName.toLowerCase().replace(/\\s+/g,'-'))"
                     x-model="vips[vi].fqdn" />
                 </td>
@@ -1630,6 +1643,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.13.3</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1133')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.13.2</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1132')"></td>
@@ -1787,7 +1805,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.13.2';
+import * as Core from './core/index.js?v=1.13.3';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1828,7 +1846,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.13.2',
+    appVersion:'1.13.3',
     activeTab:'overview',
     get tabs() {
       return [
@@ -1883,6 +1901,13 @@ function vcfApp(){
     get selectedComponent(){
       if(!this.selectedComponentKey)return null;
       return this.componentRow(this.selectedComponentKey.id,this.selectedComponentKey.domain);
+    },
+    get appliancesIPCompletion(){
+      const eligible=this.appliances.filter(a=>a.applianceType!=='VCF Identity Broker (Embedded)');
+      return {done:eligible.filter(a=>a.ipAddress).length, total:eligible.length};
+    },
+    get vipsIPCompletion(){
+      return {done:this.vips.filter(v=>v.ipAddress).length, total:this.vips.length};
     },
     toastMsg:'',toastVisible:false,
 

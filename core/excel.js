@@ -31,7 +31,7 @@ export function doExcelExport(state, XLSXLib) {
   const ws3 = XLSXLib.utils.aoa_to_sheet(ad); ws3['!cols'] = [28, 22, 28, 28, 18, 36, 10, 40].map(colW); applyHdr(XLSXLib, ws3, 'A1:H1');
   XLSXLib.utils.book_append_sheet(wb, ws3, 'Appliance Allocation');
 
-  const vipd = [['VIP Name', 'Service', 'Domain', 'VLAN', 'IP Address', 'FQDN', 'Notes'], ...state.vips.map(v => [xs(v.vipName), xs(v.associatedService), xs(v.domain), xs(v.vlan), xs(v.ipAddress || v.ipPlaceholder), xs(v.fqdn || v.fqdnPlaceholder), xs(v.notes)])];
+  const vipd = [['VIP Name', 'Service', 'Domain', 'VLAN', 'IP Address', 'FQDN', 'Notes'], ...state.vips.map(v => [xs(v.vipName), xs(v.associatedService), xs(v.domain), xs(v.vlan), xs(v.ipAddress), xs(v.fqdn), xs(v.notes)])];
   const ws4 = XLSXLib.utils.aoa_to_sheet(vipd); ws4['!cols'] = [32, 24, 28, 28, 18, 36, 40].map(colW); applyHdr(XLSXLib, ws4, 'A1:G1');
   XLSXLib.utils.book_append_sheet(wb, ws4, 'VIPs');
 

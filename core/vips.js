@@ -4,7 +4,7 @@
 let _vipId=0;
 export function resetVipCounter(){_vipId=0;}
 export function mkVIP(vipName,service,domain,vlan,notes){
-  return {id:`vip-${++_vipId}`,vipName,associatedService:service,domain,vlan,ipPlaceholder:'TBD',fqdnPlaceholder:'TBD',notes,ipAddress:'',fqdn:''};
+  return {id:`vip-${++_vipId}`,vipName,associatedService:service,domain,vlan,notes,ipAddress:'',fqdn:''};
 }
 
 export function buildManagementVIPs(mgmt,project){
