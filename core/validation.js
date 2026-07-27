@@ -58,6 +58,21 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   // "NSX VLAN Segment" is not one of the 4 officially documented VCF 9.1 network models — kept only for backward
   // compatibility with existing 9.1 projects that already selected it before the option was removed from the select.
   if(project.vcfVersion==='9.1'&&mgmt.fleetPlacement==='nsx-vlan-segment') msgs.push(mkMsg('warning','vlan',domain,t('val.legacy_nsxvlan_warn'),t('val.legacy_nsxvlan_warn_res')));
+  // Legacy JSON safety net: these 5 per-component "dedicated VLAN" flags have no UI checkbox and no effect under
+  // dedicated-fleet-vlan / shared-mgmt-vlan (no such option is documented by Broadcom for these models — see
+  // core/vlan.js comments, VCF-MGMT-DV-NET-REQD-001). A project imported from before this flag was locked down (or
+  // hand-edited JSON) may still carry one set to true; the app still honors it (still generates a separate VLAN row)
+  // for backward compatibility, so this is informational only, not a blocker.
+  if(mgmt.fleetPlacement==='dedicated-fleet-vlan'||mgmt.fleetPlacement==='shared-mgmt-vlan'){
+    const legacyFlags=[
+      ['VCF Operations',mgmt.vcfOperations.requiresDedicatedVLAN],
+      ['VCF Operations for Logs',mgmt.vcfOperationsForLogs.requiresDedicatedVLAN],
+      ['VCF Operations for Networks',mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN],
+      ['VCF Automation',mgmt.vcfAutomation.requiresDedicatedVLAN],
+      ['VCF Identity Broker',mgmt.vcfIdentityBroker.requiresDedicatedVLAN],
+    ].filter(([,v])=>v).map(([n])=>n);
+    if(legacyFlags.length) msgs.push(mkMsg('info','vlan',domain,t('val.legacy_dedicated_vlan_flags',{components:legacyFlags.join(', ')}),t('val.legacy_dedicated_vlan_flags_res')));
+  }
   if((mgmt.vksEnabled||project.scenario==='vcf-automation-vks')&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario',domain,'VKS enabled but NSX Edge not deployed.','Deploy NSX Edge or confirm overlay from WLD NSX.'));
   if(mgmt.aviDeployed&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('info','scenario',domain,'AVI enabled but NSX Edge not deployed. Verify data plane connectivity.','Verify AVI SE network design.'));
   if(mgmt.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',domain,'TEP interfaces per host < 2. Recommend 2 for TEP HA.','Set TEP to 2+.'));

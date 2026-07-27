@@ -100,11 +100,13 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   }
 
   if(mgmt.vcfAutomation.enabled){
-    // 9.1: VCF Automation /29 (5 IPs) defaults to the Management VM Network regardless of the Fleet/Runtime placement,
-    // EXCEPT in nsx-overlay-segment mode, where — per Broadcom's official Dedicated VLAN + NSX Overlay Segment model —
-    // VCF Automation is a Day-2 component that defaults to the overlay segment instead ; a dedicated VLAN is still
-    // possible via the VCF Operations fleet lifecycle API ; 9.0 = platform-services placement (unchanged)
-    const aVLAN=is91?(mgmt.vcfAutomation.requiresDedicatedVLAN?'VCF Automation Network':(isOverlayModel?overlayVLANName:'Management VM Network')):platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
+    // Follows the same placement logic as VCF Operations / Ops for Networks / Identity Broker (platVLAN):
+    // Management VM Network when fleetPlacement is Shared, the dedicated Fleet/Runtime VLAN when it's Dedicated
+    // VLAN (Broadcom VCF-MGMT-DV-NET-REQD-001: Automation/Operations/Networks/License Server all join the same
+    // dedicated VLAN as Fleet/Instance/Runtime, Day-0, no API step) — or the NSX overlay segment in overlay mode
+    // (unchanged: platVLAN already resolves to overlayVLANName there). requiresDedicatedVLAN still forces its own
+    // separate VLAN if explicitly set (legacy compatibility — no UI control exposes this, see core/vlan.js).
+    const aVLAN=platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
     if(is91){
       // 9.1: 1 dedicated Automation FQDN (endpoint/VIP) + 1 dedicated VCF Services Runtime FQDN. Nodes (/29 block) without individual DNS.
       apps.push(mkApp('vcf-automation-01','VCF Automation',domain,aVLAN,true,false,true,t('app.auto_91')));

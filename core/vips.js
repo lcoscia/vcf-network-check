@@ -37,10 +37,11 @@ export function buildManagementVIPs(mgmt,project){
   }
   if(mgmt.vcfOperationsForNetworks.enabled){const v=platVLAN(mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN,'VCF Operations for Networks Network');vips.push(mkVIP('VCF Operations for Networks VIP','VCF Operations for Networks',domain,v,'VIP for VCF Ops for Networks UI/API.'));}
   if(mgmt.vcfAutomation.enabled){
-    // 9.1: /29 (5 IPs) block defaults to Management VM Network — independent from the Services Runtime block —
-    // EXCEPT in nsx-overlay-segment mode, where VCF Automation is a Day-2 component that defaults to the overlay
-    // segment instead (mirrors core/appliances.js).
-    const v=is91?(mgmt.vcfAutomation.requiresDedicatedVLAN?'VCF Automation Network':(isOverlayModel?overlayVLANName:'Management VM Network')):platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
+    // Follows the same placement logic as VCF Operations / Ops for Networks / Identity Broker (platVLAN):
+    // Management VM Network when fleetPlacement is Shared, the dedicated Fleet/Runtime VLAN when it's Dedicated
+    // VLAN (Broadcom VCF-MGMT-DV-NET-REQD-001), or the NSX overlay segment in overlay mode (mirrors
+    // core/appliances.js). requiresDedicatedVLAN still forces its own separate VLAN if explicitly set.
+    const v=platVLAN(mgmt.vcfAutomation.requiresDedicatedVLAN,'VCF Automation Network');
     vips.push(mkVIP('VCF Automation VIP','VCF Automation',domain,v,is91?'VCF Automation 9.1 endpoint (FQDN = VIP). /29 block (5 IPs): 3 IPs assigned to nodes + 2 IPs buffer for redeploy/rolling updates.':(mgmt.vcfAutomation.mode==='clustered'?'Cluster VIP for VCF Automation HA (3 active + 1 upgrade node).':'Standalone VCF Automation VIP.')));
     if(mgmt.vcfAutomation.orchestratorMode==='standalone') vips.push(mkVIP('VCF Automation Orchestrator (vRO) VIP','VCF Automation Orchestrator (vRO)',domain,v,mgmt.vcfAutomation.orchestratorNodeCount>1?'Cluster VIP for standalone vRO HA cluster.':'Standalone vRO VIP — reserved for DNS.'));
   }

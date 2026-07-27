@@ -55,13 +55,17 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   // 9.1: VCF Automation Endpoint VIP (1 IP, vcf-automation-01) + dedicated VCF Services Runtime (1 IP) + /29 node
   // block (5 IPs: 3 node IPs + 2 buffer for redeploy/rolling updates) = 7 IPs total, per Broadcom's Network Design
   // Options page (VCF 9.1) — both appliances sit on aVLAN, so both must be counted here, consistent with how
-  // opsNodesInMgmtVM/opsReqIPs above already include VCF Operations' own VIP. Separate block from the Fleet's
-  // Services Runtime — default placement is the Management VM Network regardless of the Fleet/Runtime placement ; 9.0 = VA nodes
-  const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&(is91||!fleetDedicated))?(is91?7:((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0))):0;
+  // opsNodesInMgmtVM/opsReqIPs above already include VCF Operations' own VIP. Counted here (Management VM Network)
+  // ONLY when fleetPlacement is Shared — symmetric with opsNodesInMgmtVM/logsInMgmtVM/netsNodesInMgmtVM above; when
+  // fleetDedicated it follows platVLAN like the others and is counted in the fleetDedicated block below instead ; 9.0 = VA nodes
+  const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&!fleetDedicated)?(is91?7:((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0))):0;
   // 9.1: Identity Broker IP is allocated from the VCF Services Runtime block — not an additional Mgmt VM Network IP ; 9.0 = VM appliances
   const ibInMgmtVM=(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&!mgmt.vcfIdentityBroker.requiresDedicatedVLAN)?(is91?0:(mgmt.vcfIdentityBroker.haEnabled?3+1:1)):0;
   const cloudProxyIP=mgmt.vcfOperations.enabled&&mgmt.vcfOperations.cloudProxyEnabled?1:0;
-  const licServerIP=mgmt.vcfOperations.enabled&&mgmt.vcfOperations.licenseServerEnabled?1:0;
+  // Counted here (Management VM Network) only when fleetPlacement is Shared — symmetric with opsNodesInMgmtVM
+  // above; when fleetDedicated the License Server follows VCF Operations' VLAN (appliances.js) and is counted in
+  // the fleetDedicated block below instead, to avoid double-counting it in both places.
+  const licServerIP=(mgmt.vcfOperations.enabled&&mgmt.vcfOperations.licenseServerEnabled&&!mgmt.vcfOperations.requiresDedicatedVLAN&&!fleetDedicated)?1:0;
   const mgmtVMIPs=1+1+nsxManagerCount+nsxVIPCount+nsxEdgeMgmtIPs+wldNSXManagerIPs+fleetCountInMgmtVM+additionalSvcIPs+aviControllerIPs+opsNodesInMgmtVM+opsCollectors+logsInMgmtVM+netsNodesInMgmtVM+netsCollectors+autoInMgmtVM+ibInMgmtVM+cloudProxyIP+licServerIP;
   const mgmtVMNotes=[
     'SDDC Manager, vCenter',
@@ -126,8 +130,14 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
     let overlayIPs=0;
     const overlayNotes=[];
     if(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN){
-      const n=mgmt.vcfOperations.mode==='enterprise'?4:1;
-      if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Ops: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Ops: ${n} IPs`);}
+      // License Server (if enabled) is deployed alongside VCF Operations and always follows its VLAN
+      // (appliances.js: mkApp('vcf-license-server-01',...,opsVLAN,...) — opsVLAN=platVLAN(...)). Verified against
+      // appliances.js before deciding: in the overlay model opsVLAN resolves to the overlay segment too, so the
+      // License Server IP was ALSO missing from overlayIPs before this fix (same double-counting bug, not just the
+      // non-overlay branch) — both branches below are corrected together, not just the fleetIPs one.
+      const licN=mgmt.vcfOperations.licenseServerEnabled?1:0;
+      const n=(mgmt.vcfOperations.mode==='enterprise'?4:1)+licN;
+      if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Ops: ${n} IPs`+(licN?' (incl. License Server)':''));} else {fleetIPs+=n;fleetNotes.push(`VCF Ops: ${n} IPs`+(licN?' (incl. License Server)':''));}
     }
     // 9.1: Log Management (6 base IPs +2/replica, Day-N) is allocated from the Services Runtime block itself — it
     // stays with Fleet/Instance/Runtime (dedicated VLAN) even in overlay mode, it does not move to the overlay
@@ -143,9 +153,15 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
       const n=mgmt.vcfOperationsForNetworks.platformNodeCount;
       if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Nets: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Nets: ${n} IPs`);}
     }
-    // 9.1: VCF Automation (7 IPs: VIP + dedicated Services Runtime + /29 node block) is a separate block from Services Runtime, counted in Management VM Network (see mgmtVMNotes) — not mixed into this block ; 9.0 = VA nodes counted here
-    if(!is91&&mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){
-      const n=(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);
+    // VCF Automation follows the same dedicated-VLAN/overlay placement as VCF Operations/Ops for Networks above
+    // (Broadcom VCF-MGMT-DV-NET-REQD-001 — Automation joins the same dedicated VLAN as Fleet/Instance/Runtime,
+    // Day-0, no API step). 9.1: 7 IPs (1 Endpoint VIP + 1 dedicated Services Runtime + /29 node block: 3 nodes + 2
+    // buffer) + standalone vRO nodes if applicable — same formula as autoReqIPs below (VCF Automation Network dedicated
+    // VLAN row), kept in sync deliberately, do not let them drift. 9.0 = VA nodes counted here (unchanged).
+    if(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){
+      const n=is91
+        ?7+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0)
+        :(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);
       if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Auto: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Auto: ${n} IPs`);}
     }
     fleetNotes.push('Collectors always in Mgmt VM Network');
@@ -173,8 +189,15 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
 
   // 9.1: VCF Automation gets its own dedicated VLAN row only when requiresDedicatedVLAN is explicitly checked —
   // name MUST stay identical to the 'VCF Automation Network' string already used in core/appliances.js /
-  // core/vips.js, otherwise the appliance/VIP → VLAN join breaks silently. Default (unchecked) keeps the /29
-  // aggregated into Management VM Network (see autoInMgmtVM above) — no VLAN row generated in that case.
+  // core/vips.js, otherwise the appliance/VIP → VLAN join breaks silently. Default (unchecked) keeps VCF Automation
+  // following platVLAN like VCF Operations/Ops for Networks/Identity Broker (Management VM Network in Shared mode,
+  // the dedicated Fleet/Runtime VLAN in Dedicated VLAN mode — see autoInMgmtVM / the fleetDedicated block above).
+  // IMPORTANT — this requiresDedicatedVLAN flag is NOT reachable from any UI checkbox under dedicated-fleet-vlan
+  // or shared-mgmt-vlan: Broadcom (VCF-MGMT-DV-NET-REQD-001) documents exactly ONE dedicated VLAN under those
+  // models, shared by Fleet/Instance/Runtime/Operations/Operations for Networks/Automation/License Server — no
+  // per-component separate-VLAN option. (The NSX Overlay Segment model is different: there the Day-0/Day-2 split
+  // is structural and real — see isOverlayModel above.) Do not add a UI checkbox for this without a new Broadcom
+  // documentation citation — this exact mistake was made for VCF Automation in v1.18.0 and is fixed by this patch.
   if(is91&&mgmt.vcfAutomation.enabled&&mgmt.vcfAutomation.requiresDedicatedVLAN){
     const auto=mgmt.vcfAutomation;
     const autoReqIPs=7+(auto.orchestratorMode==='standalone'?auto.orchestratorNodeCount+(auto.orchestratorNodeCount>1?1:0):0);
@@ -185,6 +208,13 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   // compute a dedicated VLAN name (VCF Operations, Ops for Logs [9.0 and 9.1], Ops for Networks, Identity
   // Broker, SSP) but which core/vlan.js never turned into an actual VLAN row. Names below MUST stay byte-for-byte
   // identical to the strings used in core/appliances.js / core/vips.js — verified by grep, not by inspection alone.
+  // IMPORTANT — same caveat as the VCF Automation block above: none of these requiresDedicatedVLAN blocks (VCF
+  // Operations Network / Log Management Network / VCF Operations for Logs Network / VCF Operations for Networks
+  // Network / VCF Identity Broker Network) are reachable from any UI checkbox under dedicated-fleet-vlan or
+  // shared-mgmt-vlan — that's intentional. Broadcom (VCF-MGMT-DV-NET-REQD-001) documents a single shared dedicated
+  // VLAN under those models, not a per-component option; only the NSX Overlay Segment model has a real, structural
+  // Day-0/Day-2 split (isOverlayModel). Do not wire a UI checkbox to any of these without a fresh Broadcom
+  // documentation citation — see the VCF Automation v1.18.0 mistake this patch corrects.
   if(mgmt.vcfOperations.enabled&&mgmt.vcfOperations.requiresDedicatedVLAN){
     const ops=mgmt.vcfOperations;
     const nc=ops.mode==='enterprise'?3:1;
