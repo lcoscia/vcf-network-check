@@ -76,13 +76,18 @@ const RULES = {
     const units = enabled ? 1 : 0;
     return { units, totalIps: enabled ? ips : 0, totalFqdns: enabled ? ips : 0 };
   },
-  'ops-collector'(mgmt) {
+  'ops-collector'(mgmt, workloadDomains, project) {
+    // Remote Collectors only exist in VCF 9.0 — VCF 9.1 replaces them with the Cloud Proxy
+    // (see core/appliances.js: `if(!is91) for(...) apps.push(...vcf-ops-rc-...)`).
+    if (project?.vcfVersion === '9.1') return { units: 0, totalIps: 0, totalFqdns: 0 };
     const units = mgmt.vcfOperations?.enabled ? (mgmt.vcfOperations.remoteCollectorCount || 0) : 0;
     return { units, totalIps: units, totalFqdns: units };
   },
-  'vcf-automation'(mgmt) {
+  'vcf-automation'(mgmt, workloadDomains, project) {
     const enabled = !!mgmt.vcfAutomation?.enabled;
-    const ips = mgmt.vcfAutomation?.mode === 'clustered' ? 7 : 2;
+    // 9.1: fixed /29 block (5 IPs), independent of HA/clustered mode (see core/vlan.js `autoInMgmtVM`).
+    // 9.0: legacy VA-nodes logic (7 IPs clustered, 2 standalone) — unchanged.
+    const ips = project?.vcfVersion === '9.1' ? 5 : (mgmt.vcfAutomation?.mode === 'clustered' ? 7 : 2);
     const units = enabled ? 1 : 0;
     return { units, totalIps: enabled ? ips : 0, totalFqdns: enabled ? 2 : 0 };
   },
@@ -129,6 +134,36 @@ const RULES = {
     const anyAvi = !!mgmt.aviDeployed || workloadDomains.some(w => w.aviEnabled);
     const units = (anySsp || anyAvi) ? 1 : 0;
     return { units, totalIps: units * r.ipsPerUnit, totalFqdns: units * r.fqdnsPerUnit };
+  },
+  'cloud-proxy'(mgmt, workloadDomains, project) {
+    // 9.1-only, single fixed appliance replacing Remote Collectors (see core/appliances.js:
+    // `if(is91&&mgmt.vcfOperations.cloudProxyEnabled) apps.push(...vcf-ops-cloud-proxy-01...)`).
+    const r = ref('cloud-proxy');
+    const units = (project?.vcfVersion === '9.1' && mgmt.vcfOperations?.enabled && mgmt.vcfOperations?.cloudProxyEnabled) ? 1 : 0;
+    return { units, totalIps: units * r.ipsPerUnit, totalFqdns: units * r.fqdnsPerUnit };
+  },
+  'ops-for-logs'(mgmt, workloadDomains, project) {
+    const enabled = !!mgmt.vcfOperationsForLogs?.enabled;
+    if (!enabled) return { units: 0, totalIps: 0, totalFqdns: 0 };
+    let n;
+    if (project?.vcfVersion === '9.1') {
+      // 9.1: single integrated appliance (vcf-log-mgmt-01) — see core/appliances.js.
+      n = 1;
+    } else {
+      // 9.0: 1 master + workers (clustered) + 1 UI VIP + 1 ILB VIP (if integratedLBVIP) —
+      // mirrors core/vlan.js `logsInMgmtVM`/line ~134.
+      const logs = mgmt.vcfOperationsForLogs;
+      n = logs.mode === 'clustered' ? 1 + logs.workerCount + (logs.integratedLBVIP ? 2 : 1) : 1;
+    }
+    return { units: 1, totalIps: n, totalFqdns: n };
+  },
+  'ops-for-networks'(mgmt) {
+    // Platform VM(s) + Collector(s), each individually addressed with its own IP and FQDN —
+    // mirrors core/appliances.js (`platformNodeCount` loop + `collectorCount` loop), same in 9.0/9.1.
+    const enabled = !!mgmt.vcfOperationsForNetworks?.enabled;
+    if (!enabled) return { units: 0, totalIps: 0, totalFqdns: 0 };
+    const n = mgmt.vcfOperationsForNetworks.platformNodeCount + mgmt.vcfOperationsForNetworks.collectorCount;
+    return { units: n, totalIps: n, totalFqdns: n };
   },
 };
 

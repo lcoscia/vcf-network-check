@@ -38,7 +38,7 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
 
   const nsxCount=mgmt.nsxManagerMode==='clustered'?3:1;
   for(let i=1;i<=nsxCount;i++) apps.push(mkApp(`nsx-manager-mgmt-0${i}`,'NSX Manager',domain,'Management VM Network',true,i===1,true,`NSX Manager node ${i} of ${nsxCount}.`));
-  // C14: VIP NSX Manager réservée dans tous les modes (Simple + HA) pour permettre un futur scale-out HA sans ré-IP — bonne pratique VCF IP Allocation Workbook (Broadcom TechDocs VCF 9.1).
+  // C14: VIP NSX Manager réservée dans tous les modes (Simple + HA) pour permettre un futur scale-out HA sans ré-IP — confirmé par la table officielle des exigences IP/FQDN NSX Manager (Broadcom TechDocs VCF 9.1).
   // Cette règle métier est désormais documentée et implémentée uniquement dans core/vips.js (buildManagementVIPs) — aucun code dupliqué ici.
 
   if(is91){
@@ -58,8 +58,8 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
 
   if(mgmt.sspEnabled){
     apps.push(mkApp('ssp-installer-01','SSP Installer (SSPI)',domain,'Management VM Network',true,false,true,'Security Services Platform Installer appliance.'));
-    apps.push(mkApp('ssp-node-pool','SSP Node Pool (3 controllers + workers)',domain,'SSP Network',true,false,false,'Pool of 13 IPs (3 controllers + minimum 4 workers, per Broadcom\'s documented minimum) — not itemized IP by IP.'));
-    apps.push(mkApp('ssp-service-pool','SSP Service IP Pool',domain,'SSP Network',true,true,true,'Contiguous pool of 7 IPs: SSP Instance (NSX metrics ingestion) + SSP Messaging (flow data).'));
+    apps.push(mkApp('ssp-node-pool','SSP Node Pool (3 controllers + workers)',domain,'SSP Network',true,false,false,'Pool of 9 IPs (3 controllers + minimum 4 workers, per Broadcom\'s documented 4-worker minimum) — not itemized IP by IP.'));
+    apps.push(mkApp('ssp-service-pool','SSP Service IP Pool',domain,'SSP Network',true,true,true,'Contiguous pool of 5 IPs: SSP Instance (NSX metrics ingestion) + SSP Messaging (flow data).'));
   }
   if(mgmt.sspEnabled||mgmt.aviDeployed){
     apps.push(mkApp('license-hub-controller','License Hub Controller',domain,'Management VM Network',true,false,true,'Licenses vDefend + Avi subscriptions — deployed once per Fleet.'));
@@ -179,8 +179,8 @@ export function buildWorkloadAppliances(wld,t=k=>k){
   }
   if(wld.vksEnabled) apps.push(mkApp(`vks-supervisor-${domain.toLowerCase()}`,'VKS Supervisor',domain,'VKS Infrastructure',true,false,true,`VKS Supervisor for ${domain}.`));
   if(wld.sspEnabled&&wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
-    apps.push(mkApp(`ssp-node-pool-${domain.toLowerCase()}`,'SSP Node Pool (3 controllers + workers)',domain,'SSP Network',true,false,false,`Pool of 13 IPs for ${domain} (3 controllers + minimum 4 workers).`));
-    apps.push(mkApp(`ssp-service-pool-${domain.toLowerCase()}`,'SSP Service IP Pool',domain,'SSP Network',true,true,true,`Contiguous pool of 7 IPs for ${domain}.`));
+    apps.push(mkApp(`ssp-node-pool-${domain.toLowerCase()}`,'SSP Node Pool (3 controllers + workers)',domain,'SSP Network',true,false,false,`Pool of 9 IPs for ${domain} (3 controllers + minimum 4 workers, per Broadcom's documented 4-worker minimum).`));
+    apps.push(mkApp(`ssp-service-pool-${domain.toLowerCase()}`,'SSP Service IP Pool',domain,'SSP Network',true,true,true,`Contiguous pool of 5 IPs for ${domain}: SSP Instance (NSX metrics ingestion) + SSP Messaging (flow data).`));
   }
   wld.additionalServices.forEach(svc=>{
     const sVLAN=svc.requiresDedicatedVLAN?`${svc.name} Network`:'VM / Application Network';
