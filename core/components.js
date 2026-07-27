@@ -85,9 +85,10 @@ const RULES = {
   },
   'vcf-automation'(mgmt, workloadDomains, project) {
     const enabled = !!mgmt.vcfAutomation?.enabled;
-    // 9.1: fixed /29 block (5 IPs), independent of HA/clustered mode (see core/vlan.js `autoInMgmtVM`).
+    // 9.1: 7 IPs total = 1 Automation Endpoint VIP + 1 dedicated VCF Services Runtime IP + /29 node block
+    // (5 IPs: 3 nodes + 2 buffer, see core/vlan.js `autoInMgmtVM`=6 which excludes the VIP), independent of HA/clustered mode.
     // 9.0: legacy VA-nodes logic (7 IPs clustered, 2 standalone) — unchanged.
-    const ips = project?.vcfVersion === '9.1' ? 5 : (mgmt.vcfAutomation?.mode === 'clustered' ? 7 : 2);
+    const ips = project?.vcfVersion === '9.1' ? 7 : (mgmt.vcfAutomation?.mode === 'clustered' ? 7 : 2);
     const units = enabled ? 1 : 0;
     return { units, totalIps: enabled ? ips : 0, totalFqdns: enabled ? 2 : 0 };
   },

@@ -108,6 +108,8 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
     if(is91){
       // 9.1: 1 dedicated Automation FQDN (endpoint/VIP) + 1 dedicated VCF Services Runtime FQDN. Nodes (/29 block) without individual DNS.
       apps.push(mkApp('vcf-automation-01','VCF Automation',domain,aVLAN,true,false,true,t('app.auto_91')));
+      // 9.1: dedicated VCF Services Runtime for Automation — separate FQDN + IP from the VIP above (Broadcom-confirmed, additive, no overlap).
+      apps.push(mkApp('vcf-automation-svcruntime-01','VCF Services Runtime (Automation)',domain,aVLAN,true,false,true,t('app.auto_svcruntime_91')));
       // 9.1: no separate vcf-auto-vip — the Automation FQDN IS the VIP endpoint.
       if(mgmt.vcfAutomation.orchestratorMode==='standalone'){
         const vrc=mgmt.vcfAutomation.orchestratorNodeCount;

@@ -52,8 +52,12 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   // 9.1: Log Management IPs (6 base + 2/replica, Day-N) are allocated from the VCF Services Runtime block — not an additional Mgmt VM Network IP ; 9.0 = master+workers architecture
   const logsInMgmtVM=(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN&&!fleetDedicated)?(is91?0:(mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1)):0;
   const netsNodesInMgmtVM=(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN&&!fleetDedicated)?mgmt.vcfOperationsForNetworks.platformNodeCount:0;
-  // 9.1: VCF Automation /29 (5 IPs: 3 node IPs + 2 buffer for redeploy/rolling updates) is a separate block from Services Runtime — default placement is the Management VM Network regardless of the Fleet/Runtime placement ; 9.0 = VA nodes
-  const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&(is91||!fleetDedicated))?(is91?5:((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0))):0;
+  // 9.1: VCF Automation Endpoint VIP (1 IP, vcf-automation-01) + dedicated VCF Services Runtime (1 IP) + /29 node
+  // block (5 IPs: 3 node IPs + 2 buffer for redeploy/rolling updates) = 7 IPs total, per Broadcom's Network Design
+  // Options page (VCF 9.1) — both appliances sit on aVLAN, so both must be counted here, consistent with how
+  // opsNodesInMgmtVM/opsReqIPs above already include VCF Operations' own VIP. Separate block from the Fleet's
+  // Services Runtime — default placement is the Management VM Network regardless of the Fleet/Runtime placement ; 9.0 = VA nodes
+  const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&(is91||!fleetDedicated))?(is91?7:((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0))):0;
   // 9.1: Identity Broker IP is allocated from the VCF Services Runtime block — not an additional Mgmt VM Network IP ; 9.0 = VM appliances
   const ibInMgmtVM=(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&!mgmt.vcfIdentityBroker.requiresDedicatedVLAN)?(is91?0:(mgmt.vcfIdentityBroker.haEnabled?3+1:1)):0;
   const cloudProxyIP=mgmt.vcfOperations.enabled&&mgmt.vcfOperations.cloudProxyEnabled?1:0;
@@ -67,7 +71,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
     aviControllerIPs?'AVI Controllers':'',
     opsCollectors?`${opsCollectors} Ops Collectors`:'',
     netsCollectors?`${netsCollectors} Nets Collectors`:'',
-    autoInMgmtVM&&is91?'5 IPs VCF Automation /29 (3 nodes + 2 buffer)':'',
+    autoInMgmtVM&&is91?'7 IPs VCF Automation (1 Endpoint VIP + 1 dedicated Services Runtime + /29: 3 nodes + 2 buffer)':'',
     cloudProxyIP?'Cloud Proxy':'',
     licServerIP?'License Server':''
   ].filter(Boolean).join(' | ');
@@ -139,7 +143,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
       const n=mgmt.vcfOperationsForNetworks.platformNodeCount;
       if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Nets: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Nets: ${n} IPs`);}
     }
-    // 9.1: VCF Automation /29 (5 IPs) is a separate block from Services Runtime, counted in Management VM Network (see mgmtVMNotes) — not mixed into this block ; 9.0 = VA nodes counted here
+    // 9.1: VCF Automation (7 IPs: VIP + dedicated Services Runtime + /29 node block) is a separate block from Services Runtime, counted in Management VM Network (see mgmtVMNotes) — not mixed into this block ; 9.0 = VA nodes counted here
     if(!is91&&mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN){
       const n=(mgmt.vcfAutomation.mode==='clustered'?5:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0);
       if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Auto: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Auto: ${n} IPs`);}
@@ -173,8 +177,8 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   // aggregated into Management VM Network (see autoInMgmtVM above) — no VLAN row generated in that case.
   if(is91&&mgmt.vcfAutomation.enabled&&mgmt.vcfAutomation.requiresDedicatedVLAN){
     const auto=mgmt.vcfAutomation;
-    const autoReqIPs=5+(auto.orchestratorMode==='standalone'?auto.orchestratorNodeCount+(auto.orchestratorNodeCount>1?1:0):0);
-    vlans.push(makeVLAN(domain,'VCF Automation Network','service','Dedicated network for VCF Automation','VCF Automation /29 block (+ standalone vRO nodes if applicable)','scenario-driven','dedicated',autoReqIPs,'5 IPs VCF Automation /29 (3 nodes + 2 buffer)'+(auto.orchestratorMode==='standalone'?` + ${auto.orchestratorNodeCount} vRO node(s)`:''),buf,bufPct));
+    const autoReqIPs=7+(auto.orchestratorMode==='standalone'?auto.orchestratorNodeCount+(auto.orchestratorNodeCount>1?1:0):0);
+    vlans.push(makeVLAN(domain,'VCF Automation Network','service','Dedicated network for VCF Automation','VCF Automation Endpoint VIP + dedicated Services Runtime + /29 node block (+ standalone vRO nodes if applicable)','scenario-driven','dedicated',autoReqIPs,'7 IPs VCF Automation (1 Endpoint VIP + 1 dedicated Services Runtime + /29: 3 nodes + 2 buffer)'+(auto.orchestratorMode==='standalone'?` + ${auto.orchestratorNodeCount} vRO node(s)`:''),buf,bufPct));
   }
 
   // Same gap as VCF Automation above, now closed for the other 5 services whose appliances.js/vips.js already
