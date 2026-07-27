@@ -22,9 +22,12 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   _valId=0;
   const msgs=[];
   const domain='Management Domain';
-  if(mgmt.hostCount<3) msgs.push(mkMsg('blocker','bring-up',domain,`Management Domain has ${mgmt.hostCount} hosts. Minimum 3 required (vSAN ESA/OSA cluster technical minimum).`,'Add hosts to reach at least 3 (vSAN minimum) or 4 (recommended).'));
-  else if(mgmt.hostCount===3){
-    if(project.scenario==='consolidated-3node-vsan-esa'&&(mgmt.storageType==='vsan-esa'||mgmt.storageType==='vsan-osa')) msgs.push(mkMsg('info','bring-up',domain,'3-host vSAN cluster meets the documented Consolidated Architecture / VCF Edge minimum (Broadcom TechDocs VCF 9.1).','No action required — 4 hosts recommended for N+1 resilience if scaling later.'));
+  // NFS/VMFS storage supports a 2-host "Simple" deployment model per Broadcom TechDocs VCF 9.1
+  // (Single-Rack vSphere Cluster Model); vSAN ESA/OSA still requires the 3-host technical minimum.
+  const mgmtMinHosts=(mgmt.storageType==='nfs'||mgmt.storageType==='vmfs')?2:3;
+  if(mgmt.hostCount<mgmtMinHosts) msgs.push(mkMsg('blocker','bring-up',domain,`Management Domain has ${mgmt.hostCount} hosts. Minimum ${mgmtMinHosts} required (${mgmtMinHosts===2?'NFS/VMFS "Simple" deployment minimum':'vSAN ESA/OSA cluster technical minimum'}).`,`Add hosts to reach at least ${mgmtMinHosts}${mgmtMinHosts===3?' (vSAN minimum) or 4 (recommended)':''}.`));
+  else if(mgmt.hostCount===3&&(mgmt.storageType==='vsan-esa'||mgmt.storageType==='vsan-osa')){
+    if(project.scenario==='consolidated-3node-vsan-esa') msgs.push(mkMsg('info','bring-up',domain,'3-host vSAN cluster meets the documented Consolidated Architecture / VCF Edge minimum (Broadcom TechDocs VCF 9.1).','No action required — 4 hosts recommended for N+1 resilience if scaling later.'));
     else msgs.push(mkMsg('warning','bring-up',domain,'Management Domain has 3 hosts — meets the vSAN technical minimum but 4 hosts is the standard recommended baseline for N+1 resilience.','Consider adding a 4th host, or select the "Consolidated / 3-Node vSAN ESA" scenario if 3 hosts is intentional.'));
   }
   if(mgmt.nsxEdgeDeployed&&mgmt.nsxEdgeNodeCount<2) msgs.push(mkMsg('warning','nsx',domain,'Single NSX Edge node — no HA. Recommend 2+ Edge nodes.','Increase Edge node count to 2.'));
@@ -66,7 +69,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   // 9.1 — VCF Automation /29 block is a separate allocation from the Services Runtime block
   if(project.vcfVersion==='9.1'&&mgmt.vcfAutomation.enabled) msgs.push(mkMsg('info','vlan',domain,t('val.auto_block_info'),t('val.auto_block_res')));
   if(mgmt.vcfAutomation.enabled&&!mgmt.vcfIdentityBroker.enabled) msgs.push(mkMsg('warning','scenario',domain,'VCF Automation enabled but VCF Identity Broker not configured.','Enable VCF Identity Broker.'));
-  const bringUpReady=mgmt.hostCount>=3&&mgmt.layer2AdjacencyConfirmed&&mgmt.tepInterfacesPerHost>=2;
+  const bringUpReady=mgmt.hostCount>=mgmtMinHosts&&mgmt.layer2AdjacencyConfirmed&&mgmt.tepInterfacesPerHost>=2;
   msgs.push(bringUpReady?mkMsg('info','bring-up',domain,'Bring-up readiness check PASSED.'):mkMsg('blocker','bring-up',domain,'Bring-up readiness check FAILED.','Address all blockers before VCF Cloud Builder.'));
 
   workloads.forEach((wld,idx)=>{

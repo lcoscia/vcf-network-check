@@ -650,7 +650,7 @@
         <h2 class="sec-title">Basic Configuration</h2>
         <div class="g4 mt12">
           <div class="field" x-show="managementDomain.topologyMode==='single-site'||managementDomain.topologyMode==='partially-stretched'"><label>Host Count</label>
-            <input class="input" type="number" min="3" x-model.number="managementDomain.hostCount" />
+            <input class="input" type="number" :min="(managementDomain.storageType==='nfs'||managementDomain.storageType==='vmfs')?2:3" x-model.number="managementDomain.hostCount" />
             <span class="field-note" x-text="t('ui.hostcount_note')"></span>
           </div>
           <template x-if="managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched'">
@@ -1026,6 +1026,10 @@
             <div class="field" x-show="managementDomain.vcfAutomation.orchestratorMode==='standalone'"><label>Orchestrator Nodes</label>
               <input class="input" type="number" min="1" x-model.number="managementDomain.vcfAutomation.orchestratorNodeCount" />
               <span class="field-note">1 (standalone) or 3 (HA)</span>
+            </div>
+            <div class="field" x-show="project.vcfVersion==='9.1'">
+              <label class="check-row"><input type="checkbox" x-model="managementDomain.vcfAutomation.requiresDedicatedVLAN" /> <span x-text="t('auto.dedicated_vlan_91')"></span></label>
+              <span class="field-note" x-text="t('auto.dedicated_vlan_note_91')"></span>
             </div>
           </div>
         </div>
@@ -1649,6 +1653,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.18.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1180')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.17.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1170')"></td>
@@ -1831,7 +1840,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.17.0';
+import * as Core from './core/index.js?v=1.18.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1872,7 +1881,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.17.0',
+    appVersion:'1.18.0',
     activeTab:'overview',
     get tabs() {
       return [
