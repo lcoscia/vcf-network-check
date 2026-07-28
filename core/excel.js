@@ -39,6 +39,15 @@ export function doExcelExport(state, XLSXLib) {
   const ws5 = XLSXLib.utils.aoa_to_sheet(vald); ws5['!cols'] = [12, 14, 28, 60, 50].map(colW); applyHdr(XLSXLib, ws5, 'A1:E1');
   XLSXLib.utils.book_append_sheet(wb, ws5, 'Validation Report');
 
+  const vksDomains = [
+    { domain: 'Management Domain', lbType: state.managementDomain.vksEnabled ? state.managementDomain.vksLBType : null, vpcs: state.managementDomain.vksVPCs },
+    ...state.workloadDomains.filter(w => w.vksEnabled).map(w => ({ domain: w.domainName, lbType: w.vksLBType, vpcs: w.vksVPCs })),
+  ].filter(d => d.lbType);
+  const vksRows = vksDomains.flatMap(d => (d.vpcs && d.vpcs.length ? d.vpcs.flatMap(vpc => (vpc.subnets && vpc.subnets.length ? vpc.subnets.map(sn => [d.domain, xs(d.lbType), xs(vpc.name), xs(vpc.type), xs(sn.name), xs(sn.accessMode), xs(sn.ipBlock)]) : [[d.domain, xs(d.lbType), xs(vpc.name), xs(vpc.type), '', '', '']])) : [[d.domain, xs(d.lbType), '', '', '', '', '']]));
+  const vksd = [['Domain', 'Load Balancer', 'VPC Name', 'VPC Type', 'Subnet Name', 'Access Mode', 'CIDR'], ...vksRows];
+  const ws6 = XLSXLib.utils.aoa_to_sheet(vksd); ws6['!cols'] = [24, 20, 24, 22, 22, 14, 18].map(colW); applyHdr(XLSXLib, ws6, 'A1:G1');
+  XLSXLib.utils.book_append_sheet(wb, ws6, 'VKS VPCs');
+
   const fname = `VCF9_Plan_${(state.project.projectName || 'Export').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSXLib.writeFile(wb, fname);
 }

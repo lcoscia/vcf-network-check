@@ -7,6 +7,13 @@ export function mkVIP(vipName,service,domain,vlan,notes){
   return {id:`vip-${++_vipId}`,vipName,associatedService:service,domain,vlan,notes,ipAddress:'',fqdn:''};
 }
 
+// Broadcom-documented VKS platform load balancer options (vSphere Supervisor / VKS networking):
+// Foundation Load Balancer (FLB, VDS/basic L4), NSX Load Balancer (NSX-LB, L4, NSX Segment/VPC), Avi Load
+// Balancer (Enterprise Edition, L4/L7 + WAF/GSLB, separate Avi license/deployment required).
+export function vksLBLabel(lbType){
+  return lbType==='avi'?'Avi Load Balancer':lbType==='foundation'?'Foundation Load Balancer':'NSX Load Balancer';
+}
+
 export function buildManagementVIPs(mgmt,project){
   resetVipCounter();
   const vips=[];
@@ -47,7 +54,7 @@ export function buildManagementVIPs(mgmt,project){
   }
   // 9.1: Identity Broker has no separate VIP — its FQDN is the Services Runtime-integrated endpoint (1 FQDN + 1 IP from the Runtime block, see Appliances tab) ; 9.0 = appliance VIP
   if(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&!is91){const v=mgmt.vcfIdentityBroker.requiresDedicatedVLAN?'VCF Identity Broker Network':'Management VM Network';vips.push(mkVIP('VCF Identity Broker VIP','VCF Identity Broker',domain,v,mgmt.vcfIdentityBroker.haEnabled?'HA VIP for Identity Broker cluster.':'Standalone Identity Broker VIP.'));}
-  if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks'){vips.push(mkVIP('VKS Supervisor API VIP','VKS Supervisor',domain,'VKS Infrastructure','Kubernetes API server VIP.'));vips.push(mkVIP('VKS Ingress VIP Pool','VKS Load Balancer',domain,'VKS Infrastructure','NSX ALB VIP pool for VKS workload ingress.'));}
+  if(mgmt.vksEnabled||project.scenario==='vcf-automation-vks'){const lb=vksLBLabel(mgmt.vksLBType);vips.push(mkVIP('VKS Supervisor API VIP','VKS Supervisor',domain,'VKS Infrastructure','Kubernetes API server VIP.'));vips.push(mkVIP('VKS Ingress VIP Pool','VKS Load Balancer',domain,'VKS Infrastructure',`${lb} VIP pool for VKS workload ingress (Supervisor Service VPC public/private subnets).`));}
   mgmt.additionalServices.forEach(svc=>{if(svc.requiresVIP&&svc.vipCount>0){const v=svc.requiresDedicatedVLAN?`${svc.name} Network`:'Management VM Network';for(let i=1;i<=svc.vipCount;i++) vips.push(mkVIP(`${svc.name} VIP ${i}`,svc.name,domain,v,`Service VIP ${i} for ${svc.name}.`));}});
   return vips;
 }
@@ -57,7 +64,7 @@ export function buildWorkloadVIPs(wld){
   const domain=wld.domainName;
   if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared') vips.push(mkVIP(`${domain} NSX Manager VIP`,'NSX Manager',domain,'Management VM Network',wld.nsxManagerMode==='clustered'?`NSX Manager cluster VIP for ${domain}.`:`NSX Manager VIP for ${domain} (reserved for DNS).`));
   if(wld.aviEnabled) vips.push(mkVIP(`${domain} AVI VIP Pool`,'AVI Load Balancer',domain,'AVI VIP Network',`LB VIP pool for ${domain} workloads.`));
-  if(wld.vksEnabled){vips.push(mkVIP(`${domain} VKS Supervisor VIP`,'VKS Supervisor',domain,'VKS Infrastructure',`Kubernetes API VIP for ${domain}.`));vips.push(mkVIP(`${domain} VKS Ingress VIP Pool`,'VKS Ingress',domain,'VKS Infrastructure',`NSX ALB VIP pool for ${domain} VKS ingress.`));}
+  if(wld.vksEnabled){const lb=vksLBLabel(wld.vksLBType);vips.push(mkVIP(`${domain} VKS Supervisor VIP`,'VKS Supervisor',domain,'VKS Infrastructure',`Kubernetes API VIP for ${domain}.`));vips.push(mkVIP(`${domain} VKS Ingress VIP Pool`,'VKS Ingress',domain,'VKS Infrastructure',`${lb} VIP pool for ${domain} VKS ingress (Supervisor Service VPC public/private subnets).`));}
   wld.additionalServices.forEach(svc=>{if(svc.requiresVIP&&svc.vipCount>0){const v=svc.requiresDedicatedVLAN?`${svc.name} Network`:'VM / Application Network';for(let i=1;i<=svc.vipCount;i++) vips.push(mkVIP(`${domain} ${svc.name} VIP ${i}`,svc.name,domain,v,`VIP for ${svc.name} in ${domain}.`));}});
   return vips;
 }

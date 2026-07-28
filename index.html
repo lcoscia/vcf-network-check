@@ -815,18 +815,28 @@
           <div class="infobox blue mb12">
             <strong>VKS Infrastructure VLAN:</strong>&nbsp;5 IPs (recommended contiguous block) — 3 control plane VMs + 1 floating IP + 1 patching IP. Workload network, AVI VIP pool, and ingress/egress/pod CIDR ranges are separate.
           </div>
+          <div class="mb12">
+            <label class="text-xs text-muted font-bold" x-text="t('vks.lb_label')"></label>
+            <select class="select" style="width:100%;max-width:360px" x-model="managementDomain.vksLBType">
+              <option value="foundation">Foundation Load Balancer</option>
+              <option value="nsx-lb">NSX Load Balancer</option>
+              <option value="avi">Avi Load Balancer (Enterprise)</option>
+            </select>
+            <div class="help-desc mt8" x-html="t('vks.lb_help')"></div>
+          </div>
           <div class="nest">
             <div class="flex-between mb8">
-              <div class="nest-title">NSX VPCs</div>
+              <div class="nest-title" x-text="t('vks.vpc_label')"></div>
               <button class="btn btn-secondary btn-sm" @click="addVKSVPC('management')">+ Add VPC</button>
             </div>
+            <div class="help-desc mb8" x-html="t('vks.vpc_help')"></div>
             <template x-for="(vpc, vi) in managementDomain.vksVPCs" :key="vpc.id">
               <div class="vpc-block">
                 <div class="flex-center gap8 mb8">
                   <input class="input flex-1" placeholder="VPC Name" x-model="managementDomain.vksVPCs[vi].name" />
-                  <select class="select" style="width:160px" x-model="managementDomain.vksVPCs[vi].type">
-                    <option value="supervisor">Supervisor VPC</option>
-                    <option value="namespace">Namespace VPC</option>
+                  <select class="select" style="width:200px" x-model="managementDomain.vksVPCs[vi].type">
+                    <option value="supervisor" x-text="t('vks.vpc_type.supervisor')"></option>
+                    <option value="namespace" x-text="t('vks.vpc_type.namespace')"></option>
                   </select>
                   <button class="btn btn-danger btn-sm" @click="managementDomain.vksVPCs.splice(vi,1)">✕</button>
                 </div>
@@ -838,10 +848,10 @@
                   <template x-for="(sn, si) in vpc.subnets" :key="sn.id">
                     <div class="subnet-row">
                       <input class="input flex-1" placeholder="Subnet name" x-model="managementDomain.vksVPCs[vi].subnets[si].name" />
-                      <select class="select" style="width:110px" x-model="managementDomain.vksVPCs[vi].subnets[si].accessMode">
-                        <option value="private">Private</option>
-                        <option value="public">Public</option>
-                        <option value="isolated">Isolated</option>
+                      <select class="select" style="width:120px" x-model="managementDomain.vksVPCs[vi].subnets[si].accessMode">
+                        <option value="private" x-text="t('vks.subnet.private')"></option>
+                        <option value="public" x-text="t('vks.subnet.public')"></option>
+                        <option value="private-tgw" x-text="t('vks.subnet.private-tgw')"></option>
                       </select>
                       <input class="input mono" style="width:150px" placeholder="CIDR" x-model="managementDomain.vksVPCs[vi].subnets[si].ipBlock" />
                       <button class="btn-link" style="color:var(--red)" @click="managementDomain.vksVPCs[vi].subnets.splice(si,1)">✕</button>
@@ -1186,17 +1196,26 @@
               <div class="infobox yellow">
                 5 IPs (recommended contiguous block) for VKS Infrastructure VLAN (3 control plane + 1 floating + 1 patching). Workload network, AVI, and ingress/egress/pod CIDR ranges are separate.
               </div>
+              <div class="mb12">
+                <label class="text-xs text-muted font-bold" x-text="t('vks.lb_label')"></label>
+                <select class="select" style="width:100%;max-width:340px" x-model="workloadDomains[wi].vksLBType">
+                  <option value="foundation">Foundation Load Balancer</option>
+                  <option value="nsx-lb">NSX Load Balancer</option>
+                  <option value="avi">Avi Load Balancer (Enterprise)</option>
+                </select>
+              </div>
               <div class="flex-between mb8">
-                <div class="nest-title" style="margin-bottom:0">NSX VPCs</div>
+                <div class="nest-title" style="margin-bottom:0" x-text="t('vks.vpc_label')"></div>
                 <button class="btn-link" @click="addVKSVPC('workload', wi)">+ Add VPC</button>
               </div>
+              <div class="help-desc mb8" x-html="t('vks.vpc_help')"></div>
               <template x-for="(vpc, vi) in workloadDomains[wi].vksVPCs" :key="vpc.id">
                 <div class="vpc-block">
                   <div class="flex-center gap8 mb8">
                     <input class="input flex-1" placeholder="VPC Name" x-model="workloadDomains[wi].vksVPCs[vi].name" />
-                    <select class="select" style="width:150px" x-model="workloadDomains[wi].vksVPCs[vi].type">
-                      <option value="supervisor">Supervisor VPC</option>
-                      <option value="namespace">Namespace VPC</option>
+                    <select class="select" style="width:190px" x-model="workloadDomains[wi].vksVPCs[vi].type">
+                      <option value="supervisor" x-text="t('vks.vpc_type.supervisor')"></option>
+                      <option value="namespace" x-text="t('vks.vpc_type.namespace')"></option>
                     </select>
                     <button class="btn btn-danger btn-sm" @click="workloadDomains[wi].vksVPCs.splice(vi,1)">✕</button>
                   </div>
@@ -1205,10 +1224,10 @@
                     <template x-for="(sn, si) in vpc.subnets" :key="sn.id">
                       <div class="subnet-row">
                         <input class="input flex-1" placeholder="Name" x-model="workloadDomains[wi].vksVPCs[vi].subnets[si].name" />
-                        <select class="select" style="width:100px" x-model="workloadDomains[wi].vksVPCs[vi].subnets[si].accessMode">
-                          <option value="private">Private</option>
-                          <option value="public">Public</option>
-                          <option value="isolated">Isolated</option>
+                        <select class="select" style="width:120px" x-model="workloadDomains[wi].vksVPCs[vi].subnets[si].accessMode">
+                          <option value="private" x-text="t('vks.subnet.private')"></option>
+                          <option value="public" x-text="t('vks.subnet.public')"></option>
+                          <option value="private-tgw" x-text="t('vks.subnet.private-tgw')"></option>
                         </select>
                         <input class="input mono" style="width:140px" placeholder="CIDR" x-model="workloadDomains[wi].vksVPCs[vi].subnets[si].ipBlock" />
                         <button class="btn-link" style="color:var(--red)" @click="workloadDomains[wi].vksVPCs[vi].subnets.splice(si,1)">✕</button>
@@ -1660,6 +1679,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.21.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1210')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.20.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1200')"></td>
@@ -1857,7 +1881,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.20.0';
+import * as Core from './core/index.js?v=1.21.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1898,7 +1922,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.20.0',
+    appVersion:'1.21.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2160,11 +2184,14 @@ function vcfApp(){
       reader.onload=(e)=>{
         try{
           const s=JSON.parse(e.target.result);
+          // Pre-v1.21.0 exports used the subnet access mode "isolated", replaced by the Broadcom-documented
+          // "Private TGW" (Private Transit Gateway) term — migrate silently on import.
+          const migrateVPCs=vpcs=>(vpcs||[]).forEach(vpc=>(vpc.subnets||[]).forEach(sn=>{if(sn.accessMode==='isolated')sn.accessMode='private-tgw';}));
           if(s.project)this.project={...Core.DEFAULT_PROJECT,...s.project};
-          if(s.managementDomain)this.managementDomain={...JSON.parse(JSON.stringify(Core.DEFAULT_MGMT)),...s.managementDomain};
-          if(s.workloadDomains)this.workloadDomains=s.workloadDomains;
+          if(s.managementDomain){this.managementDomain={...JSON.parse(JSON.stringify(Core.DEFAULT_MGMT)),...s.managementDomain};migrateVPCs(this.managementDomain.vksVPCs);}
+          if(s.workloadDomains){this.workloadDomains=s.workloadDomains.map((w,i)=>({...Core.defaultWorkloadDomain(i+1),...w}));this.workloadDomains.forEach(w=>migrateVPCs(w.vksVPCs));}
           this.compute();
-          if(s.vlans)s.vlans.forEach(sv=>{const v=this.vlans.find(x=>x.domain===sv.domain&&x.vlanName===sv.vlanName);if(v){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';}});
+          if(s.vlans)s.vlans.forEach(sv=>{const v=this.vlans.find(x=>x.domain===sv.domain&&x.vlanName===sv.vlanName);if(v){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';}});
           if(s.appliances)s.appliances.forEach(sa=>{const a=this.appliances.find(x=>x.applianceName===sa.applianceName);if(a){a.ipAddress=sa.ipAddress||'';a.fqdn=sa.fqdn||'';}});
           if(s.vips)s.vips.forEach(sv=>{const v=this.vips.find(x=>x.vipName===sv.vipName);if(v){v.ipAddress=sv.ipAddress||'';v.fqdn=sv.fqdn||'';}});
           this.showToast('JSON imported successfully');

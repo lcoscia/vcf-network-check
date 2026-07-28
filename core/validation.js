@@ -74,6 +74,8 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
     if(legacyFlags.length) msgs.push(mkMsg('info','vlan',domain,t('val.legacy_dedicated_vlan_flags',{components:legacyFlags.join(', ')}),t('val.legacy_dedicated_vlan_flags_res')));
   }
   if((mgmt.vksEnabled||project.scenario==='vcf-automation-vks')&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('warning','scenario',domain,'VKS enabled but NSX Edge not deployed.','Deploy NSX Edge or confirm overlay from WLD NSX.'));
+  if(mgmt.vksEnabled&&(!mgmt.vksVPCs||mgmt.vksVPCs.length===0)) msgs.push(mkMsg('info','vlan',domain,t('val.vks_no_vpc'),t('val.vks_no_vpc_res')));
+  if(mgmt.vksEnabled&&mgmt.vksLBType==='avi'&&!mgmt.aviDeployed) msgs.push(mkMsg('warning','scenario',domain,t('val.vks_avi_mismatch'),t('val.vks_avi_mismatch_res')));
   if(mgmt.aviDeployed&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('info','scenario',domain,'AVI enabled but NSX Edge not deployed. Verify data plane connectivity.','Verify AVI SE network design.'));
   if(mgmt.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',domain,'TEP interfaces per host < 2. Recommend 2 for TEP HA.','Set TEP to 2+.'));
   if(project.vcfVersion!=='9.1'&&mgmt.vcfOperations.enabled&&mgmt.vcfOperations.mode==='enterprise'&&mgmt.vcfOperations.remoteCollectorCount===0) msgs.push(mkMsg('info','scenario',domain,t('val.ops_no_collectors'),t('val.ops_no_collectors_res')));
@@ -93,6 +95,8 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
     if(wld.hostCount<3) msgs.push(mkMsg('warning','bring-up',d,`"${d}" has only ${wld.hostCount} hosts. Min 3 recommended.`,'Add another host.'));
     if(wld.edgeRequired&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','nsx',d,`"${d}": Edge required but NSX not enabled.`,'Enable NSX.'));
     if(wld.vksEnabled&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','scenario',d,`"${d}": VKS enabled but NSX not enabled.`,'Enable NSX.'));
+    if(wld.vksEnabled&&(!wld.vksVPCs||wld.vksVPCs.length===0)) msgs.push(mkMsg('info','vlan',d,t('val.vks_no_vpc'),t('val.vks_no_vpc_res')));
+    if(wld.vksEnabled&&wld.vksLBType==='avi'&&!wld.aviEnabled) msgs.push(mkMsg('warning','scenario',d,t('val.vks_avi_mismatch'),t('val.vks_avi_mismatch_res')));
     if(wld.edgeRequired&&wld.edgeNodeCount<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": only 1 Edge node. Min 2 recommended.`,'Increase Edge count.'));
     if(wld.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
     if(wld.topologyMode==='vsan-stretched') msgs.push(mkMsg('warning','bring-up',d,t('val.vsan_warn'),t('val.vsan_warn_res')));
