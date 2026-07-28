@@ -1679,6 +1679,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.22.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1220')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.21.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1210')"></td>
@@ -1881,7 +1886,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.21.0';
+import * as Core from './core/index.js?v=1.22.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1922,7 +1927,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.21.0',
+    appVersion:'1.22.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -1996,7 +2001,31 @@ function vcfApp(){
       // AUTH DISABLED — décommenter pour réactiver : this.initAuth();
     },
 
+    // Avi Service Engine data interfaces connect to VPC-backed private network segments, and routable VIPs are
+    // allocated from the VPC's own External/Public IP blocks — no separate Avi-specific VPC or subnet is needed
+    // (Broadcom TechDocs, Avi Load Balancer for VCF). So as soon as VKS + Avi Load Balancer are both selected on a
+    // domain with no VPC yet, pre-create the mandatory Supervisor Service VPC with its Private (SE data/workloads)
+    // and Public (external/routable VIPs) subnets, so the user isn't left with an empty "NSX VPCs" list they have
+    // to build from scratch. Idempotent (guarded by vksVPCs.length===0) so it never overwrites user edits/renames.
+    ensureVKSVPCDefaults(){
+      const mkDefaultVPC=(name)=>({id:Core.newId(),name,type:'supervisor',subnets:[
+        {id:Core.newId(),name:'Private',accessMode:'private',ipBlock:'',notes:'Avi Service Engine data interfaces + Supervisor workloads.'},
+        {id:Core.newId(),name:'Public (External VIPs)',accessMode:'public',ipBlock:'',notes:'Routable VIP pool — Avi allocates Supervisor/Ingress VIPs from here.'},
+      ]});
+      if(this.managementDomain.vksEnabled&&this.managementDomain.vksLBType==='avi'&&(!this.managementDomain.vksVPCs||this.managementDomain.vksVPCs.length===0)){
+        this.managementDomain.vksVPCs.push(mkDefaultVPC('Supervisor Service VPC'));
+        this.showToast(this.t('vks.vpc_autocreated'));
+      }
+      this.workloadDomains.forEach(w=>{
+        if(w.vksEnabled&&w.vksLBType==='avi'&&(!w.vksVPCs||w.vksVPCs.length===0)){
+          w.vksVPCs.push(mkDefaultVPC(`${w.domainName} Supervisor Service VPC`));
+          this.showToast(this.t('vks.vpc_autocreated'));
+        }
+      });
+    },
+
     compute(){
+      this.ensureVKSVPCDefaults();
       // Keep workloadDomainCount in sync with actual array length
       this.project.workloadDomainCount=this.workloadDomains.length;
 
