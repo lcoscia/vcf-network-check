@@ -764,6 +764,15 @@
           <!-- VCF 9.1 — VCF Management Services info box (C8, C13) -->
           <div x-show="project.vcfVersion==='9.1'" class="infobox blue mt8" x-html="t('fleet.infobox_91')"></div>
 
+          <!-- VCF 9.1 — Services Runtime IP block sizing (Minimum 12 / Recommended 30, per Broadcom VCF 9.1 Planning and Preparation Workbook) -->
+          <div x-show="project.vcfVersion==='9.1'" class="mt8">
+            <label class="check-row">
+              <input type="checkbox" x-model="managementDomain.svcRuntimeReserve30" />
+              <span x-text="t('fleet.svcruntime30_label')"></span>
+            </label>
+            <div class="help-desc mt8" x-html="t('fleet.svcruntime30_help')"></div>
+          </div>
+
           <!-- Shared VLAN — VCF 9.0 -->
           <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan' && project.vcfVersion==='9.0'" class="role-desc mt8" x-html="t('fleet.shared_desc_90')"></div>
 
@@ -1258,7 +1267,7 @@
               <th class="resizable" style="width:180px">VLAN Name</th>
               <th class="resizable" style="width:100px">VLAN ID</th>
               <th class="resizable" style="width:140px">CIDR</th>
-              <th class="resizable" style="width:230px">Range Start</th>
+              <th class="resizable" style="width:300px">Range Start / End</th>
               <th class="resizable" style="width:80px">Req. IPs</th>
               <th class="resizable" style="width:90px">Rec. CIDR</th>
               <th class="resizable" style="width:90px">Mandatory</th>
@@ -1274,9 +1283,11 @@
                 <td><input class="input mono" style="width:80px" placeholder="e.g. 100" x-model="vlans[vi].vlanId" /></td>
                 <td><input class="input mono" style="width:130px" placeholder="10.0.0.0/24" x-model="vlans[vi].cidr" /></td>
                 <td style="white-space:nowrap">
-                  <input class="input mono" style="width:110px" placeholder="10.0.1.10" x-model="vlans[vi].rangeStart" />
-                  <button class="btn btn-secondary btn-sm" x-show="v.rangeStart" @click="autoFillFromRange(v)" :title="t('vlan.autofill_tooltip')">↳ Auto-fill</button>
-                  <span class="text-muted text-xs mono" x-show="rangeEnd(v)" x-text="'→ ' + rangeEnd(v)" :title="t('vlan.rangeend_tooltip')"></span>
+                  <input class="input mono" style="width:105px" placeholder="10.0.1.10" x-model="vlans[vi].rangeStart" />
+                  <span class="text-muted text-xs">→</span>
+                  <input class="input mono" style="width:105px" placeholder="10.0.1.21" x-model="vlans[vi].rangeEnd" />
+                  <button class="btn btn-secondary btn-sm" x-show="v.rangeStart && !v.rangeEnd" @click="suggestRangeEnd(v)" :title="t('vlan.suggest_tooltip')">✨ Suggest</button>
+                  <button class="btn btn-secondary btn-sm" x-show="v.rangeStart && v.rangeEnd" @click="autoFillFromRange(v)" :title="t('vlan.autofill_tooltip')">↳ Auto-fill</button>
                 </td>
                 <td class="text-center font-bold" x-text="v.requiredIPs"></td>
                 <td class="text-center tbl-mono" x-text="v.recommendedCIDR"></td>
@@ -1649,6 +1660,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.20.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1200')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.19.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1190')"></td>
@@ -1841,7 +1857,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.19.0';
+import * as Core from './core/index.js?v=1.20.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -1882,7 +1898,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.19.0',
+    appVersion:'1.20.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -1961,7 +1977,7 @@ function vcfApp(){
       this.project.workloadDomainCount=this.workloadDomains.length;
 
       const vlanEdits={};
-      this.vlans.forEach(v=>{if(v.vlanId||v.cidr||v.rangeStart)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr,rangeStart:v.rangeStart};});
+      this.vlans.forEach(v=>{if(v.vlanId||v.cidr||v.rangeStart||v.rangeEnd)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr,rangeStart:v.rangeStart,rangeEnd:v.rangeEnd||''};});
       const appEdits={};
       this.appliances.forEach(a=>{if(a.ipAddress||a.fqdn)appEdits[a.applianceName]={ipAddress:a.ipAddress,fqdn:a.fqdn};});
       const vipEdits={};
@@ -2086,20 +2102,23 @@ function vcfApp(){
       return Core.getVLANPrefix(this.vlans, appDomain, vlanName);
     },
 
-    // Derived, read-only end-of-range = rangeStart + requiredIPs - 1; '' if rangeStart/requiredIPs invalid or absent.
-    rangeEnd(vlanRow){
-      return Core.computeRangeEnd(vlanRow.rangeStart, vlanRow.requiredIPs);
+    // One-shot suggestion writing vlanRow.rangeEnd = rangeStart + requiredIPs - 1 — editable afterward like any
+    // other field, e.g. to enter the exact range from the official VCF 9.1 Planning and Preparation Workbook.
+    suggestRangeEnd(vlanRow){
+      const suggestion=Core.computeRangeEnd(vlanRow.rangeStart, vlanRow.requiredIPs);
+      if(suggestion) vlanRow.rangeEnd=suggestion;
     },
 
-    // Sequentially pre-fills IPs for the appliances of this VLAN block from vlanRow.rangeStart — never overwrites
-    // an IP already entered manually, never touches VCF Identity Broker (Embedded) (IP disabled by design).
+    // Sequentially pre-fills IPs for the appliances of this VLAN block from vlanRow.rangeStart to vlanRow.rangeEnd —
+    // never overwrites an IP already entered manually, never touches VCF Identity Broker (Embedded) (IP disabled by design).
     autoFillFromRange(vlanRow){
-      const {addresses,truncated}=Core.generateIPRange(vlanRow.rangeStart, vlanRow.requiredIPs);
-      if(truncated){ this.showToast(this.t('vlan.autofill_invalid')); return; }
+      const size=Core.rangeSize(vlanRow.rangeStart, vlanRow.rangeEnd);
+      if(size===0){ this.showToast(this.t('vlan.autofill_invalid')); return; }
+      const {addresses}=Core.generateIPRange(vlanRow.rangeStart, size);
       const targets=this.appliances.filter(a=>a.domain===vlanRow.domain && a.vlan===vlanRow.vlanName && !a.ipAddress && a.applianceType!=='VCF Identity Broker (Embedded)');
       if(targets.length===0) return;
       if(targets.length > addresses.length){
-        this.showToast(this.t('vlan.autofill_insufficient'));
+        this.showToast(this.t('vlan.autofill_range_too_small',{size,need:targets.length}));
       }
       targets.slice(0, addresses.length).forEach((a,i)=>{
         const idx=this.appliances.findIndex(x=>x.id===a.id);

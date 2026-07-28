@@ -26,6 +26,14 @@ export function computeRangeEnd(rangeStart, requiredIPs){
   return intToIp(start+requiredIPs-1);
 }
 
+// Number of addresses between rangeStart and rangeEnd inclusive. Returns 0 if either bound is invalid/empty,
+// or if end < start (invalid range) — never negative, never NaN.
+export function rangeSize(rangeStart, rangeEnd){
+  const start=ipToInt(rangeStart), end=ipToInt(rangeEnd);
+  if(start===null||end===null||end<start) return 0;
+  return end-start+1;
+}
+
 export function ipInCidr(ip, cidr){
   const m=/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/.exec((cidr||'').trim());
   if(!m) return null;

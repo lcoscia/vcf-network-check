@@ -7,7 +7,7 @@ let _vlanId=0;
 export function resetVlanCounter(){_vlanId=0;}
 export function makeVLAN(domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,notes,bufferEnabled,bufferPercent){
   const rec=recommendCIDR(requiredIPs,bufferEnabled,bufferPercent);
-  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,vlanId:'',cidr:'',rangeStart:''};
+  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,vlanId:'',cidr:'',rangeStart:'',rangeEnd:''};
 }
 
 export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) {
@@ -27,6 +27,10 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const fleetVLANName=dedicatedVLANName;
   const fleetVLANType=mgmt.fleetPlacement==='nsx-vlan-segment'?'service':'fleet';
   const isStretched=mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched';
+  // Broadcom VCF 9.1 Services Runtime sizing: Minimum 12 IPs (/28) required for deployment; Recommended 30 IPs (/27)
+  // reserved for new management components or scaling out existing ones (VCF 9.1 Planning and Preparation Workbook).
+  const svcRuntimeBlockSize=is91?(mgmt.svcRuntimeReserve30?30:12):0;
+  const fleetIPsBase=is91?(2+svcRuntimeBlockSize):1;
 
   if(isStretched){
     vlans.push(makeVLAN(domain,'ESXi Management — AZ1','management','ESXi vmk0 only','VMkernel vmk0 — Availability Zone 1','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk0 IPs (AZ1)`,buf,bufPct));
@@ -39,7 +43,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   // C14: VIP NSX Manager réservée dans tous les modes (Simple + HA) pour permettre un futur scale-out HA sans ré-IP — confirmé par la table officielle des exigences IP/FQDN NSX Manager (Broadcom TechDocs VCF 9.1)
   const nsxVIPCount=1;
   const nsxEdgeMgmtIPs=mgmt.nsxEdgeDeployed?mgmt.nsxEdgeNodeCount:0;
-  const fleetCountInMgmtVM=fleetDedicated?0:(is91?14:1);
+  const fleetCountInMgmtVM=fleetDedicated?0:fleetIPsBase;
   const additionalSvcIPs=mgmt.additionalServices.filter(s=>!s.requiresDedicatedVLAN).reduce((a,s)=>a+s.applianceCount,0);
   const aviControllerIPs=mgmt.aviDeployed?3+1:0;
   const wldNSXManagerIPs=workloadDomains.reduce((sum,wld)=>{
@@ -71,7 +75,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
     'SDDC Manager, vCenter',
     `${nsxManagerCount} NSX Mgr + VIP`,
     nsxEdgeMgmtIPs?`${nsxEdgeMgmtIPs} Edge Mgmt`:'',
-    !fleetDedicated?(is91?'Fleet + Instance + 12 Svc Runtime nodes (incl. Identity Broker)':'Fleet'):'',
+    !fleetDedicated?(is91?`Fleet + Instance + ${svcRuntimeBlockSize} Svc Runtime nodes (incl. Identity Broker)`:'Fleet'):'',
     aviControllerIPs?'AVI Controllers':'',
     opsCollectors?`${opsCollectors} Ops Collectors`:'',
     netsCollectors?`${netsCollectors} Nets Collectors`:'',
@@ -121,8 +125,8 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   }
 
   if(fleetDedicated){
-    let fleetIPs=is91?14:1;
-    const fleetNotes=is91?['Fleet appliance (1 IP)','Instance component (1 IP)','Services Runtime nodes /28 min (12 IPs) — incl. Identity Broker']:['1 Fleet appliance (Simple mode)'];
+    let fleetIPs=fleetIPsBase;
+    const fleetNotes=is91?['Fleet appliance (1 IP)','Instance component (1 IP)',`Services Runtime nodes ${mgmt.svcRuntimeReserve30?'/27 recommended (30 IPs)':'/28 min (12 IPs)'} — incl. Identity Broker`]:['1 Fleet appliance (Simple mode)'];
     // Broadcom VCF 9.1 official Dedicated VLAN + NSX Overlay Segment model: VCF Operations / VCF Automation (9.0) /
     // VCF Operations for Networks are Day-2 components that move to the overlay segment — Fleet/Instance/Services
     // Runtime/Identity Broker (above) stay on the Day-0 dedicated VLAN. For the other 3 placement modes (no overlay

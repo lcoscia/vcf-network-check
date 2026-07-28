@@ -1,6 +1,6 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
-import { ipInCidr } from './iprange.js';
+import { ipInCidr, rangeSize } from './iprange.js';
 
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;
@@ -80,7 +80,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&!mgmt.vcfOperationsForLogs.integratedLBVIP) msgs.push(mkMsg('warning','vip',domain,'VCF Ops for Logs clustered but ILB VIP disabled. Log sources cannot use a single syslog endpoint.','Enable ILB VIP.'));
   if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&mgmt.vcfOperationsForLogs.workerCount<2) msgs.push(mkMsg('warning','scenario',domain,`VCF Ops for Logs: only ${mgmt.vcfOperationsForLogs.workerCount} worker(s). Min 2 recommended.`,'Set worker count ≥ 2.'));
   // 9.1 — Identity Broker, Log Management and Real-time Metrics (Day-N) IPs are all allocated from the Services Runtime block; may push it from /28 to /27
-  if(project.vcfVersion==='9.1'&&mgmt.vcfOperationsForLogs.enabled) msgs.push(mkMsg('info','vlan',domain,t('val.svcruntime_27_info'),t('val.svcruntime_27_res')));
+  if(project.vcfVersion==='9.1'&&mgmt.vcfOperationsForLogs.enabled&&!mgmt.svcRuntimeReserve30) msgs.push(mkMsg('info','vlan',domain,t('val.svcruntime_27_info'),t('val.svcruntime_27_res')));
   // 9.1 — VCF Automation /29 block is a separate allocation from the Services Runtime block
   if(project.vcfVersion==='9.1'&&mgmt.vcfAutomation.enabled) msgs.push(mkMsg('info','vlan',domain,t('val.auto_block_info'),t('val.auto_block_res')));
   if(mgmt.vcfAutomation.enabled&&!mgmt.vcfIdentityBroker.enabled) msgs.push(mkMsg('warning','scenario',domain,'VCF Automation enabled but VCF Identity Broker not configured.','Enable VCF Identity Broker.'));
@@ -114,11 +114,17 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
     if(e2&&!e1) msgs.push(mkMsg('blocker','vlan',dom,`"${dom}": Edge Uplink 2 present but Uplink 1 missing.`,'Both uplinks are mandatory.'));
   });
 
-  // C6: IP range (rangeStart) rules — Chantier C, Auto-fill feature. Non-blocking: this app has no blocking rule
-  // on free-form appliance IP entry today, so these stay warning/info regardless of the range/CIDR mismatch.
+  // C6: IP range (rangeStart/rangeEnd) rules — Chantier C, Auto-fill feature. Non-blocking: this app has no blocking
+  // rule on free-form appliance IP entry today, so these stay warning/info regardless of the range/CIDR mismatch.
   vlans.forEach(v=>{
     if(!v.rangeStart) return;
     if(v.cidr&&ipInCidr(v.rangeStart,v.cidr)===false) msgs.push(mkMsg('warning','vlan',v.domain,t('val.range_outside_cidr',{vlan:v.vlanName,range:v.rangeStart,cidr:v.cidr}),t('val.range_outside_cidr_res')));
+    if(v.rangeEnd){
+      if(v.cidr&&ipInCidr(v.rangeEnd,v.cidr)===false) msgs.push(mkMsg('warning','vlan',v.domain,t('val.rangeend_outside_cidr',{vlan:v.vlanName,range:v.rangeEnd,cidr:v.cidr}),t('val.range_outside_cidr_res')));
+      const size=rangeSize(v.rangeStart,v.rangeEnd);
+      if(size===0) msgs.push(mkMsg('warning','vlan',v.domain,t('val.range_end_before_start',{vlan:v.vlanName}),t('val.range_end_before_start_res')));
+      else if(size<v.requiredIPs) msgs.push(mkMsg('info','vlan',v.domain,t('val.range_too_small',{vlan:v.vlanName,size,need:v.requiredIPs}),t('val.range_too_small_res')));
+    }
     const need=appliances.filter(a=>a.domain===v.domain&&a.vlan===v.vlanName&&a.staticIPRequired===true).length;
     if(need>v.requiredIPs) msgs.push(mkMsg('info','vlan',v.domain,t('val.range_insufficient',{vlan:v.vlanName,need,available:v.requiredIPs}),t('val.range_insufficient_res')));
   });
