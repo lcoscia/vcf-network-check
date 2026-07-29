@@ -265,7 +265,7 @@
 
     /* ── TABLES ────────────────────────────────────────────────── */
     .tbl-wrap { overflow-x: auto; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.09); }
-    .tbl { width: 100%; border-collapse: collapse; background: white; font-size: 12px; }
+    .tbl { width: 100%; border-collapse: collapse; background: var(--surface); font-size: 12px; }
     .tbl thead tr { background: var(--blue-mid); }
     .tbl thead th {
       padding: 10px 12px; text-align: left; font-weight: 600; color: white;
@@ -309,13 +309,13 @@
     .val-summary-label { font-size: 12px; color: #a8c4de; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
     .val-count { padding: 5px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; }
     .val-count.blocker { background: var(--red); color: white; }
-    .val-count.warning { background: var(--orange); color: white; }
-    .val-count.info    { background: var(--blue-light); color: white; }
+    .val-count.warning { background: var(--orange); color: #4a3400; }
+    .val-count.info    { background: var(--blue-light); color: var(--blue-dark); }
     .val-count.ok      { background: var(--green); color: white; }
 
     .anomaly-block {
       margin-bottom: 10px; border-radius: 8px; overflow: hidden;
-      border-left: 5px solid; background: white;
+      border-left: 5px solid; background: var(--surface);
       box-shadow: 0 1px 4px rgba(0,0,0,0.07);
     }
     .anomaly-block.blocker { border-color: var(--red); }
@@ -330,7 +330,7 @@
       border-radius: 10px; color: white; text-transform: uppercase; white-space: nowrap;
     }
     .anomaly-sev.blocker { background: var(--red); }
-    .anomaly-sev.warning { background: var(--orange); }
+    .anomaly-sev.warning { background: var(--orange); color: #4a3400; }
     .anomaly-sev.info    { background: var(--blue-accent); }
     .anomaly-title { font-weight: 700; font-size: 13px; flex: 1; }
     .anomaly-meta  { font-size: 11px; color: var(--text-muted); }
@@ -344,7 +344,7 @@
     @media (max-width: 1000px) { .dom-cards { grid-template-columns: repeat(2,1fr); } }
     @media (max-width: 640px)  { .dom-cards { grid-template-columns: 1fr; } }
 
-    .dom-card { background: white; border-radius: 8px; border: 1px solid var(--gray-border); box-shadow: 0 1px 5px rgba(0,0,0,0.08); overflow: hidden; }
+    .dom-card { background: var(--surface); border-radius: 8px; border: 1px solid var(--gray-border); box-shadow: 0 1px 5px rgba(0,0,0,0.08); overflow: hidden; }
     .dom-card-head {
       background: linear-gradient(135deg, var(--blue-mid) 0%, #1d4570 100%);
       color: white; padding: 12px 16px;
@@ -359,7 +359,7 @@
     .dom-services { margin-top: 10px; font-size: 11px; color: var(--text-muted); font-style: italic; }
 
     /* ── WORKLOAD DOMAIN CARD ──────────────────────────────────── */
-    .wld-card { background: white; border-radius: 8px; border: 1px solid var(--gray-border); box-shadow: 0 1px 5px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 16px; }
+    .wld-card { background: var(--surface); border-radius: 8px; border: 1px solid var(--gray-border); box-shadow: 0 1px 5px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 16px; }
     .wld-card-head {
       background: linear-gradient(90deg, var(--blue-mid) 0%, #1d4570 100%);
       padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;
@@ -384,7 +384,7 @@
     .infobox.green  { background: #e8f8f0; border: 1px solid #a5d5b5; color: #1a5c2e; }
 
     /* ── SERVICE ACCORDION BLOCK ───────────────────────────────── */
-    .svc-block { border: 1px solid var(--gray-border); border-radius: 6px; padding: 16px; margin-bottom: 10px; background: white; }
+    .svc-block { border: 1px solid var(--gray-border); border-radius: 6px; padding: 16px; margin-bottom: 10px; background: var(--surface); }
     .svc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 0; }
     .svc-head label { font-size: 14px; font-weight: 700; color: var(--blue-mid); display: flex; align-items: center; gap: 8px; cursor: pointer; }
     .svc-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gray-border); }
@@ -393,7 +393,7 @@
     .addsvc-row { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: #fafbfd; }
 
     /* ── VPC / SUBNET ──────────────────────────────────────────── */
-    .vpc-block { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: white; }
+    .vpc-block { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: var(--surface); }
     .subnet-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
 
     /* ── EXPORT GRID ───────────────────────────────────────────── */
