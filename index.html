@@ -311,7 +311,7 @@
 
     /* ── CARD ──────────────────────────────────────────────────── */
     .card {
-      background: white; border-radius: 8px;
+      background: var(--surface); border-radius: 8px;
       border: 1px solid var(--gray-border);
       box-shadow: 0 1px 5px rgba(0,0,0,0.07);
       padding: 20px; margin-bottom: 16px;
@@ -341,14 +341,14 @@
     .input, .select {
       width: 100%; border: 1px solid var(--gray-border); border-radius: 5px;
       padding: 6px 10px; font-size: 12px; color: var(--text-dark);
-      background: white; outline: none; font-family: inherit;
+      background: var(--surface); outline: none; font-family: inherit;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     .input:focus, .select:focus {
       border-color: var(--blue-accent);
       box-shadow: 0 0 0 2px rgba(255,79,65,0.13);
     }
-    .input:disabled { background: #f0f3f8; color: #aaa; }
+    .input:disabled { background: var(--gray-light); color: #aaa; }
     .input.mono { font-family: 'Courier New', monospace; font-size: 11px; }
     .check-row { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; margin-top: 2px; }
     .check-row input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--blue-accent); cursor: pointer; }
@@ -361,8 +361,8 @@
     }
     .btn-primary  { background: var(--blue-accent); color: white; border-color: var(--blue-accent); }
     .btn-primary:hover  { background: var(--itq-orange-hover); border-color: var(--itq-orange-hover); }
-    .btn-secondary { background: white; color: var(--blue-mid); border-color: var(--gray-border); }
-    .btn-secondary:hover { background: #f0f5fb; border-color: var(--blue-light); }
+    .btn-secondary { background: var(--surface); color: var(--blue-mid); border-color: var(--gray-border); }
+    .btn-secondary:hover { background: var(--gray-light); border-color: var(--blue-light); }
     .btn-danger  { background: #fde8e8; color: var(--red); border-color: #f5b5b5; }
     .btn-danger:hover { background: #fbd0d0; }
     .btn-sm { padding: 3px 9px; font-size: 11px; }
@@ -386,10 +386,10 @@
     .tbl tbody td { padding: 7px 12px; vertical-align: middle; }
     .tbl .input {
       border-color: #dde6f0; padding: 3px 8px; font-size: 11px;
-      box-shadow: none; background: white;
+      box-shadow: none; background: var(--surface);
     }
     .tbl .input:focus { border-color: var(--blue-accent); }
-    .tbl .input.input-missing { border-style: dashed; border-color: var(--gray-border); background: #fbfcfe; }
+    .tbl .input.input-missing { border-style: dashed; border-color: var(--gray-border); background: var(--gray-light); }
     .tbl .input.input-missing::placeholder { color: var(--text-muted); }
     .tbl-domain { font-weight: 600; color: var(--blue-accent); }
     .tbl-mono { font-family: 'Courier New', monospace; font-size: 11px; }
@@ -482,7 +482,7 @@
     .wld-card-body { padding: 18px; }
 
     /* ── NESTED SECTION ────────────────────────────────────────── */
-    .nest { border: 1px solid var(--gray-border); border-radius: 6px; padding: 14px; margin-top: 14px; background: #fafbfd; }
+    .nest { border: 1px solid var(--gray-border); border-radius: 6px; padding: 14px; margin-top: 14px; background: var(--gray-light); }
     .nest-title { font-size: 11px; font-weight: 700; color: var(--blue-mid); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
 
     /* ── INFO BOX ──────────────────────────────────────────────── */
@@ -498,7 +498,7 @@
     .svc-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gray-border); }
 
     /* ── ADDITIONAL SERVICE ROW ────────────────────────────────── */
-    .addsvc-row { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: #fafbfd; }
+    .addsvc-row { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: var(--gray-light); }
 
     /* ── VPC / SUBNET ──────────────────────────────────────────── */
     .vpc-block { border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 8px; background: var(--surface); }
@@ -542,7 +542,7 @@
     .help-desc li { margin-bottom: 2px; }
     .role-desc {
       font-size: 11px; color: var(--text-muted); margin-top: 4px;
-      padding: 7px 10px; background: #f4f6f9; border-radius: 4px;
+      padding: 7px 10px; background: var(--gray-light); border-radius: 4px;
       font-style: italic; line-height: 1.5;
     }
     .role-desc strong { color: var(--blue-mid); font-style: normal; }
@@ -1803,6 +1803,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.23.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1230')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.22.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Jul 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1220')"></td>
@@ -2010,7 +2015,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.22.0';
+import * as Core from './core/index.js?v=1.23.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -2052,7 +2057,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.22.0',
+    appVersion:'1.23.0',
     activeTab:'overview',
     get tabs() {
       return [
