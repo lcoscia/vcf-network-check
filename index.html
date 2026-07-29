@@ -14,6 +14,17 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   ══ FIN AUTH DISABLED ══ -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('vcf-net-planner-theme');
+        var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- Tailwind is prefixed (tw-) so its utility classes can never collide with the existing
        hand-written design system below (e.g. .flex, .text-sm, .font-bold already exist with
@@ -28,24 +39,108 @@
   <style>
     /* ── CSS DESIGN SYSTEM (VCF-DD) ───────────────────────────── */
     :root {
-      --blue-dark:   #0d1b2a;
-      --blue-mid:    #1b3a5c;
-      --blue-accent: #1e6abf;
-      --blue-light:  #3a9bd5;
-      --green:  #27ae60;
-      --orange: #e67e22;
-      --red:    #c0392b;
-      --yellow: #f39c12;
-      --gray-light:  #f4f6f9;
-      --gray-border: #dce1e9;
-      --text-dark:  #1a1a2e;
-      --text-muted: #5a6a7a;
-      --white: #ffffff;
+      /* ITQ brand tokens */
+      --itq-royal: #040559;
+      --itq-royal-2: #0a0c7a;
+      --itq-orange: #FF4F41;
+      --itq-orange-hover: #e8392b;
+      --itq-light-blue: #CDE3F7;
+      --itq-gold: #F3BA16;
+      --itq-gray: #53565A;
+      --itq-success: #23800A;
+
+      /* Existing semantic vars remapped to ITQ palette (names kept for compatibility) */
+      --blue-dark:   var(--itq-royal);
+      --blue-mid:    var(--itq-royal-2);
+      --blue-accent: var(--itq-orange);
+      --blue-light:  var(--itq-light-blue);
+      --green:  var(--itq-success);
+      --orange: var(--itq-gold);
+      --red:    #c0392b;   /* unchanged — ITQ has no dedicated red, keep distinct from the new coral accent */
+      --gray-light:  #F7F8F9;
+      --gray-border: #E4E6EA;
+      --text-dark:  #1B1D2A;
+      --text-muted: var(--itq-gray);
+      --surface: #ffffff;
+    }
+    html[data-theme="dark"] {
+      --gray-light: #191A30;
+      --gray-border: #33355A;
+      --text-dark: #F2F3F7;
+      --text-muted: #B6B8C8;
+      --surface: #24263F;
+      --blue-accent: #FF6F63;
+    }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) {
+        --gray-light: #191A30;
+        --gray-border: #33355A;
+        --text-dark: #F2F3F7;
+        --text-muted: #B6B8C8;
+        --surface: #24263F;
+        --blue-accent: #FF6F63;
+      }
+    }
+    @font-face {
+      font-family: 'Metropolis';
+      src: url('./assets/fonts/Metropolis-ExtraLight.ttf') format('truetype');
+      font-weight: 200;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Metropolis';
+      src: url('./assets/fonts/Metropolis-Light.ttf') format('truetype');
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Metropolis';
+      src: url('./assets/fonts/Metropolis-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Metropolis';
+      src: url('./assets/fonts/Metropolis-Medium.ttf') format('truetype');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Metropolis';
+      src: url('./assets/fonts/Metropolis-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Titillium';
+      src: url('./assets/fonts/Titillium-Regular.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Titillium';
+      src: url('./assets/fonts/Titillium-Semibold.otf') format('opentype');
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Titillium';
+      src: url('./assets/fonts/Titillium-Bold.otf') format('opentype');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     [x-cloak] { display: none !important; }
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
+      font-family: 'Metropolis', 'Segoe UI', Arial, sans-serif;
       background: var(--gray-light);
       color: var(--text-dark);
       font-size: 13px;
@@ -79,7 +174,7 @@
     }
     .access-req-overlay.open { display: flex; }
     .access-req-box {
-      background: white; border-radius: 10px; width: 100%; max-width: 440px;
+      background: var(--surface); border-radius: 10px; width: 100%; max-width: 440px;
       box-shadow: 0 24px 64px rgba(0,0,0,0.4); overflow: hidden;
     }
     .access-req-header {
@@ -112,11 +207,11 @@
       display: flex; align-items: center; justify-content: center;
     }
     .login-card {
-      background: white; border-radius: 12px; width: 100%; max-width: 380px;
+      background: var(--surface); border-radius: 12px; width: 100%; max-width: 380px;
       padding: 40px; box-shadow: 0 24px 64px rgba(0,0,0,0.45);
     }
     .login-logo { text-align: center; margin-bottom: 28px; }
-    .login-logo .brand { font-size: 34px; font-weight: 800; color: var(--blue-mid); letter-spacing: -1px; }
+    .login-logo .brand { font-size: 34px; font-weight: 800; color: var(--blue-mid); letter-spacing: -1px; font-family: 'Titillium', 'Segoe UI', Arial, sans-serif; }
     .login-logo .sub   { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
     .login-field { margin-bottom: 14px; }
     .login-error { font-size: 12px; color: var(--red); min-height: 16px; margin-bottom: 10px; }
@@ -125,7 +220,7 @@
       border: none; border-radius: 6px; font-size: 14px; font-weight: 700;
       cursor: pointer; font-family: inherit; transition: background 0.15s;
     }
-    .login-btn:hover:not(:disabled) { background: #155fa0; }
+    .login-btn:hover:not(:disabled) { background: var(--itq-orange-hover); }
     .login-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
     /* ── HEADER ────────────────────────────────────────────────── */
@@ -137,7 +232,7 @@
       position: sticky; top: 0; z-index: 50;
     }
     .app-header-left { display: flex; align-items: center; gap: 14px; }
-    .app-header-brand { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
+    .app-header-brand { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; font-family: 'Titillium', 'Segoe UI', Arial, sans-serif; }
     .app-header-project { font-size: 12px; color: #a8c4de; }
     .header-badge {
       font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
@@ -154,6 +249,18 @@
       transition: all 0.15s;
     }
     .header-btn:hover { background: rgba(255,255,255,0.12); color: white; border-color: rgba(255,255,255,0.3); }
+
+    /* ── THEME TOGGLE ──────────────────────────────────────────────── */
+    .theme-toggle {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%;
+      color: #a8c4de; background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(168,196,222,0.3);
+      cursor: pointer; transition: all 0.15s; padding: 0;
+    }
+    .theme-toggle:hover { background: rgba(255,255,255,0.18); color: white; border-color: rgba(255,255,255,0.4); }
+    .theme-toggle:active { background: rgba(255,255,255,0.24); }
+    .theme-toggle__icon { display: block; }
 
     /* ── LANG TOGGLE ───────────────────────────────────────────────── */
     .lang-toggle { display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; padding:2px 3px; border-radius:20px; transition:background 0.15s; }
@@ -180,7 +287,7 @@
       font-family: inherit;
     }
     .tab-btn:hover { color: white; background: rgba(255,255,255,0.07); }
-    .tab-btn.active { color: white; border-bottom-color: #5bc8ff; background: rgba(255,255,255,0.1); }
+    .tab-btn.active { color: white; border-bottom-color: var(--itq-orange); background: rgba(255,255,255,0.1); }
 
     /* ── MAIN CONTAINER ────────────────────────────────────────── */
     .main { padding: 22px 28px; max-width: 1440px; margin: 0 auto; }
@@ -199,6 +306,7 @@
       font-size: 13px; font-weight: 700; color: var(--blue-mid);
       border-left: 4px solid var(--blue-accent); padding-left: 11px;
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
+      font-family: 'Titillium', 'Segoe UI', Arial, sans-serif;
     }
 
     /* ── CARD ──────────────────────────────────────────────────── */
@@ -238,7 +346,7 @@
     }
     .input:focus, .select:focus {
       border-color: var(--blue-accent);
-      box-shadow: 0 0 0 2px rgba(30,106,191,0.13);
+      box-shadow: 0 0 0 2px rgba(255,79,65,0.13);
     }
     .input:disabled { background: #f0f3f8; color: #aaa; }
     .input.mono { font-family: 'Courier New', monospace; font-size: 11px; }
@@ -252,7 +360,7 @@
       display: inline-flex; align-items: center; gap: 5px;
     }
     .btn-primary  { background: var(--blue-accent); color: white; border-color: var(--blue-accent); }
-    .btn-primary:hover  { background: #155fa0; border-color: #155fa0; }
+    .btn-primary:hover  { background: var(--itq-orange-hover); border-color: var(--itq-orange-hover); }
     .btn-secondary { background: white; color: var(--blue-mid); border-color: var(--gray-border); }
     .btn-secondary:hover { background: #f0f5fb; border-color: var(--blue-light); }
     .btn-danger  { background: #fde8e8; color: var(--red); border-color: #f5b5b5; }
@@ -350,7 +458,7 @@
       color: white; padding: 12px 16px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .dom-card-head .dom-name { font-size: 14px; font-weight: 700; }
+    .dom-card-head .dom-name { font-size: 14px; font-weight: 700; font-family: 'Titillium', 'Segoe UI', Arial, sans-serif; }
     .dom-card-body { padding: 14px 16px; }
     .dom-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
     .dom-stat  { text-align: center; background: var(--gray-light); border-radius: 6px; padding: 10px; }
@@ -367,7 +475,7 @@
     .wld-head-input {
       background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
       border-radius: 5px; padding: 5px 10px; color: white; font-size: 14px; font-weight: 700;
-      font-family: inherit; outline: none; min-width: 200px;
+      font-family: 'Titillium', 'Segoe UI', Arial, sans-serif; outline: none; min-width: 200px;
     }
     .wld-head-input::placeholder { color: rgba(255,255,255,0.5); }
     .wld-head-input:focus { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.6); }
@@ -537,6 +645,22 @@
           <span class="pill-opt" :class="{ active: lang==='en' }">EN</span>
         </div>
       </div>
+      <button class="theme-toggle" type="button" @click="darkMode = !darkMode" :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'">
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" x-show="!darkMode" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="12" y1="2" x2="12" y2="4"></line>
+          <line x1="12" y1="20" x2="12" y2="22"></line>
+          <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line>
+          <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line>
+          <line x1="2" y1="12" x2="4" y2="12"></line>
+          <line x1="20" y1="12" x2="22" y2="12"></line>
+          <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line>
+          <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line>
+        </svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" x-show="darkMode" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -1908,6 +2032,7 @@ function vcfApp(){
 
     // Language
     lang: localStorage.getItem('vcf-lang') || 'fr',
+    darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
     t(key, vars) {
       return Core.translate(Core.translations, this.lang, key, vars);
     },
@@ -1994,6 +2119,10 @@ function vcfApp(){
 
     init(){
       this.$watch('lang', v => { localStorage.setItem('vcf-lang', v); this.compute(); });
+      this.$watch('darkMode', v => {
+        document.documentElement.setAttribute('data-theme', v ? 'dark' : 'light');
+        localStorage.setItem('vcf-net-planner-theme', v ? 'dark' : 'light');
+      });
       this.$watch('project',()=>this.compute());
       this.$watch('managementDomain',()=>this.compute());
       this.$watch('workloadDomains',()=>this.compute());
