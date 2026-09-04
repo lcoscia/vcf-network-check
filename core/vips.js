@@ -1,5 +1,7 @@
 // Pure VIP domain logic: builds management/workload virtual IP inventories.
 
+import { isVcf91Plus } from './data.js?v=1.24.0';
+
 // ── VIP ENGINE ──────────────────────────────────────────────────
 let _vipId=0;
 export function resetVipCounter(){_vipId=0;}
@@ -18,7 +20,7 @@ export function buildManagementVIPs(mgmt,project){
   resetVipCounter();
   const vips=[];
   const domain='Management Domain';
-  const is91=project.vcfVersion==='9.1';
+  const is91=isVcf91Plus(project.vcfVersion);
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
   const isOverlayModel=mgmt.fleetPlacement==='nsx-overlay-segment';
   // Mirrors core/vlan.js and core/appliances.js: Fleet VIP / Log Management VIP (Day-0) always resolve to the

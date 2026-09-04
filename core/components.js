@@ -2,6 +2,7 @@
 // from the static COMPONENT_REFERENCE table.
 
 import { COMPONENT_REFERENCE } from './reference.js?v=1.11.0';
+import { isVcf91Plus } from './data.js?v=1.24.0';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 
@@ -79,7 +80,7 @@ const RULES = {
   'ops-collector'(mgmt, workloadDomains, project) {
     // Remote Collectors only exist in VCF 9.0 — VCF 9.1 replaces them with the Cloud Proxy
     // (see core/appliances.js: `if(!is91) for(...) apps.push(...vcf-ops-rc-...)`).
-    if (project?.vcfVersion === '9.1') return { units: 0, totalIps: 0, totalFqdns: 0 };
+    if (isVcf91Plus(project?.vcfVersion)) return { units: 0, totalIps: 0, totalFqdns: 0 };
     const units = mgmt.vcfOperations?.enabled ? (mgmt.vcfOperations.remoteCollectorCount || 0) : 0;
     return { units, totalIps: units, totalFqdns: units };
   },
@@ -88,7 +89,7 @@ const RULES = {
     // 9.1: 7 IPs total = 1 Automation Endpoint VIP + 1 dedicated VCF Services Runtime IP + /29 node block
     // (5 IPs: 3 nodes + 2 buffer, see core/vlan.js `autoInMgmtVM`=6 which excludes the VIP), independent of HA/clustered mode.
     // 9.0: legacy VA-nodes logic (7 IPs clustered, 2 standalone) — unchanged.
-    const ips = project?.vcfVersion === '9.1' ? 7 : (mgmt.vcfAutomation?.mode === 'clustered' ? 7 : 2);
+    const ips = isVcf91Plus(project?.vcfVersion) ? 7 : (mgmt.vcfAutomation?.mode === 'clustered' ? 7 : 2);
     const units = enabled ? 1 : 0;
     return { units, totalIps: enabled ? ips : 0, totalFqdns: enabled ? 2 : 0 };
   },
@@ -140,14 +141,14 @@ const RULES = {
     // 9.1-only, single fixed appliance replacing Remote Collectors (see core/appliances.js:
     // `if(is91&&mgmt.vcfOperations.cloudProxyEnabled) apps.push(...vcf-ops-cloud-proxy-01...)`).
     const r = ref('cloud-proxy');
-    const units = (project?.vcfVersion === '9.1' && mgmt.vcfOperations?.enabled && mgmt.vcfOperations?.cloudProxyEnabled) ? 1 : 0;
+    const units = (isVcf91Plus(project?.vcfVersion) && mgmt.vcfOperations?.enabled && mgmt.vcfOperations?.cloudProxyEnabled) ? 1 : 0;
     return { units, totalIps: units * r.ipsPerUnit, totalFqdns: units * r.fqdnsPerUnit };
   },
   'ops-for-logs'(mgmt, workloadDomains, project) {
     const enabled = !!mgmt.vcfOperationsForLogs?.enabled;
     if (!enabled) return { units: 0, totalIps: 0, totalFqdns: 0 };
     let n;
-    if (project?.vcfVersion === '9.1') {
+    if (isVcf91Plus(project?.vcfVersion)) {
       // 9.1: single integrated appliance (vcf-log-mgmt-01) — see core/appliances.js.
       n = 1;
     } else {

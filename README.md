@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.23.0
+# VCF 9.1 Network Planner — v1.24.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -7,7 +7,7 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 ## Features
 
 ### Planning tabs
-- **Overview** — global config, VCF version selector (9.0 / 9.1), FQDN suffix/prefix, domain summary cards
+- **Overview** — global config, VCF version selector (9.0 / 9.1 / 9.1.1), FQDN suffix/prefix, domain summary cards
 - **Management Domain** — hosts, NSX, storage type, topology mode, VCF Management Services network model
 - **Platform Services** — VCF Operations, Log Management, Networks, Automation, Identity Broker
 - **Workload Domains** — per-domain config with storage type, NSX, VKS, domain roles
@@ -18,7 +18,9 @@ Single-page network design tool for VMware Cloud Foundation 9 pre-deployment pla
 - **Export / Import** — Excel workbook (5 sheets) + JSON save/restore
 - **VCF Components** — clickable card grid grouped by domain (Management + each Workload Domain); click a component (SDDC Manager, vCenter, NSX Manager/Edge, ESXi, VCF Operations/Automation, Avi, VKS, **SSP**, **License Hub**…) to see its scope, IPs/unit, FQDNs/unit, and the totals computed dynamically from the current project configuration
 
-### VCF 9.0 / 9.1 dual support
+### VCF 9.0 / 9.1 / 9.1.1 support
+
+VCF 9.1.1 is a maintenance release (updated Bill of Materials, supportability fixes — GA September 3, 2026) on the same VCF Management Services architecture as 9.1: selecting it in the version dropdown reuses every 9.1 IP/FQDN/VLAN rule below, with no separate calculation branch. It is the default/recommended selection for new projects; 9.1 and 9.0 remain selectable for existing/legacy deployments.
 
 #### VCF 9.1
 - **VCF Management Services** — 4 mandatory Day-0 FQDNs (Fleet, Instance, VCF Services Runtime, Identity Broker) + Services Runtime IP block /28 min (12 IPs) – /27 max (30 IPs); Identity Broker's IP is allocated from this block (not additional). License Server is a separate component (1 FQDN, IP in the Management VM Network, outside the Services Runtime block)
@@ -121,6 +123,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.24.0 | Sep 2026 | Added VCF 9.1.1 as a selectable version (Overview → VCF Version), alongside 9.0 and 9.1 — now the default recommended version. VCF 9.1.1 is a maintenance release (updated BoM, supportability fixes) on the same VCF Management Services architecture as 9.1, so it reuses every IP/FQDN/VLAN rule already validated for 9.1, with no calculation changes. Confirmed by the official Broadcom TechDocs Release Notes (VMware Cloud Foundation 9.1.1.0, GA September 3, 2026) |
 | v1.23.0 | Jul 2026 | Visual refresh: the ITQ design system's color palette, fonts (Metropolis / Titillium), and a light/dark theme toggle (used across the other VCF tools in the suite) are now applied to the app, with no layout or functionality changes |
 | v1.22.0 | Jul 2026 | Targeted VKS + Avi Load Balancer improvement, from official Broadcom documentation (Avi Load Balancer for VCF): Avi Service Engine data interfaces connect to VPC-backed private network segments, and routable VIPs are allocated from the VPC's own external/public IP blocks — no separate Avi-specific VPC or subnet is needed. As soon as VKS and Avi Load Balancer are both selected on a domain (Management or Workload) with no VPC defined yet, a Supervisor Service VPC is now auto-created with its two mandatory subnets — Private (SE data + Supervisor workloads) and Public (routable external VIPs) — instead of leaving the user with an empty "NSX VPCs" list. Non-destructive: only triggers when the domain's VPC list is empty |
 | v1.21.0 | Jul 2026 | VKS/Kubernetes networking overhaul, designed from official Broadcom TechDocs for VCF 9.1 (Supervisor Networking with VPC, Avi Load Balancer for VCF). Platform Load Balancer for VKS: new selector (Management Domain + each Workload Domain) among the three Broadcom-documented options — Foundation Load Balancer (FLB), NSX Load Balancer (NSX-LB, default), Avi Load Balancer (Enterprise); generated VIP rows now reflect the actually-selected type. Corrected NSX VPC terminology: VPC types renamed "Supervisor Service VPC" / "vSphere Namespace VPC", and the incorrect subnet access mode "Isolated" replaced with the Broadcom-documented "Private TGW" (Private, Private TGW, Public); old JSON projects are migrated automatically on import. New non-blocking validation rules: VKS enabled with no VPC defined; Avi Load Balancer selected but Avi not deployed/enabled on the domain. Excel export: new "VKS VPCs" sheet with the Load Balancer choice and full VPC/subnet breakdown per domain. Minor fix: JSON import now correctly restores Range Start/Range End on VLANs |

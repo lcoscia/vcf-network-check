@@ -1,5 +1,7 @@
 // Pure appliance/component domain logic: builds management/workload appliance inventories.
 
+import { isVcf91Plus } from './data.js?v=1.24.0';
+
 // ── APPLIANCE ENGINE ────────────────────────────────────────────
 let _appId=0;
 export function resetAppCounter(){_appId=0;}
@@ -11,7 +13,7 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   resetAppCounter();
   const apps=[];
   const domain='Management Domain';
-  const is91=project.vcfVersion==='9.1';
+  const is91=isVcf91Plus(project.vcfVersion);
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
   const isOverlayModel=mgmt.fleetPlacement==='nsx-overlay-segment';
   // Broadcom VCF 9.1 official Dedicated VLAN + NSX Overlay Segment model: Fleet Appliance / VCF Mgmt Services
@@ -42,7 +44,7 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   // Cette règle métier est désormais documentée et implémentée uniquement dans core/vips.js (buildManagementVIPs) — aucun code dupliqué ici.
 
   if(is91){
-    apps.push(mkApp('fleet-01','Fleet Appliance (VCF 9.1)',domain,fleetVLAN,true,false,true,t('app.fleet_91',{placement:mgmt.fleetPlacement})));
+    apps.push(mkApp('fleet-01',`Fleet Appliance (VCF ${project.vcfVersion})`,domain,fleetVLAN,true,false,true,t('app.fleet_91',{placement:mgmt.fleetPlacement})));
     apps.push(mkApp('mgmt-instance-01','VCF Mgmt Services Instance',domain,fleetVLAN,true,false,true,t('app.instance_91')));
     apps.push(mkApp('vcf-svc-runtime','VCF Services Runtime',domain,fleetVLAN,true,false,true,t('app.svc_runtime')));
   } else {

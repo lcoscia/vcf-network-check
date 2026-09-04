@@ -1,6 +1,7 @@
 // Pure VLAN domain logic: builds management/workload VLAN lists and derives helper lookups.
 
 import { recommendCIDR } from './sizing.js?v=1.11.0';
+import { isVcf91Plus } from './data.js?v=1.24.0';
 
 // ── VLAN ENGINE ─────────────────────────────────────────────────
 let _vlanId=0;
@@ -15,7 +16,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const vlans=[];
   const buf=project.subnetBufferEnabled, bufPct=project.subnetBufferPercent;
   const domain='Management Domain';
-  const is91=project.vcfVersion==='9.1';
+  const is91=isVcf91Plus(project.vcfVersion);
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
   const isOverlayModel=mgmt.fleetPlacement==='nsx-overlay-segment';
   // Broadcom VCF 9.1 official network models: in the NSX Overlay Segment model (Model 3/4), Fleet/Instance/Services
