@@ -1,8 +1,9 @@
 // Pure calculation: derives per-component IP/FQDN totals for the current project configuration
 // from the static COMPONENT_REFERENCE table.
 
-import { COMPONENT_REFERENCE } from './reference.js?v=1.26.0';
-import { isVcf91Plus, effectiveHostCount } from './data.js?v=1.26.0';
+import { COMPONENT_REFERENCE } from './reference.js?v=1.27.0';
+import { isVcf91Plus, effectiveHostCount } from './data.js?v=1.27.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.27.0';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 
@@ -21,9 +22,14 @@ function sumPerDomain(perDomain) {
 // actually carries this component, since each domain (Management + each Workload Domain) is its own
 // VLAN/network pool in VCF and IP requirements should not be conflated across domains.
 const RULES = {
-  'vcf-mgmt-services'(mgmt) {
-    const r = ref('vcf-mgmt-services');
-    return { units: 1, totalIps: r.ipsPerUnit, totalFqdns: r.fqdnsPerUnit };
+  'vcf-mgmt-services'(mgmt, workloadDomains, project) {
+    // 9.1+: Fleet / Instance / Services Runtime / Identity Broker endpoint FQDNs (1 IP each, outside the pool) +
+    // the services runtime node pool (core/mgmtservices.js). The Log Management FQDN is counted under
+    // 'ops-for-logs', its node IPs are part of the pool here. 9.0: the single Fleet appliance.
+    const plan = buildMgmtServicesPlan(mgmt, project || {});
+    if (!plan) return { units: 1, totalIps: 1, totalFqdns: 1 };
+    const fqdns = plan.endpoints.filter(e => e.key !== 'logs-vip').length;
+    return { units: 1, totalIps: fqdns + plan.pool.size, totalFqdns: fqdns };
   },
   'sddc-manager'(mgmt) {
     const r = ref('sddc-manager');
@@ -149,7 +155,7 @@ const RULES = {
     if (!enabled) return { units: 0, totalIps: 0, totalFqdns: 0 };
     let n;
     if (isVcf91Plus(project?.vcfVersion)) {
-      // 9.1: single integrated appliance (vcf-log-mgmt-01) — see core/appliances.js.
+      // 9.1+: 1 FQDN + 1 IP outside the runtime pool; its node IPs are counted in 'vcf-mgmt-services' (pool).
       n = 1;
     } else {
       // 9.0: 1 master + workers (clustered) + 1 UI VIP + 1 ILB VIP (if integratedLBVIP) —

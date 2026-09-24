@@ -48,6 +48,17 @@ export function doExcelExport(state, XLSXLib) {
   const ws6 = XLSXLib.utils.aoa_to_sheet(vksd); ws6['!cols'] = [24, 20, 24, 22, 22, 14, 18].map(colW); applyHdr(XLSXLib, ws6, 'A1:G1');
   XLSXLib.utils.book_append_sheet(wb, ws6, 'VKS VPCs');
 
+  // 9.1+: VCF Management Services reserved ranges (core/mgmtservices.js) — what to reserve vs what was entered.
+  if (state.msPlan) {
+    const { pool, vcfa, endpoints } = state.msPlan;
+    const need = pool.consumers.map(c => c.key === 'runtime' ? '12 min (Day-0 nodes + buffer)' : `${c.key === 'logs' ? 'Log Management' : 'Real-time Metrics'} ${c.ips}`).join(' + ');
+    const msd = [['Range', 'Start', 'End', 'Entered IPs', 'Required IPs', 'Notes'],
+      ['VCF Management Services (services runtime nodes)', xs(pool.start), xs(pool.end), pool.rangeSize, pool.size, xs(`${need}. Endpoint FQDN IPs outside this range: ${endpoints.map(e => e.key).join(', ')}.`)],
+      ...(vcfa.enabled ? [['VCF Automation nodes', xs(vcfa.start), xs(vcfa.end), vcfa.rangeSize, vcfa.required, '3 active + 2 buffer. VCF Automation and its services runtime FQDN IPs outside this range.']] : [])];
+    const ws7 = XLSXLib.utils.aoa_to_sheet(msd); ws7['!cols'] = [44, 16, 16, 12, 12, 70].map(colW); applyHdr(XLSXLib, ws7, 'A1:F1');
+    XLSXLib.utils.book_append_sheet(wb, ws7, 'Mgmt Services Ranges');
+  }
+
   const fname = `VCF9_Plan_${(state.project.projectName || 'Export').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSXLib.writeFile(wb, fname);
 }

@@ -73,3 +73,17 @@ export function expandHostIP(input, cidr){
   if(prefix<=30&&target===broadcast) return {ip:'',error:'broadcast'};
   return {ip:intToIp(target),error:null};
 }
+
+// True when ip lies within [start, end] inclusive; false when outside; null if any bound is invalid/empty.
+export function ipInRange(ip, start, end){
+  const x=ipToInt(ip), s=ipToInt(start), e=ipToInt(end);
+  if(x===null||s===null||e===null) return null;
+  return x>=s&&x<=e;
+}
+
+// True when ranges [a1,a2] and [b1,b2] share at least one address; null if any bound is invalid/empty.
+export function rangesOverlap(a1, a2, b1, b2){
+  const [as,ae,bs,be]=[a1,a2,b1,b2].map(ipToInt);
+  if([as,ae,bs,be].some(v=>v===null)) return null;
+  return as<=be&&bs<=ae;
+}

@@ -1,6 +1,6 @@
 // Pure VIP domain logic: builds management/workload virtual IP inventories.
 
-import { isVcf91Plus } from './data.js?v=1.26.0';
+import { isVcf91Plus } from './data.js?v=1.27.0';
 
 // ── VIP ENGINE ──────────────────────────────────────────────────
 let _vipId=0;
@@ -34,18 +34,20 @@ export function buildManagementVIPs(mgmt,project){
   // 9.1+: no Fleet VIP — only the 'Fleet components' FQDN, which already has its own IP on fleet-01 (Appliances tab).
   if(!is91) vips.push(mkVIP('Fleet VIP','Fleet',domain,fleetVLAN,mgmt.fleetMode==='clustered'?'Fleet HA cluster VIP.':'Fleet standalone VIP. Reserved for DNS stability.'));
   if(mgmt.aviDeployed) vips.push(mkVIP('AVI Controller Cluster VIP','Avi Load Balancer',domain,'Management VM Network','AVI Controller cluster VIP.'));
-  if(mgmt.vcfOperations.enabled){const v=platVLAN(mgmt.vcfOperations.requiresDedicatedVLAN,'VCF Operations Network');vips.push(mkVIP('VCF Operations VIP','VCF Operations',domain,v,mgmt.vcfOperations.mode==='enterprise'?'Enterprise analytics cluster VIP.':'Standalone VCF Operations VIP — reserved for DNS.'));}
+  // 9.1+: the VCF Operations load balancer FQDN is optional and HA-only (TechDocs 9.1) — no VIP in Simple mode.
+  if(mgmt.vcfOperations.enabled&&!(is91&&mgmt.vcfOperations.mode!=='enterprise')){const v=platVLAN(mgmt.vcfOperations.requiresDedicatedVLAN,'VCF Operations Network');vips.push(mkVIP('VCF Operations VIP','VCF Operations',domain,v,is91?'Optional — external load balancer FQDN in front of the VCF Operations HA cluster.':mgmt.vcfOperations.mode==='enterprise'?'Enterprise analytics cluster VIP.':'Standalone VCF Operations VIP — reserved for DNS.'));}
   if(mgmt.vcfOperationsForLogs.enabled){
     if(is91){
       // 9.1: Log Management = 1 FQDN (LB endpoint), IPs (6 base +2/replica) allocated from the VCF Services Runtime block — no separate UI/ILB VIPs
-      vips.push(mkVIP('VCF Log Management VIP','VCF Log Management',domain,fleetVLAN,'Log Management LB endpoint (1 FQDN). IPs allocated from the VCF Services Runtime block (6 base + 2 per additional replica).'));
+      vips.push(mkVIP('VCF Log Management VIP','VCF Log Management',domain,fleetVLAN,'Log Management endpoint (1 FQDN + 1 IP) — must be OUTSIDE the Services Runtime node pool. Its 6 node IPs (+2 per extra replica) are taken from that pool.'));
     } else {
       const v=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'VCF Operations for Logs Network');
       vips.push(mkVIP('VCF Operations for Logs UI VIP','VCF Operations for Logs',domain,v,mgmt.vcfOperationsForLogs.mode==='clustered'?'UI/API VIP for Logs cluster.':'Standalone Logs VIP — reserved for DNS.'));
       if(mgmt.vcfOperationsForLogs.mode==='clustered'&&mgmt.vcfOperationsForLogs.integratedLBVIP) vips.push(mkVIP('VCF Operations for Logs ILB Syslog VIP','VCF Operations for Logs — ILB',domain,v,'ILB VIP for syslog (UDP 514) and CFAPI. All log sources must point here.'));
     }
   }
-  if(mgmt.vcfOperationsForNetworks.enabled){const v=platVLAN(mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN,'VCF Operations for Networks Network');vips.push(mkVIP('VCF Operations for Networks VIP','VCF Operations for Networks',domain,v,'VIP for VCF Ops for Networks UI/API.'));}
+  // 9.1+: no VCF Operations for Networks VIP in the TechDocs 9.1 FQDN/IP table (platform + collector IPs only).
+  if(mgmt.vcfOperationsForNetworks.enabled&&!is91){const v=platVLAN(mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN,'VCF Operations for Networks Network');vips.push(mkVIP('VCF Operations for Networks VIP','VCF Operations for Networks',domain,v,'VIP for VCF Ops for Networks UI/API.'));}
   if(mgmt.vcfAutomation.enabled){
     // Follows the same placement logic as VCF Operations / Ops for Networks / Identity Broker (platVLAN):
     // Management VM Network when fleetPlacement is Shared, the dedicated Fleet/Runtime VLAN when it's Dedicated

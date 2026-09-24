@@ -1,7 +1,8 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
-import { ipInCidr, rangeSize } from './iprange.js?v=1.26.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount } from './data.js?v=1.26.0';
+import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap } from './iprange.js?v=1.27.0';
+import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.27.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount } from './data.js?v=1.27.0';
 
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;
@@ -34,9 +35,49 @@ function stretchedHostChecks(msgs,d,label,dom){
   }
 }
 
+// VCF 9.1+ Management Services ranges (core/mgmtservices.js): services runtime node pool and VCF Automation node
+// range — size, placement in the network CIDR, overlap, and no appliance/VIP IP inside either range.
+function mgmtServicesChecks(msgs,domain,plan,vlans,appliances,vips,t){
+  if(!plan)return;
+  const cidrOf=appName=>{
+    const app=appliances.find(a=>a.applianceName===appName);
+    return app?(vlans.find(v=>v.domain===domain&&v.vlanName===app.vlan)?.cidr||''):'';
+  };
+  const {pool,vcfa}=plan;
+  if(pool.required>SVC_RUNTIME_MIN_IPS) msgs.push(mkMsg('info','vlan',domain,t('val.ms_pool_sized',{required:pool.required,size:pool.size}),t('val.ms_pool_sized_res')));
+  const ranges=[];
+  if(!pool.start&&!pool.end) msgs.push(mkMsg('info','vlan',domain,t('val.ms_range_missing',{size:pool.size}),t('val.ms_range_missing_res')));
+  else if(pool.rangeSize===0) msgs.push(mkMsg('warning','vlan',domain,t('val.ms_range_invalid'),t('val.ms_range_invalid_res')));
+  else{
+    ranges.push({label:t('ms.pool_label'),start:pool.start,end:pool.end});
+    if(pool.rangeSize<SVC_RUNTIME_MIN_IPS) msgs.push(mkMsg('blocker','vlan',domain,t('val.ms_range_min',{size:pool.rangeSize}),t('val.ms_range_min_res')));
+    else if(pool.rangeSize<pool.required) msgs.push(mkMsg('warning','vlan',domain,t('val.ms_range_small',{size:pool.rangeSize,required:pool.required}),t('val.ms_pool_sized_res')));
+    const cidr=cidrOf('fleet-01');
+    if(cidr&&(ipInCidr(pool.start,cidr)===false||ipInCidr(pool.end,cidr)===false)) msgs.push(mkMsg('warning','vlan',domain,t('val.ms_range_outside',{range:t('ms.pool_label'),cidr}),t('val.ms_range_outside_res')));
+  }
+  if(vcfa.enabled){
+    if(!vcfa.start&&!vcfa.end) msgs.push(mkMsg('info','vlan',domain,t('val.vcfa_range_missing'),t('val.ms_range_missing_res')));
+    else if(vcfa.rangeSize===0) msgs.push(mkMsg('warning','vlan',domain,t('val.ms_range_invalid'),t('val.ms_range_invalid_res')));
+    else{
+      ranges.push({label:t('ms.vcfa_label'),start:vcfa.start,end:vcfa.end});
+      if(vcfa.rangeSize<vcfa.required) msgs.push(mkMsg('warning','vlan',domain,t('val.vcfa_range_small',{size:vcfa.rangeSize}),t('val.vcfa_range_small_res')));
+      const cidr=cidrOf('vcf-automation-01');
+      if(cidr&&(ipInCidr(vcfa.start,cidr)===false||ipInCidr(vcfa.end,cidr)===false)) msgs.push(mkMsg('warning','vlan',domain,t('val.ms_range_outside',{range:t('ms.vcfa_label'),cidr}),t('val.ms_range_outside_res')));
+      if(pool.rangeSize>0&&rangesOverlap(pool.start,pool.end,vcfa.start,vcfa.end)) msgs.push(mkMsg('blocker','vlan',domain,t('val.ms_ranges_overlap'),t('val.ms_ranges_overlap_res')));
+    }
+  }
+  // "Each FQDN must resolve to a unique, currently unassigned IP address [...] must not overlap with any IP ranges
+  // already reserved for VCF services runtime nodes or VCF Automation nodes." — applies to every planned IP.
+  [...appliances.map(a=>({name:a.applianceName,ip:a.ipAddress})),...vips.map(v=>({name:v.vipName,ip:v.ipAddress}))]
+    .filter(x=>ipToInt(x.ip)!==null)
+    .forEach(x=>ranges.forEach(r=>{
+      if(ipInRange(x.ip,r.start,r.end)) msgs.push(mkMsg('blocker','vlan',domain,t('val.ms_ip_in_range',{name:x.name,ip:x.ip,range:r.label}),t('val.ms_ip_in_range_res')));
+    }));
+}
+
 // `appliances` added as the last parameter (kept optional/defaulted to [] so existing single caller doesn't break
 // if it's ever omitted) — needed to count appliances per VLAN block for the IP-range rules below.
-export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[]){
+export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],vips=[]){
   _valId=0;
   const msgs=[];
   const domain='Management Domain';
@@ -95,7 +136,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   if(!is91&&mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&!mgmt.vcfOperationsForLogs.integratedLBVIP) msgs.push(mkMsg('warning','vip',domain,'VCF Ops for Logs clustered but ILB VIP disabled. Log sources cannot use a single syslog endpoint.','Enable ILB VIP.'));
   if(!is91&&mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.mode==='clustered'&&mgmt.vcfOperationsForLogs.workerCount<2) msgs.push(mkMsg('warning','scenario',domain,`VCF Ops for Logs: only ${mgmt.vcfOperationsForLogs.workerCount} worker(s). Min 2 recommended.`,'Set worker count ≥ 2.'));
   // 9.1 — Identity Broker, Log Management and Real-time Metrics (Day-N) IPs are all allocated from the Services Runtime block; may push it from /28 to /27
-  if(is91&&mgmt.vcfOperationsForLogs.enabled&&!mgmt.svcRuntimeReserve30) msgs.push(mkMsg('info','vlan',domain,t('val.svcruntime_27_info'),t('val.svcruntime_27_res')));
+  if(is91) mgmtServicesChecks(msgs,domain,buildMgmtServicesPlan(mgmt,project),vlans,appliances,vips,t);
   // 9.1 — VCF Automation /29 block is a separate allocation from the Services Runtime block
   if(is91&&mgmt.vcfAutomation.enabled) msgs.push(mkMsg('info','vlan',domain,t('val.auto_block_info'),t('val.auto_block_res')));
   if(mgmt.vcfAutomation.enabled&&!mgmt.vcfIdentityBroker.enabled) msgs.push(mkMsg('warning','scenario',domain,'VCF Automation enabled but VCF Identity Broker not configured.','Enable VCF Identity Broker.'));
@@ -165,6 +206,9 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
     if(mgmt.storageType!=='vsan-esa') msgs.push(mkMsg('warning','scenario','Management Domain','Scenario "Consolidated / 3-Node vSAN ESA" expects vSAN ESA storage.','Set Storage Type to vSAN ESA.'));
     if(workloads.length>0) msgs.push(mkMsg('info','scenario','Global','Consolidated Architecture: Workload Domain(s) typically run as resource pools on the shared 3-host Management cluster rather than separate clusters.','Refer to VCF 9.1 Consolidated Architecture design guidance.'));
   }
+  // TechDocs 9.1: "Domain suffixes such as .local are not supported."
+  const localFqdn=[project.fqdnSuffix,...appliances.map(a=>a.fqdn),...vips.map(v=>v.fqdn)].some(f=>/\.local\.?$/i.test((f||'').trim()));
+  if(localFqdn) msgs.push(mkMsg('warning','scenario','Global',t('val.fqdn_local'),t('val.fqdn_local_res')));
   if(!project.projectName.trim()) msgs.push(mkMsg('info','scenario','Global','Project name is not set.','Enter project name.'));
 
   return msgs;
