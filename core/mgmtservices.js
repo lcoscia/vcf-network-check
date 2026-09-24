@@ -12,8 +12,8 @@
 //   • "Each FQDN must resolve to a unique, currently unassigned IP address, and those IP addresses must not
 //     overlap with any IP ranges already reserved for VCF services runtime nodes or VCF Automation nodes."
 
-import { isVcf91Plus } from './data.js?v=1.28.0';
-import { rangeSize } from './iprange.js?v=1.28.0';
+import { isVcf91Plus } from './data.js?v=1.29.0';
+import { rangeSize } from './iprange.js?v=1.29.0';
 
 export const SVC_RUNTIME_MIN_IPS = 12;
 export const SVC_RUNTIME_RECOMMENDED_IPS = 30;

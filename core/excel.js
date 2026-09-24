@@ -24,13 +24,20 @@ export function doExcelExport(state, XLSXLib) {
   XLSXLib.utils.book_append_sheet(wb, ws1, 'Domain Summary');
 
   // AZ: 'AZ1'/'AZ2' for per-AZ rows; L2 Stretched: 'Yes' for a single VLAN spanning both AZs of a stretched domain.
-  const vd = [['Domain', 'VLAN Name', 'Type', 'AZ', 'L2 Stretched', 'VLAN ID', 'CIDR', 'Req. IPs', 'Rec. CIDR', 'Rec. MTU', 'Mandatory', 'Scope', 'Notes'], ...state.vlans.map(v => [xs(v.domain), xs(v.vlanName), xs(v.vlanType), xs(v.az || ''), v.stretchedL2 ? 'Yes' : '', xs(v.vlanId), xs(v.cidr), v.requiredIPs, xs(v.recommendedCIDR), v.recommendedMTU || '', xs(v.mandatory), xs(v.scope), xs(v.notes)])];
-  const ws2 = XLSXLib.utils.aoa_to_sheet(vd); ws2['!cols'] = [28, 24, 18, 6, 12, 10, 16, 10, 12, 10, 14, 12, 40].map(colW); applyHdr(XLSXLib, ws2, 'A1:M1');
+  const vd = [['Domain', 'VLAN Name', 'Type', 'AZ', 'L2 Stretched', 'VLAN ID', 'CIDR', 'Gateway', 'Req. IPs', 'Rec. CIDR', 'Rec. MTU', 'Mandatory', 'Scope', 'Notes'], ...state.vlans.map(v => [xs(v.domain), xs(v.vlanName), xs(v.vlanType), xs(v.az || ''), v.stretchedL2 ? 'Yes' : '', xs(v.vlanId), xs(v.cidr), xs(v.gateway), v.requiredIPs, xs(v.recommendedCIDR), v.recommendedMTU || '', xs(v.mandatory), xs(v.scope), xs(v.notes)])];
+  const ws2 = XLSXLib.utils.aoa_to_sheet(vd); ws2['!cols'] = [28, 24, 18, 6, 12, 10, 16, 16, 10, 12, 10, 14, 12, 40].map(colW); applyHdr(XLSXLib, ws2, 'A1:N1');
   XLSXLib.utils.book_append_sheet(wb, ws2, 'VLAN Summary');
 
   const ad = [['Appliance Name', 'Type', 'Domain', 'VLAN', 'IP Address', 'FQDN', 'Static IP', 'Notes'], ...state.appliances.map(a => [xs(a.applianceName), xs(a.applianceType), xs(a.domain), xs(a.vlan), xs(a.ipAddress), xs(a.fqdn), a.staticIPRequired ? 'Yes' : 'No', xs(a.notes)])];
   const ws3 = XLSXLib.utils.aoa_to_sheet(ad); ws3['!cols'] = [28, 22, 28, 28, 18, 36, 10, 40].map(colW); applyHdr(XLSXLib, ws3, 'A1:H1');
   XLSXLib.utils.book_append_sheet(wb, ws3, 'Appliance Allocation');
+
+  // ESXi hosts: FQDN + management vmk0 IP per host (vMotion/vSAN/NFS/TEP come from the VLAN network/IP pools).
+  if (state.hosts && state.hosts.length) {
+    const hd = [['Domain', 'AZ', 'Host', 'FQDN', 'Management IP (vmk0)', 'VLAN'], ...state.hosts.map(h => [xs(h.domain), xs(h.az), xs(h.hostName), xs(h.fqdn), xs(h.ipAddress), xs(h.vlan)])];
+    const wsh = XLSXLib.utils.aoa_to_sheet(hd); wsh['!cols'] = [28, 6, 20, 40, 20, 28].map(colW); applyHdr(XLSXLib, wsh, 'A1:F1');
+    XLSXLib.utils.book_append_sheet(wb, wsh, 'ESXi Hosts');
+  }
 
   const vipd = [['VIP Name', 'Service', 'Domain', 'VLAN', 'IP Address', 'FQDN', 'Notes'], ...state.vips.map(v => [xs(v.vipName), xs(v.associatedService), xs(v.domain), xs(v.vlan), xs(v.ipAddress), xs(v.fqdn), xs(v.notes)])];
   const ws4 = XLSXLib.utils.aoa_to_sheet(vipd); ws4['!cols'] = [32, 24, 28, 28, 18, 36, 40].map(colW); applyHdr(XLSXLib, ws4, 'A1:G1');

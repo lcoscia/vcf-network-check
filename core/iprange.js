@@ -87,3 +87,29 @@ export function rangesOverlap(a1, a2, b1, b2){
   if([as,ae,bs,be].some(v=>v===null)) return null;
   return as<=be&&bs<=ae;
 }
+
+// Parses "a.b.c.d/nn" into integer bounds; null when malformed. firstUsable/lastUsable follow the usual
+// network/broadcast exclusion, except /31 and /32 where every address is usable.
+export function parseCidr(cidr){
+  const m=/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec((cidr||'').trim());
+  if(!m) return null;
+  const base=ipToInt(m[1]); const prefix=Number(m[2]);
+  if(base===null||prefix>32) return null;
+  const mask=prefix===0?0:(~0<<(32-prefix))>>>0;
+  const network=(base&mask)>>>0, broadcast=(network|(~mask>>>0))>>>0;
+  const edge=prefix<=30;
+  return {network,broadcast,prefix,size:broadcast-network+1,firstUsable:edge?network+1:network,lastUsable:edge?broadcast-1:broadcast};
+}
+
+// True when two CIDRs share at least one address; null if either is malformed.
+export function cidrsOverlap(a, b){
+  const x=parseCidr(a), y=parseCidr(b);
+  if(!x||!y) return null;
+  return x.network<=y.broadcast&&y.network<=x.broadcast;
+}
+
+// Gateway field accepts "10.0.1.1" or the workbook's CIDR notation "10.0.1.1/24"; returns the bare IP or ''.
+export function gatewayIP(gateway){
+  const g=(gateway||'').trim().replace(/\/\d{1,2}$/,'');
+  return ipToInt(g)!==null?g:'';
+}

@@ -1,0 +1,12 @@
+{
+  "name": "vcf-net-planner",
+  "private": true,
+  "description": "VCF 9.1 Network Planner — static web app; this file only drives the engine test suite.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
