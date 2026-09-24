@@ -1,6 +1,6 @@
 // Pure appliance/component domain logic: builds management/workload appliance inventories.
 
-import { isVcf91Plus, hasVsanWitness } from './data.js?v=1.27.0';
+import { isVcf91Plus, hasVsanWitness } from './data.js?v=1.28.0';
 
 // ── APPLIANCE ENGINE ────────────────────────────────────────────
 let _appId=0;

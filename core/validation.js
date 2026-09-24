@@ -1,8 +1,8 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
-import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap } from './iprange.js?v=1.27.0';
-import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.27.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount } from './data.js?v=1.27.0';
+import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap } from './iprange.js?v=1.28.0';
+import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.28.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount } from './data.js?v=1.28.0';
 
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;
@@ -33,6 +33,13 @@ function stretchedHostChecks(msgs,d,label,dom){
     const tier=az1<=10?'<200ms RTT':az1<=15?'<100ms RTT':'exceeds the documented 15-host/site tier';
     msgs.push(mkMsg('info','bring-up',d,`${label}Witness latency tier for ${az1} hosts/site: ${tier} required between each AZ and the vSAN Witness (min 10 Gbps between AZ1 and AZ2).`,'Confirm the WAN/L3 link to the Witness meets this RTT.'));
   }
+}
+
+// Stretched topology vs principal storage: a vSAN stretched cluster needs vSAN storage; a vMSC is the non-vSAN option.
+function topologyStorageChecks(msgs,d,label,dom,t){
+  const vsan=dom.storageType==='vsan-esa'||dom.storageType==='vsan-osa';
+  if(dom.topologyMode==='vsan-stretched'&&!vsan) msgs.push(mkMsg('blocker','bring-up',d,`${label}${t('val.topo_vsan_storage')}`,t('val.topo_vsan_storage_res')));
+  if(dom.topologyMode==='stretched'&&vsan) msgs.push(mkMsg('warning','bring-up',d,`${label}${t('val.topo_vmsc_storage')}`,t('val.topo_vmsc_storage_res')));
 }
 
 // VCF 9.1+ Management Services ranges (core/mgmtservices.js): services runtime node pool and VCF Automation node
@@ -98,6 +105,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
   }
   if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,t('val.vmsc_l2_warn'),t('val.vmsc_l2_res')));
   if(isStretchedTopology(mgmt.topologyMode)) stretchedHostChecks(msgs,domain,'',mgmt);
+  topologyStorageChecks(msgs,domain,'',mgmt,t);
   if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,t('val.overlay_block'),t('val.overlay_res')));
   // Model 4 (Dedicated VLAN + NSX Stretched Overlay Segment): fleetPlacement==='nsx-overlay-segment' combined with
   // a stretched topologyMode. The dedicated VLAN (Fleet/Instance/Services Runtime/Identity Broker, Day-0) must be
@@ -157,6 +165,16 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
     if(wld.topologyMode==='vsan-stretched') msgs.push(mkMsg('warning','bring-up',d,t('val.vsan_warn'),t('val.vsan_warn_res')));
     if(wld.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',d,`"${d}": ${t('val.vmsc_l2_warn')}`,t('val.vmsc_l2_res')));
     if(isStretchedTopology(wld.topologyMode)) stretchedHostChecks(msgs,d,`"${d}": `,wld);
+    topologyStorageChecks(msgs,d,`"${d}": `,wld,t);
+    // TechDocs 9.1 (Stretching Clusters): the default management domain cluster must be stretched first.
+    if(isStretchedTopology(wld.topologyMode)&&!isStretchedTopology(mgmt.topologyMode)) msgs.push(mkMsg('blocker','bring-up',d,`"${d}": ${t('val.wld_stretch_first')}`,t('val.wld_stretch_first_res')));
+  });
+
+  // Per-AZ networks (not stretched) need a distinct subnet on each AZ — the VLAN ID may be the same (Broadcom 9.1).
+  vlans.filter(v=>v.az==='AZ1'&&v.cidr).forEach(v1=>{
+    const base=v1.vlanName.replace(/ — AZ1$/,'');
+    const v2=vlans.find(v=>v.domain===v1.domain&&v.vlanName===`${base} — AZ2`);
+    if(v2&&v2.cidr.trim()===v1.cidr.trim()) msgs.push(mkMsg('warning','vlan',v1.domain,t('val.az_same_cidr',{vlan:base,cidr:v1.cidr}),t('val.az_same_cidr_res')));
   });
 
   const domains=[...new Set(vlans.map(v=>v.domain))];
