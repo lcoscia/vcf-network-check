@@ -1,16 +1,24 @@
 // Pure VLAN domain logic: builds management/workload VLAN lists and derives helper lookups.
 
-import { recommendCIDR } from './sizing.js?v=1.27.0';
-import { isVcf91Plus, isStretchedTopology, isStretchAllL2, hasVsanWitness, effectiveHostCount } from './data.js?v=1.27.0';
-import { ipToInt, intToIp } from './iprange.js?v=1.27.0';
-import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.27.0';
+import { recommendCIDR } from './sizing.js?v=1.28.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, azNetworkMode, RECOMMENDED_MTU } from './data.js?v=1.28.0';
+import { ipToInt, intToIp } from './iprange.js?v=1.28.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.28.0';
 
 // ── VLAN ENGINE ─────────────────────────────────────────────────
 let _vlanId=0;
 export function resetVlanCounter(){_vlanId=0;}
 export function makeVLAN(domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,notes,bufferEnabled,bufferPercent){
   const rec=recommendCIDR(requiredIPs,bufferEnabled,bufferPercent);
-  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,vlanId:'',cidr:'',rangeStart:'',rangeEnd:''};
+  const az=/ — (AZ[12])$/.exec(vlanName)?.[1]||'';
+  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,az,stretchedL2:false,recommendedMTU:RECOMMENDED_MTU[vlanType]||'',vlanId:'',cidr:'',rangeStart:'',rangeEnd:''};
+}
+
+// In a stretched domain, every VLAN row not tied to one AZ is used by hosts in both AZs, i.e. an L2 network stretched
+// between them — except the vSAN Witness (third site) and the NSX overlay segment (not a physical VLAN).
+function markStretched(vlans,isStretched){
+  if(isStretched) vlans.forEach(v=>{v.stretchedL2=!v.az&&v.vlanType!=='vsan-witness'&&v.vlanType!=='overlay';});
+  return vlans;
 }
 
 export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) {
@@ -33,8 +41,12 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const hostCount=effectiveHostCount(mgmt);
   // vMSC = "Stretch all Layer-2 Networks" (KB 417356): one VLAN/subnet per network, same VLAN ID on AZ1 and AZ2,
   // sized for AZ1+AZ2 hosts. Only vSAN stretched keeps separate AZ1/AZ2 rows.
-  const perAZ=isStretched&&!isStretchAllL2(mgmt.topologyMode);
-  const l2=isStretchAllL2(mgmt.topologyMode)?` — ${t('vlan.stretched_l2_note',{az1:mgmt.az1HostCount,az2:mgmt.az2HostCount})}`:'';
+  // Per-network AZ layout (core/data.js azNetworkMode): vSAN stretched follows the domain's azNetworks choice
+  // (Broadcom default: per AZ), vMSC is always stretched. Always-stretched networks (VM Management, Edge, NFS…) use l2.
+  const perAZ=key=>azNetworkMode(mgmt,key)==='per-az';
+  const l2=isStretched?` — ${t('vlan.stretched_l2_note',{az1:mgmt.az1HostCount,az2:mgmt.az2HostCount})}`:'';
+  const l2n=key=>azNetworkMode(mgmt,key)==='stretched'?l2:'';
+  const azNote=` — ${t('vlan.per_az_note')}`;
   // Broadcom VCF 9.1 Services Runtime sizing: Minimum 12 IPs (/28) required for deployment; Recommended 30 IPs (/27)
   // reserved for new management components or scaling out existing ones (VCF 9.1 Planning and Preparation Workbook).
   // 9.1: the node pool is sized for the Day-0 minimum (12) + Log Management + Real-time Metrics, or 30 when reserved
@@ -47,11 +59,11 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const msEndpointsNote=msPlan?`${msPlan.endpoints.length} endpoint IPs outside the pool (${msPlan.endpoints.map(e=>msEndpointNames[e.key]).join(', ')})`:'';
   const msPoolNote=msPlan?`Services Runtime node pool: ${svcRuntimeBlockSize} IPs (${msPlan.pool.consumers.map(c=>c.key==='runtime'?'12 min':c.key==='logs'?`Log Mgmt ${c.ips}`:`Real-time Metrics ${c.ips}`).join(' + ')}${svcRuntimeBlockSize>msPlan.pool.required?`, reserved ${svcRuntimeBlockSize}`:''})`:'';
 
-  if(perAZ){
-    vlans.push(makeVLAN(domain,'ESXi Management — AZ1','management','ESXi vmk0 only','VMkernel vmk0 — Availability Zone 1','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk0 IPs (AZ1)`,buf,bufPct));
-    vlans.push(makeVLAN(domain,'ESXi Management — AZ2','management','ESXi vmk0 only','VMkernel vmk0 — Availability Zone 2','mandatory','dedicated',mgmt.az2HostCount,`${mgmt.az2HostCount} vmk0 IPs (AZ2)`,buf,bufPct));
+  if(perAZ('hostMgmt')){
+    vlans.push(makeVLAN(domain,'ESXi Management — AZ1','management','ESXi vmk0 only','VMkernel vmk0 — Availability Zone 1','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk0 IPs (AZ1)${azNote}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'ESXi Management — AZ2','management','ESXi vmk0 only','VMkernel vmk0 — Availability Zone 2','mandatory','dedicated',mgmt.az2HostCount,`${mgmt.az2HostCount} vmk0 IPs (AZ2)${azNote}`,buf,bufPct));
   } else {
-    vlans.push(makeVLAN(domain,'ESXi Management','management','ESXi vmk0 only','VMkernel vmk0 for out-of-band ESXi management','mandatory','dedicated',hostCount,`${hostCount} vmk0 IPs (1 per host)${l2}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'ESXi Management','management','ESXi vmk0 only','VMkernel vmk0 for out-of-band ESXi management','mandatory','dedicated',hostCount,`${hostCount} vmk0 IPs (1 per host)${l2n('hostMgmt')}`,buf,bufPct));
   }
 
   const nsxManagerCount=mgmt.nsxManagerMode==='clustered'?3:1;
@@ -101,32 +113,32 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   ].filter(Boolean).join(' | ');
   vlans.push(makeVLAN(domain,'Management VM Network','vm-network','SDDC Manager, vCenter, NSX Managers, platform service VMs','All management plane VMs','mandatory','dedicated',mgmtVMIPs,mgmtVMNotes+l2,buf,bufPct));
 
-  if(perAZ){
-    vlans.push(makeVLAN(domain,'vMotion — AZ1','vmotion','VMkernel vMotion portgroup','Live migration — Availability Zone 1','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk IPs (AZ1)`,buf,bufPct));
-    vlans.push(makeVLAN(domain,'vMotion — AZ2','vmotion','VMkernel vMotion portgroup','Live migration — Availability Zone 2','mandatory','dedicated',mgmt.az2HostCount,`${mgmt.az2HostCount} vmk IPs (AZ2)`,buf,bufPct));
+  if(perAZ('vmotion')){
+    vlans.push(makeVLAN(domain,'vMotion — AZ1','vmotion','VMkernel vMotion portgroup','Live migration — Availability Zone 1','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk IPs (AZ1)${azNote}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vMotion — AZ2','vmotion','VMkernel vMotion portgroup','Live migration — Availability Zone 2','mandatory','dedicated',mgmt.az2HostCount,`${mgmt.az2HostCount} vmk IPs (AZ2)${azNote}`,buf,bufPct));
   } else {
-    vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion portgroup','Live migration','mandatory','dedicated',hostCount,`${hostCount} vmk IPs${l2}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion portgroup','Live migration','mandatory','dedicated',hostCount,`${hostCount} vmk IPs${l2n('vmotion')}`,buf,bufPct));
   }
   if(mgmt.storageType==='nfs'){
     vlans.push(makeVLAN(domain,'NFS Storage','nfs',t('vlan.nfs_vmk_desc'),'NFS primary storage — 1 vmk per host. L2 mandatory between ESXi and NFS server.','mandatory','dedicated',hostCount,t('vlan.nfs_notes_mgmt',{n:hostCount})+l2,buf,bufPct));
   } else if(mgmt.storageType==='vmfs'){
     // VMFS sur SAN (iSCSI/FC) : pas de VLAN VMkernel de stockage généré automatiquement
     // L'iSCSI doit être configuré manuellement via "Additional Services" si un VLAN dédié est requis
-  } else if(perAZ){
+  } else if(perAZ('vsan')){
     // vSAN ESA/OSA en Stretched Cluster : L2 ou L3 entre AZ1/AZ2, mais L3 obligatoire vers le Witness (modélisé séparément ci-dessous)
-    vlans.push(makeVLAN(domain,'vSAN — AZ1','vsan','vSAN ESA VMkernel','vSAN ESA storage — Availability Zone 1 (L2 or L3 to AZ2, L3-only to Witness)','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk IPs (AZ1, vSAN ESA)`,buf,bufPct));
-    vlans.push(makeVLAN(domain,'vSAN — AZ2','vsan','vSAN ESA VMkernel','vSAN ESA storage — Availability Zone 2 (L2 or L3 to AZ1, L3-only to Witness)','mandatory','dedicated',mgmt.az2HostCount,`${mgmt.az2HostCount} vmk IPs (AZ2, vSAN ESA)`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vSAN — AZ1','vsan','vSAN ESA VMkernel','vSAN ESA storage — Availability Zone 1 (L2 or L3 to AZ2, L3-only to Witness)','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk IPs (AZ1, vSAN ESA)${azNote}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vSAN — AZ2','vsan','vSAN ESA VMkernel','vSAN ESA storage — Availability Zone 2 (L2 or L3 to AZ1, L3-only to Witness)','mandatory','dedicated',mgmt.az2HostCount,`${mgmt.az2HostCount} vmk IPs (AZ2, vSAN ESA)${azNote}`,buf,bufPct));
   } else {
     // vSAN ESA (default) ou vSAN OSA
-    vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN ESA storage — 1 vmk per host','mandatory','dedicated',hostCount,`${hostCount} vmk IPs (vSAN ESA)${l2}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN ESA storage — 1 vmk per host','mandatory','dedicated',hostCount,`${hostCount} vmk IPs (vSAN ESA)${l2n('vsan')}`,buf,bufPct));
   }
-  if(perAZ){
+  if(perAZ('hostTep')){
     const tepAZ1=mgmt.az1HostCount*mgmt.tepInterfacesPerHost, tepAZ2=mgmt.az2HostCount*mgmt.tepInterfacesPerHost;
-    vlans.push(makeVLAN(domain,'NSX Host TEP — AZ1','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts — Availability Zone 1','mandatory','dedicated',tepAZ1,`${mgmt.az1HostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepAZ1} IPs (AZ1)`,buf,bufPct));
-    vlans.push(makeVLAN(domain,'NSX Host TEP — AZ2','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts — Availability Zone 2','mandatory','dedicated',tepAZ2,`${mgmt.az2HostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepAZ2} IPs (AZ2)`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'NSX Host TEP — AZ1','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts — Availability Zone 1','mandatory','dedicated',tepAZ1,`${mgmt.az1HostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepAZ1} IPs (AZ1)${azNote}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'NSX Host TEP — AZ2','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts — Availability Zone 2','mandatory','dedicated',tepAZ2,`${mgmt.az2HostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepAZ2} IPs (AZ2)${azNote}`,buf,bufPct));
   } else {
     const tepIPs=hostCount*mgmt.tepInterfacesPerHost;
-    vlans.push(makeVLAN(domain,'NSX Host TEP','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts','mandatory','dedicated',tepIPs,`${hostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepIPs} IPs${l2}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'NSX Host TEP','nsx-tep','NSX Host TEP pool','Geneve overlay for ESXi hosts','mandatory','dedicated',tepIPs,`${hostCount} hosts × ${mgmt.tepInterfacesPerHost} = ${tepIPs} IPs${l2n('hostTep')}`,buf,bufPct));
   }
   // vSAN Witness only exists for a vSAN stretched cluster — a vMSC (non-vSAN FC/NFS/iSCSI) uses the array
   // vendor's tiebreaker, not a vSAN Witness Host (KB 417356). Mirrors core/appliances.js.
@@ -190,14 +202,9 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
     fleetNotes.push('Collectors always in Mgmt VM Network');
     if(isOverlayModel){
       overlayNotes.push('Collectors always in Mgmt VM Network');
-      if(perAZ){
-        // Model 4 (Dedicated VLAN + NSX Stretched Overlay Segment) on vSAN stretched: kept as AZ1/AZ2 rows for now
-        // (per-network L2/per-AZ choice pending). In vMSC it is a single stretched row (else branch below).
-        vlans.push(makeVLAN(domain,`${dedicatedVLANName} — AZ1`,'fleet',`${dedicatedVLANName} — Fleet/Instance/Services Runtime (Day-0, Availability Zone 1)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | '),buf,bufPct));
-        vlans.push(makeVLAN(domain,`${dedicatedVLANName} — AZ2`,'fleet',`${dedicatedVLANName} — Fleet/Instance/Services Runtime (Day-0, Availability Zone 2)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | '),buf,bufPct));
-      } else {
-        vlans.push(makeVLAN(domain,dedicatedVLANName,'fleet',`${dedicatedVLANName} — Fleet appliance + Instance + Services Runtime (Day-0)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | ')+l2,buf,bufPct));
-      }
+      // Dedicated VLAN (Models 3/4): one Day-0 physical VLAN — in a stretched domain it is a single L2 network
+      // stretched between AZ1/AZ2 (Broadcom: "VCF management network must be stretched"), never duplicated per AZ.
+      vlans.push(makeVLAN(domain,dedicatedVLANName,'fleet',`${dedicatedVLANName} — Fleet appliance + Instance + Services Runtime (Day-0)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',fleetIPs,fleetNotes.join(' | ')+l2,buf,bufPct));
       // The overlay segment itself is never duplicated AZ1/AZ2 — it is a single NSX Federation-stretched segment.
       const overlayNote2=t('vlan.fleet_note_overlay')+(isStretched?` — ${t('vlan.overlay_federation_note')}`:'');
       vlans.push(makeVLAN(domain,overlayVLANName,'overlay',`${overlayVLANName} — VCF Operations/Automation/Networks (Day-2)`,t('vlan.fleet_platform_purpose',{placement:mgmt.fleetPlacement}),'scenario-driven','dedicated',overlayIPs,overlayNotes.join(' | ')+overlayNote2,buf,bufPct));
@@ -287,7 +294,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   }
 
   mgmt.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated network for ${svc.name}`,`Service VLAN: ${svc.name}`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||`${svc.applianceCount} appliances`,buf,bufPct)));
-  return vlans;
+  return markStretched(vlans,isStretched);
 }
 
 export function buildWorkloadVLANs(wld, project, t=k=>k) {
@@ -299,41 +306,45 @@ export function buildWorkloadVLANs(wld, project, t=k=>k) {
   const isStretched=isStretchedTopology(wld.topologyMode);
   const hostCount=effectiveHostCount(wld);
   // Same "Stretch all Layer-2 Networks" rule as buildManagementVLANs for a vMSC Workload Domain.
-  const perAZ=isStretched&&!isStretchAllL2(wld.topologyMode);
-  const l2=isStretchAllL2(wld.topologyMode)?` — ${t('vlan.stretched_l2_note',{az1:wld.az1HostCount,az2:wld.az2HostCount})}`:'';
+  // Per-network AZ layout (core/data.js azNetworkMode): vSAN stretched follows the domain's azNetworks choice
+  // (Broadcom default: per AZ), vMSC is always stretched. Always-stretched networks (VM Management, Edge, NFS…) use l2.
+  const perAZ=key=>azNetworkMode(wld,key)==='per-az';
+  const l2=isStretched?` — ${t('vlan.stretched_l2_note',{az1:wld.az1HostCount,az2:wld.az2HostCount})}`:'';
+  const l2n=key=>azNetworkMode(wld,key)==='stretched'?l2:'';
+  const azNote=` — ${t('vlan.per_az_note')}`;
 
-  if(perAZ){
-    vlans.push(makeVLAN(domain,'ESXi Management — AZ1','management','vmk0 only','ESXi vmk0 — Availability Zone 1','mandatory',scope,wld.az1HostCount,`${wld.az1HostCount} vmk0 IPs (AZ1)`,buf,bufPct));
-    vlans.push(makeVLAN(domain,'ESXi Management — AZ2','management','vmk0 only','ESXi vmk0 — Availability Zone 2','mandatory',scope,wld.az2HostCount,`${wld.az2HostCount} vmk0 IPs (AZ2)`,buf,bufPct));
+  if(perAZ('hostMgmt')){
+    vlans.push(makeVLAN(domain,'ESXi Management — AZ1','management','vmk0 only','ESXi vmk0 — Availability Zone 1','mandatory',scope,wld.az1HostCount,`${wld.az1HostCount} vmk0 IPs (AZ1)${azNote}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'ESXi Management — AZ2','management','vmk0 only','ESXi vmk0 — Availability Zone 2','mandatory',scope,wld.az2HostCount,`${wld.az2HostCount} vmk0 IPs (AZ2)${azNote}`,buf,bufPct));
   } else {
-    vlans.push(makeVLAN(domain,'ESXi Management','management','vmk0 only','ESXi vmk0 for workload domain hosts','mandatory',scope,hostCount,`${hostCount} vmk0 IPs${l2}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'ESXi Management','management','vmk0 only','ESXi vmk0 for workload domain hosts','mandatory',scope,hostCount,`${hostCount} vmk0 IPs${l2n('hostMgmt')}`,buf,bufPct));
   }
   vlans.push(makeVLAN(domain,'VM / Application Network','vm-network','Workload VM network','Application VLAN','mandatory',scope,32,'Adjust to actual VM count'+l2,buf,bufPct));
-  if(perAZ){
-    vlans.push(makeVLAN(domain,'vMotion — AZ1','vmotion','VMkernel vMotion','Live migration — Availability Zone 1','mandatory',scope,wld.az1HostCount,`${wld.az1HostCount} vmk IPs (AZ1)`,buf,bufPct));
-    vlans.push(makeVLAN(domain,'vMotion — AZ2','vmotion','VMkernel vMotion','Live migration — Availability Zone 2','mandatory',scope,wld.az2HostCount,`${wld.az2HostCount} vmk IPs (AZ2)`,buf,bufPct));
+  if(perAZ('vmotion')){
+    vlans.push(makeVLAN(domain,'vMotion — AZ1','vmotion','VMkernel vMotion','Live migration — Availability Zone 1','mandatory',scope,wld.az1HostCount,`${wld.az1HostCount} vmk IPs (AZ1)${azNote}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vMotion — AZ2','vmotion','VMkernel vMotion','Live migration — Availability Zone 2','mandatory',scope,wld.az2HostCount,`${wld.az2HostCount} vmk IPs (AZ2)${azNote}`,buf,bufPct));
   } else {
-    vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion','Live migration','mandatory',scope,hostCount,`${hostCount} vmk IPs${l2}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vMotion','vmotion','VMkernel vMotion','Live migration','mandatory',scope,hostCount,`${hostCount} vmk IPs${l2n('vmotion')}`,buf,bufPct));
   }
   if(wld.storageType==='nfs'){
     vlans.push(makeVLAN(domain,'NFS Storage','nfs',t('vlan.nfs_vmk_desc'),'NFS primary storage — 1 vmk per host. L2 mandatory.','mandatory',scope,hostCount,t('vlan.nfs_notes_wld',{n:hostCount})+l2,buf,bufPct));
   } else if(wld.storageType==='vmfs'){
     // VMFS sur SAN : pas de VLAN VMkernel de stockage généré
-  } else if(perAZ){
-    vlans.push(makeVLAN(domain,'vSAN — AZ1','vsan','vSAN ESA VMkernel','vSAN storage — Availability Zone 1 (L2 or L3 to AZ2, L3-only to Witness)','mandatory',scope,wld.az1HostCount,`${wld.az1HostCount} vmk IPs (AZ1, vSAN ESA)`,buf,bufPct));
-    vlans.push(makeVLAN(domain,'vSAN — AZ2','vsan','vSAN ESA VMkernel','vSAN storage — Availability Zone 2 (L2 or L3 to AZ1, L3-only to Witness)','mandatory',scope,wld.az2HostCount,`${wld.az2HostCount} vmk IPs (AZ2, vSAN ESA)`,buf,bufPct));
+  } else if(perAZ('vsan')){
+    vlans.push(makeVLAN(domain,'vSAN — AZ1','vsan','vSAN ESA VMkernel','vSAN storage — Availability Zone 1 (L2 or L3 to AZ2, L3-only to Witness)','mandatory',scope,wld.az1HostCount,`${wld.az1HostCount} vmk IPs (AZ1, vSAN ESA)${azNote}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vSAN — AZ2','vsan','vSAN ESA VMkernel','vSAN storage — Availability Zone 2 (L2 or L3 to AZ1, L3-only to Witness)','mandatory',scope,wld.az2HostCount,`${wld.az2HostCount} vmk IPs (AZ2, vSAN ESA)${azNote}`,buf,bufPct));
   } else {
-    vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN storage — 1 vmk per host','mandatory',scope,hostCount,`${hostCount} vmk IPs (vSAN ESA)${l2}`,buf,bufPct));
+    vlans.push(makeVLAN(domain,'vSAN','vsan','vSAN ESA VMkernel','vSAN storage — 1 vmk per host','mandatory',scope,hostCount,`${hostCount} vmk IPs (vSAN ESA)${l2n('vsan')}`,buf,bufPct));
   }
 
   if(wld.nsxEnabled){
-    if(perAZ){
+    if(perAZ('hostTep')){
       const tepAZ1=wld.az1HostCount*wld.tepInterfacesPerHost, tepAZ2=wld.az2HostCount*wld.tepInterfacesPerHost;
-      vlans.push(makeVLAN(domain,'NSX Host TEP — AZ1','nsx-tep','NSX Host TEP pool','Geneve overlay — Availability Zone 1','mandatory',scope,tepAZ1,`${wld.az1HostCount} × ${wld.tepInterfacesPerHost} = ${tepAZ1} IPs (AZ1)`,buf,bufPct));
-      vlans.push(makeVLAN(domain,'NSX Host TEP — AZ2','nsx-tep','NSX Host TEP pool','Geneve overlay — Availability Zone 2','mandatory',scope,tepAZ2,`${wld.az2HostCount} × ${wld.tepInterfacesPerHost} = ${tepAZ2} IPs (AZ2)`,buf,bufPct));
+      vlans.push(makeVLAN(domain,'NSX Host TEP — AZ1','nsx-tep','NSX Host TEP pool','Geneve overlay — Availability Zone 1','mandatory',scope,tepAZ1,`${wld.az1HostCount} × ${wld.tepInterfacesPerHost} = ${tepAZ1} IPs (AZ1)${azNote}`,buf,bufPct));
+      vlans.push(makeVLAN(domain,'NSX Host TEP — AZ2','nsx-tep','NSX Host TEP pool','Geneve overlay — Availability Zone 2','mandatory',scope,tepAZ2,`${wld.az2HostCount} × ${wld.tepInterfacesPerHost} = ${tepAZ2} IPs (AZ2)${azNote}`,buf,bufPct));
     } else {
       const tepIPs=hostCount*wld.tepInterfacesPerHost;
-      vlans.push(makeVLAN(domain,'NSX Host TEP','nsx-tep','NSX Host TEP pool','Geneve overlay','mandatory',scope,tepIPs,`${hostCount} × ${wld.tepInterfacesPerHost} = ${tepIPs} IPs${l2}`,buf,bufPct));
+      vlans.push(makeVLAN(domain,'NSX Host TEP','nsx-tep','NSX Host TEP pool','Geneve overlay','mandatory',scope,tepIPs,`${hostCount} × ${wld.tepInterfacesPerHost} = ${tepIPs} IPs${l2n('hostTep')}`,buf,bufPct));
     }
     if(wld.edgeRequired){
       const edgeScope=wld.sharedEdgeUplinks?'shared':'dedicated';
@@ -357,7 +368,7 @@ export function buildWorkloadVLANs(wld, project, t=k=>k) {
     vlans.push(makeVLAN(domain,'SSP Network','service','Dedicated network for Security Services Platform (SSP)','SSP Node Pool + SSP Service IP Pool','scenario-driven','dedicated',14,'9 IPs Node Pool (3 controllers + min. 4 workers) + 5 IPs Service Pool (Instance + Messaging)',buf,bufPct));
   }
   wld.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated VLAN for ${svc.name}`,`Service VLAN`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||'',buf,bufPct)));
-  return vlans;
+  return markStretched(vlans,isStretched);
 }
 
 // VLAN row an appliance/VIP lives on. Falls back to a name-only match on purpose: Workload Domain appliances

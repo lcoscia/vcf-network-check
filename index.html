@@ -823,6 +823,46 @@
         </div>
       </div>
 
+      <template x-if="managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched'">
+        <div class="card">
+            <div class="flex-between mb8">
+              <div class="sec-title" style="margin-bottom:0" x-text="t('az.net_title')"></div>
+              <div class="flex-center gap8" x-show="managementDomain.topologyMode==='vsan-stretched'">
+                <span class="text-xs text-muted" x-text="t('az.net_preset')"></span>
+                <select class="select" style="width:auto" :value="azPreset(managementDomain)" @change="setAzPreset(managementDomain,$event.target.value)">
+                  <option value="broadcom" x-text="t('az.preset_broadcom')"></option>
+                  <option value="all" x-text="t('az.preset_all')"></option>
+                  <option value="custom" disabled x-text="t('az.preset_custom')"></option>
+                </select>
+              </div>
+            </div>
+            <div class="infobox blue mb8" x-show="managementDomain.topologyMode==='stretched'"><div class="text-xs" x-text="t('az.vmsc_locked')"></div></div>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr>
+                  <th x-text="t('az.col_net')"></th><th class="text-center" x-text="t('az.col_l2')"></th><th>AZ1</th><th>AZ2</th>
+                  <th class="text-center" x-text="t('az.col_gw')"></th><th class="text-center" x-text="t('az.col_mtu')"></th>
+                </tr></thead>
+                <tbody>
+                  <template x-for="r in azNetRows(managementDomain)" :key="r.key">
+                    <tr>
+                      <td class="font-bold" x-text="r.label"></td>
+                      <td class="text-center">
+                        <input type="checkbox" :checked="r.stretched" :disabled="r.locked" @change="toggleAzNet(managementDomain,r.key,$event.target.checked)" />
+                        <span class="text-xs text-muted" x-show="r.fixed" x-text="' ' + t('az.fixed')"></span>
+                      </td>
+                      <td x-text="r.stretched ? t('az.cell_stretched') : t('az.cell_own',{az:'AZ1'})"></td>
+                      <td x-text="r.stretched ? t('az.cell_stretched') : t('az.cell_own',{az:'AZ2'})"></td>
+                      <td class="text-center" x-text="t('az.yes')"></td>
+                      <td class="text-center tbl-mono" x-text="r.mtu"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div class="help-desc mt8" x-html="t('az.help')"></div>
+        </div>
+      </template>
       <template x-if="managementDomain.topologyMode==='vsan-stretched'">
         <div class="card">
           <h2 class="sec-title" x-text="t('witness.section_title')">vSAN Witness</h2>
@@ -1347,6 +1387,47 @@
               </div>
             </div>
 
+            <!-- AZ1 / AZ2 network layout (stretched cluster) -->
+            <template x-if="workloadDomains[wi].topologyMode==='vsan-stretched'||workloadDomains[wi].topologyMode==='stretched'">
+              <div class="nest mt12">
+            <div class="flex-between mb8">
+              <div class="nest-title" style="margin-bottom:0" x-text="t('az.net_title')"></div>
+              <div class="flex-center gap8" x-show="workloadDomains[wi].topologyMode==='vsan-stretched'">
+                <span class="text-xs text-muted" x-text="t('az.net_preset')"></span>
+                <select class="select" style="width:auto" :value="azPreset(workloadDomains[wi])" @change="setAzPreset(workloadDomains[wi],$event.target.value)">
+                  <option value="broadcom" x-text="t('az.preset_broadcom')"></option>
+                  <option value="all" x-text="t('az.preset_all')"></option>
+                  <option value="custom" disabled x-text="t('az.preset_custom')"></option>
+                </select>
+              </div>
+            </div>
+            <div class="infobox blue mb8" x-show="workloadDomains[wi].topologyMode==='stretched'"><div class="text-xs" x-text="t('az.vmsc_locked')"></div></div>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr>
+                  <th x-text="t('az.col_net')"></th><th class="text-center" x-text="t('az.col_l2')"></th><th>AZ1</th><th>AZ2</th>
+                  <th class="text-center" x-text="t('az.col_gw')"></th><th class="text-center" x-text="t('az.col_mtu')"></th>
+                </tr></thead>
+                <tbody>
+                  <template x-for="r in azNetRows(workloadDomains[wi])" :key="r.key">
+                    <tr>
+                      <td class="font-bold" x-text="r.label"></td>
+                      <td class="text-center">
+                        <input type="checkbox" :checked="r.stretched" :disabled="r.locked" @change="toggleAzNet(workloadDomains[wi],r.key,$event.target.checked)" />
+                        <span class="text-xs text-muted" x-show="r.fixed" x-text="' ' + t('az.fixed')"></span>
+                      </td>
+                      <td x-text="r.stretched ? t('az.cell_stretched') : t('az.cell_own',{az:'AZ1'})"></td>
+                      <td x-text="r.stretched ? t('az.cell_stretched') : t('az.cell_own',{az:'AZ2'})"></td>
+                      <td class="text-center" x-text="t('az.yes')"></td>
+                      <td class="text-center tbl-mono" x-text="r.mtu"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div class="help-desc mt8" x-html="t('az.help')"></div>
+              </div>
+            </template>
             <!-- vSAN Witness (Stretched Cluster) -->
             <template x-if="workloadDomains[wi].topologyMode==='vsan-stretched'">
               <div class="nest mt12">
@@ -1875,6 +1956,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.28.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1280')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.27.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1270')"></td>
@@ -2107,7 +2193,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.27.0';
+import * as Core from './core/index.js?v=1.28.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -2149,7 +2235,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.27.0',
+    appVersion:'1.28.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2314,6 +2400,38 @@ function vcfApp(){
     },
 
     hostsOf(d){ return Core.effectiveHostCount(d); },
+
+    // Rows of the "AZ1 / AZ2 networks" table: choice networks (per AZ by default in vSAN stretched) plus the networks
+    // that are always stretched. vMSC locks everything to stretched (KB 417356).
+    azNetRows(d){
+      const isMgmt=d===this.managementDomain;
+      const vsan=d.storageType==='vsan-esa'||d.storageType==='vsan-osa';
+      const locked=d.topologyMode==='stretched';
+      const choice=key=>({key,label:this.t('az.net.'+key),stretched:Core.azNetworkMode(d,key)==='stretched',locked,fixed:false,mtu:key==='hostMgmt'?1500:9000});
+      const fixed=(key,label,mtu)=>({key,label,stretched:true,locked:true,fixed:true,mtu});
+      return [
+        fixed('vmMgmt',isMgmt?this.t('az.net.vmMgmt'):'VM / Application Network',1500),
+        choice('hostMgmt'),choice('vmotion'),
+        ...(vsan?[choice('vsan')]:[]),
+        ...(d.storageType==='nfs'?[fixed('nfs',this.t('az.net.nfs'),9000)]:[]),
+        ...(isMgmt||d.nsxEnabled?[choice('hostTep')]:[]),
+        ...((isMgmt?d.nsxEdgeDeployed:(d.nsxEnabled&&d.edgeRequired))?[fixed('edge',this.t('az.net.edge'),'9000 / 1500')]:[]),
+      ];
+    },
+
+    azPreset(d){
+      const modes=Core.AZ_NETWORK_KEYS.map(k=>d.azNetworks?.[k]==='stretched'?'stretched':'per-az');
+      return modes.every(m=>m==='per-az')?'broadcom':modes.every(m=>m==='stretched')?'all':'custom';
+    },
+
+    setAzPreset(d,preset){
+      if(preset==='custom')return;
+      d.azNetworks=Object.fromEntries(Core.AZ_NETWORK_KEYS.map(k=>[k,preset==='all'?'stretched':'per-az']));
+    },
+
+    toggleAzNet(d,key,stretched){
+      d.azNetworks={...(d.azNetworks||Core.defaultAzNetworks()),[key]:stretched?'stretched':'per-az'};
+    },
 
     // VCF 9.1+ Management Services plan (null for 9.0) — pool sizing, endpoints and VCF Automation range.
     get msPlan(){ return Core.buildMgmtServicesPlan(this.managementDomain,this.project); },

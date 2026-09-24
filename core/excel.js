@@ -23,8 +23,9 @@ export function doExcelExport(state, XLSXLib) {
   const ws1 = XLSXLib.utils.aoa_to_sheet(ds); ws1['!cols'] = [32, 18, 10, 40, 10, 12, 8, 40].map(colW); applyHdr(XLSXLib, ws1, 'A1:H1');
   XLSXLib.utils.book_append_sheet(wb, ws1, 'Domain Summary');
 
-  const vd = [['Domain', 'VLAN Name', 'Type', 'VLAN ID', 'CIDR', 'Req. IPs', 'Rec. CIDR', 'Mandatory', 'Scope', 'Notes'], ...state.vlans.map(v => [xs(v.domain), xs(v.vlanName), xs(v.vlanType), xs(v.vlanId), xs(v.cidr), v.requiredIPs, xs(v.recommendedCIDR), xs(v.mandatory), xs(v.scope), xs(v.notes)])];
-  const ws2 = XLSXLib.utils.aoa_to_sheet(vd); ws2['!cols'] = [28, 24, 18, 10, 16, 10, 12, 14, 12, 40].map(colW); applyHdr(XLSXLib, ws2, 'A1:J1');
+  // AZ: 'AZ1'/'AZ2' for per-AZ rows; L2 Stretched: 'Yes' for a single VLAN spanning both AZs of a stretched domain.
+  const vd = [['Domain', 'VLAN Name', 'Type', 'AZ', 'L2 Stretched', 'VLAN ID', 'CIDR', 'Req. IPs', 'Rec. CIDR', 'Rec. MTU', 'Mandatory', 'Scope', 'Notes'], ...state.vlans.map(v => [xs(v.domain), xs(v.vlanName), xs(v.vlanType), xs(v.az || ''), v.stretchedL2 ? 'Yes' : '', xs(v.vlanId), xs(v.cidr), v.requiredIPs, xs(v.recommendedCIDR), v.recommendedMTU || '', xs(v.mandatory), xs(v.scope), xs(v.notes)])];
+  const ws2 = XLSXLib.utils.aoa_to_sheet(vd); ws2['!cols'] = [28, 24, 18, 6, 12, 10, 16, 10, 12, 10, 14, 12, 40].map(colW); applyHdr(XLSXLib, ws2, 'A1:M1');
   XLSXLib.utils.book_append_sheet(wb, ws2, 'VLAN Summary');
 
   const ad = [['Appliance Name', 'Type', 'Domain', 'VLAN', 'IP Address', 'FQDN', 'Static IP', 'Notes'], ...state.appliances.map(a => [xs(a.applianceName), xs(a.applianceType), xs(a.domain), xs(a.vlan), xs(a.ipAddress), xs(a.fqdn), a.staticIPRequired ? 'Yes' : 'No', xs(a.notes)])];
