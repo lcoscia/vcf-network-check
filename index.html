@@ -736,7 +736,7 @@
         <div class="g2 mt12">
           <div class="field">
             <label>FQDN Suffix (DNS domain)</label>
-            <input class="input mono" x-model="project.fqdnSuffix" placeholder="e.g. vcf.domain.local" />
+            <input class="input mono" x-model="project.fqdnSuffix" placeholder="e.g. vcf.example.com" />
             <span class="field-note">Optional — used as placeholder in Appliances &amp; VIPs tabs to pre-fill FQDNs (hostname.suffix)</span>
           </div>
           <div class="field">
@@ -893,6 +893,54 @@
             </label>
             <div class="help-desc mt8" x-html="t('fleet.svcruntime30_help')"></div>
           </div>
+
+          <!-- VCF 9.1 — Management Services IP ranges (core/mgmtservices.js) -->
+          <template x-if="is91() && msPlan">
+            <div class="nest mt12">
+              <div class="nest-title" x-text="t('ms.section_title')"></div>
+              <div class="text-xs font-bold mb8" x-text="t('ms.pool_title')"></div>
+              <div class="g4">
+                <div class="field"><label x-text="t('ms.start')"></label>
+                  <input class="input mono" placeholder="10.11.99.31" x-model="managementDomain.svcRuntimeRangeStart" />
+                </div>
+                <div class="field"><label x-text="t('ms.end')"></label>
+                  <input class="input mono" placeholder="10.11.99.45" x-model="managementDomain.svcRuntimeRangeEnd" />
+                </div>
+                <div class="field" style="justify-content:flex-end">
+                  <button class="btn btn-secondary btn-sm" :disabled="!managementDomain.svcRuntimeRangeStart" @click="msSuggestEnd('pool')" x-text="t('ms.suggest_end',{n:msPlan.pool.size})"></button>
+                </div>
+              </div>
+              <div class="field-note mt4" x-text="t('ms.need',{size:msPlan.pool.size,breakdown:msBreakdown()})"></div>
+              <div class="field-note" x-text="msPlan.pool.rangeSize ? t('ms.entered',{start:msPlan.pool.start,end:msPlan.pool.end,n:msPlan.pool.rangeSize}) : t('ms.not_entered')"></div>
+              <div class="field-note" x-text="t('ms.endpoints',{n:msPlan.endpoints.length,list:msEndpointList()})"></div>
+              <div class="g4 mt8">
+                <div class="field" x-show="managementDomain.vcfOperationsForLogs.enabled"><label x-text="t('ms.logs_replicas')"></label>
+                  <input class="input" type="number" min="0" x-model.number="managementDomain.logMgmtExtraReplicas" />
+                  <span class="field-note" x-text="t('ms.logs_replicas_note')"></span>
+                </div>
+                <div style="display:flex;align-items:center">
+                  <label class="check-row"><input type="checkbox" x-model="managementDomain.realtimeMetricsEnabled" /> <span x-text="t('ms.rtm_label')"></span></label>
+                </div>
+              </div>
+              <template x-if="msPlan.vcfa.enabled">
+                <div class="mt12">
+                  <div class="text-xs font-bold mb8" x-text="t('ms.vcfa_title')"></div>
+                  <div class="g4">
+                    <div class="field"><label x-text="t('ms.start')"></label>
+                      <input class="input mono" placeholder="10.11.99.46" x-model="managementDomain.vcfaRangeStart" />
+                    </div>
+                    <div class="field"><label x-text="t('ms.end')"></label>
+                      <input class="input mono" placeholder="10.11.99.50" x-model="managementDomain.vcfaRangeEnd" />
+                    </div>
+                    <div class="field" style="justify-content:flex-end">
+                      <button class="btn btn-secondary btn-sm" :disabled="!managementDomain.vcfaRangeStart" @click="msSuggestEnd('vcfa')" x-text="t('ms.suggest_end',{n:msPlan.vcfa.required})"></button>
+                    </div>
+                  </div>
+                  <div class="field-note mt4" x-text="t('ms.vcfa_need')"></div>
+                </div>
+              </template>
+            </div>
+          </template>
 
           <!-- Shared VLAN — VCF 9.0 -->
           <div x-show="managementDomain.fleetPlacement==='shared-mgmt-vlan' && !is91()" class="role-desc mt8" x-html="t('fleet.shared_desc_90')"></div>
@@ -1071,14 +1119,14 @@
                     Cloud Proxy
                   </label>
                   <span class="field-note" x-text="t('ops.collectors_note_91')"></span>
-                  <span class="field-note" style="margin-bottom:8px">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-ops-proxy.vcf.domain.local</span></span>
+                  <span class="field-note" style="margin-bottom:8px">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-ops-proxy.vcf.example.com</span></span>
                 </div>
               </template>
               <label class="check-row mt4">
                 <input type="checkbox" x-model="managementDomain.vcfOperations.licenseServerEnabled" />
                 License Server
               </label>
-              <span class="field-note">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-license.vcf.domain.local</span></span>
+              <span class="field-note">1 FQDN required (lowercase) — e.g.: <span class="tbl-mono">vcf-license.vcf.example.com</span></span>
             </div>
           </div>
         </div>
@@ -1466,6 +1514,15 @@
       </div>
       <!-- Subnet pre-fill hint -->
       <div class="infobox blue mb8" x-html="t('app.prefill')"></div>
+      <!-- VCF 9.1 — reserved Management Services ranges -->
+      <div class="infobox yellow mb8" x-show="is91() && msPlan">
+        <div class="text-xs">
+          <strong x-text="t('ms.banner_title')"></strong>
+          <div class="mt4"><span x-text="t('ms.pool_title') + ' : '"></span><span class="tbl-mono" x-text="msPlan && msPlan.pool.rangeSize ? msPlan.pool.start + ' → ' + msPlan.pool.end + ' (' + msPlan.pool.rangeSize + ' IPs)' : t('ms.not_entered')"></span> — <span x-text="msPlan ? t('ms.need',{size:msPlan.pool.size,breakdown:msBreakdown()}) : ''"></span></div>
+          <div x-show="msPlan && msPlan.vcfa.enabled"><span x-text="t('ms.vcfa_title') + ' : '"></span><span class="tbl-mono" x-text="msPlan && msPlan.vcfa.rangeSize ? msPlan.vcfa.start + ' → ' + msPlan.vcfa.end + ' (' + msPlan.vcfa.rangeSize + ' IPs)' : t('ms.not_entered')"></span></div>
+          <div class="mt4" x-text="t('ms.banner_hint')"></div>
+        </div>
+      </div>
       <div class="tbl-wrap">
         <table class="tbl">
           <thead>
@@ -1636,8 +1693,8 @@
 
         <div class="card">
           <h3 class="sec-title" style="font-size:12px;margin-bottom:10px">Excel Export</h3>
-          <p class="text-muted text-sm mb12">Export a full planning workbook with 6 sheets:<br>
-            <strong>Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report · VKS VPCs</strong>
+          <p class="text-muted text-sm mb12">Export a full planning workbook:<br>
+            <strong>Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report · VKS VPCs · Mgmt Services Ranges (9.1+)</strong>
           </p>
           <button class="btn btn-primary" @click="exportExcel()">⬇ Export to Excel (.xlsx)</button>
         </div>
@@ -1817,6 +1874,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.27.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1270')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.26.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
@@ -2045,7 +2107,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.26.0';
+import * as Core from './core/index.js?v=1.27.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -2087,7 +2149,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.26.0',
+    appVersion:'1.27.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2247,11 +2309,37 @@ function vcfApp(){
     },
 
     revalidate(){
-      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,(key,vars)=>this.t(key,vars),this.appliances);
+      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,(key,vars)=>this.t(key,vars),this.appliances,this.vips);
       this.domainSummaries=Core.buildDomainSummaries(this.project,this.managementDomain,this.workloadDomains,this.vlans,this.vips);
     },
 
     hostsOf(d){ return Core.effectiveHostCount(d); },
+
+    // VCF 9.1+ Management Services plan (null for 9.0) — pool sizing, endpoints and VCF Automation range.
+    get msPlan(){ return Core.buildMgmtServicesPlan(this.managementDomain,this.project); },
+
+    msBreakdown(){
+      const p=this.msPlan; if(!p)return '';
+      const parts=p.pool.consumers.map(c=>c.key==='runtime'?this.t('ms.c.runtime'):this.t(c.key==='logs'?'ms.c.logs':'ms.c.rtm',{ips:c.ips}));
+      if(p.pool.size>p.pool.required)parts.push(this.t('ms.c.reserve'));
+      return parts.join(' + ');
+    },
+
+    msEndpointList(){ return (this.msPlan?.endpoints||[]).map(e=>this.t('ms.names.'+e.key)).join(', '); },
+
+    // Writes end = start + size - 1 for the services runtime pool or the VCF Automation range.
+    msSuggestEnd(kind){
+      const p=this.msPlan; if(!p)return;
+      const [startKey,endKey,n]=kind==='vcfa'?['vcfaRangeStart','vcfaRangeEnd',p.vcfa.required]:['svcRuntimeRangeStart','svcRuntimeRangeEnd',p.pool.size];
+      const end=Core.computeRangeEnd(this.managementDomain[startKey],n);
+      if(end)this.managementDomain[endKey]=end;
+    },
+
+    // Addresses auto-fill must never hand out: the services runtime pool and the VCF Automation node range.
+    isReservedIP(ip){
+      const p=this.msPlan; if(!p)return false;
+      return !!(Core.ipInRange(ip,p.pool.start,p.pool.end)||(p.vcfa.enabled&&Core.ipInRange(ip,p.vcfa.start,p.vcfa.end)));
+    },
 
     /* AUTH DISABLED — décommenter pour réactiver l'authentification Supabase
     async initAuth(){
@@ -2361,15 +2449,16 @@ function vcfApp(){
     },
 
     // Sequentially pre-fills IPs for the appliances of this VLAN block from vlanRow.rangeStart to vlanRow.rangeEnd —
-    // never overwrites an IP already entered manually, never touches VCF Identity Broker (Embedded) (IP disabled by design).
+    // never overwrites an IP already entered manually, never touches VCF Identity Broker (Embedded) (IP disabled by design),
+    // and skips the reserved VCF Management Services / VCF Automation node ranges (their FQDN IPs must be outside them).
     autoFillFromRange(vlanRow){
       const size=Core.rangeSize(vlanRow.rangeStart, vlanRow.rangeEnd);
       if(size===0){ this.showToast(this.t('vlan.autofill_invalid')); return; }
-      const {addresses}=Core.generateIPRange(vlanRow.rangeStart, size);
+      const addresses=Core.generateIPRange(vlanRow.rangeStart, size).addresses.filter(ip=>!this.isReservedIP(ip));
       const targets=this.appliances.filter(a=>a.domain===vlanRow.domain && a.vlan===vlanRow.vlanName && !a.ipAddress && a.applianceType!=='VCF Identity Broker (Embedded)');
       if(targets.length===0) return;
       if(targets.length > addresses.length){
-        this.showToast(this.t('vlan.autofill_range_too_small',{size,need:targets.length}));
+        this.showToast(this.t('vlan.autofill_range_too_small',{size:addresses.length,need:targets.length}));
       }
       targets.slice(0, addresses.length).forEach((a,i)=>{
         const idx=this.appliances.findIndex(x=>x.id===a.id);
@@ -2422,7 +2511,7 @@ function vcfApp(){
       return prefix+this.fqdnSlug(name)+'.'+suffix;
     },
 
-    buildFQDNPlaceholder(name){ return this.fqdnSuggestion(name)||'host.domain.local'; },
+    buildFQDNPlaceholder(name){ return this.fqdnSuggestion(name)||'host.example.com'; },
 
     // Tab / → on an empty FQDN field copies the suggestion into the value (Tab still moves focus afterwards).
     acceptFQDN(row,name,event){
@@ -2445,7 +2534,7 @@ function vcfApp(){
 
     exportExcel(){
       this.normalizeStoredIPs();
-      Core.doExcelExport({project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips,validationMessages:this.validationMessages,domainSummaries:this.domainSummaries}, XLSX);
+      Core.doExcelExport({msPlan:this.msPlan,project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips,validationMessages:this.validationMessages,domainSummaries:this.domainSummaries}, XLSX);
       this.showToast('Excel exported successfully');
     },
 

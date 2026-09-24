@@ -1,6 +1,6 @@
 // Pure appliance/component domain logic: builds management/workload appliance inventories.
 
-import { isVcf91Plus, hasVsanWitness } from './data.js?v=1.26.0';
+import { isVcf91Plus, hasVsanWitness } from './data.js?v=1.27.0';
 
 // ── APPLIANCE ENGINE ────────────────────────────────────────────
 let _appId=0;
@@ -82,11 +82,9 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   }
 
   if(mgmt.vcfOperationsForLogs.enabled){
-    if(is91){
-      // C6: 9.1 — Log Management intégré dans VCF Management Services (Aria Ops for Logs 8.18)
-      const lVLAN=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'Log Management Network');
-      apps.push(mkApp('vcf-log-mgmt-01','VCF Log Management',domain,lVLAN,true,false,true,t('app.log_mgmt_91')));
-    } else {
+    // 9.1+: Log Management is a VCF services runtime service, not an appliance — its single FQDN/IP is the
+    // 'VCF Log Management VIP' row (core/vips.js) and its node IPs come from the runtime pool (core/mgmtservices.js).
+    if(!is91){
       // VCF 9.0 — architecture master + workers classique
       const lVLAN=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'VCF Operations for Logs Network');
       apps.push(mkApp('vcf-logs-master-01','VCF Ops for Logs Master',domain,lVLAN,true,false,true,'Master node.'));

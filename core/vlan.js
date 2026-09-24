@@ -1,8 +1,9 @@
 // Pure VLAN domain logic: builds management/workload VLAN lists and derives helper lookups.
 
-import { recommendCIDR } from './sizing.js?v=1.26.0';
-import { isVcf91Plus, isStretchedTopology, isStretchAllL2, hasVsanWitness, effectiveHostCount } from './data.js?v=1.26.0';
-import { ipToInt, intToIp } from './iprange.js?v=1.26.0';
+import { recommendCIDR } from './sizing.js?v=1.27.0';
+import { isVcf91Plus, isStretchedTopology, isStretchAllL2, hasVsanWitness, effectiveHostCount } from './data.js?v=1.27.0';
+import { ipToInt, intToIp } from './iprange.js?v=1.27.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.27.0';
 
 // ── VLAN ENGINE ─────────────────────────────────────────────────
 let _vlanId=0;
@@ -36,8 +37,15 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const l2=isStretchAllL2(mgmt.topologyMode)?` — ${t('vlan.stretched_l2_note',{az1:mgmt.az1HostCount,az2:mgmt.az2HostCount})}`:'';
   // Broadcom VCF 9.1 Services Runtime sizing: Minimum 12 IPs (/28) required for deployment; Recommended 30 IPs (/27)
   // reserved for new management components or scaling out existing ones (VCF 9.1 Planning and Preparation Workbook).
-  const svcRuntimeBlockSize=is91?(mgmt.svcRuntimeReserve30?30:12):0;
-  const fleetIPsBase=is91?(2+svcRuntimeBlockSize):1;
+  // 9.1: the node pool is sized for the Day-0 minimum (12) + Log Management + Real-time Metrics, or 30 when reserved
+  // (core/mgmtservices.js). Fleet / Instance / Services Runtime / Identity Broker / Log Management FQDNs each need
+  // their own IP on the same network, OUTSIDE that pool — counted on top of it.
+  const msPlan=buildMgmtServicesPlan(mgmt,project);
+  const svcRuntimeBlockSize=msPlan?msPlan.pool.size:0;
+  const fleetIPsBase=msPlan?(msPlan.endpoints.length+svcRuntimeBlockSize):1;
+  const msEndpointNames={fleet:'Fleet',instance:'Instance',runtime:'Services Runtime',idb:'Identity Broker','logs-vip':'Log Management'};
+  const msEndpointsNote=msPlan?`${msPlan.endpoints.length} endpoint IPs outside the pool (${msPlan.endpoints.map(e=>msEndpointNames[e.key]).join(', ')})`:'';
+  const msPoolNote=msPlan?`Services Runtime node pool: ${svcRuntimeBlockSize} IPs (${msPlan.pool.consumers.map(c=>c.key==='runtime'?'12 min':c.key==='logs'?`Log Mgmt ${c.ips}`:`Real-time Metrics ${c.ips}`).join(' + ')}${svcRuntimeBlockSize>msPlan.pool.required?`, reserved ${svcRuntimeBlockSize}`:''})`:'';
 
   if(perAZ){
     vlans.push(makeVLAN(domain,'ESXi Management — AZ1','management','ESXi vmk0 only','VMkernel vmk0 — Availability Zone 1','mandatory','dedicated',mgmt.az1HostCount,`${mgmt.az1HostCount} vmk0 IPs (AZ1)`,buf,bufPct));
@@ -60,7 +68,8 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const opsCollectors=(!is91&&mgmt.vcfOperations.enabled)?mgmt.vcfOperations.remoteCollectorCount:0;
   const netsCollectors=mgmt.vcfOperationsForNetworks.enabled?mgmt.vcfOperationsForNetworks.collectorCount:0;
   const opsNodesInMgmtVM=(mgmt.vcfOperations.enabled&&!mgmt.vcfOperations.requiresDedicatedVLAN&&!fleetDedicated)?(mgmt.vcfOperations.mode==='enterprise'?3+1:1):0;
-  // 9.1: Log Management IPs (6 base + 2/replica, Day-N) are allocated from the VCF Services Runtime block — not an additional Mgmt VM Network IP ; 9.0 = master+workers architecture
+  // 9.1: Log Management node IPs come from the Services Runtime pool and its FQDN IP is one of the Management Services
+  // endpoints — both already in fleetIPsBase (core/mgmtservices.js), so nothing here ; 9.0 = master+workers architecture
   const logsInMgmtVM=(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN&&!fleetDedicated)?(is91?0:(mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1)):0;
   const netsNodesInMgmtVM=(mgmt.vcfOperationsForNetworks.enabled&&!mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN&&!fleetDedicated)?mgmt.vcfOperationsForNetworks.platformNodeCount:0;
   // 9.1: VCF Automation Endpoint VIP (1 IP, vcf-automation-01) + dedicated VCF Services Runtime (1 IP) + /29 node
@@ -70,7 +79,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   // ONLY when fleetPlacement is Shared — symmetric with opsNodesInMgmtVM/logsInMgmtVM/netsNodesInMgmtVM above; when
   // fleetDedicated it follows platVLAN like the others and is counted in the fleetDedicated block below instead ; 9.0 = VA nodes
   const autoInMgmtVM=(mgmt.vcfAutomation.enabled&&!mgmt.vcfAutomation.requiresDedicatedVLAN&&!fleetDedicated)?(is91?7:((mgmt.vcfAutomation.mode==='clustered'?4+1:1)+(mgmt.vcfAutomation.orchestratorMode==='standalone'?mgmt.vcfAutomation.orchestratorNodeCount+(mgmt.vcfAutomation.orchestratorNodeCount>1?1:0):0))):0;
-  // 9.1: Identity Broker IP is allocated from the VCF Services Runtime block — not an additional Mgmt VM Network IP ; 9.0 = VM appliances
+  // 9.1: Identity Broker FQDN IP is one of the Management Services endpoints, already in fleetIPsBase ; 9.0 = VM appliances
   const ibInMgmtVM=(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&!mgmt.vcfIdentityBroker.requiresDedicatedVLAN)?(is91?0:(mgmt.vcfIdentityBroker.haEnabled?3+1:1)):0;
   const cloudProxyIP=mgmt.vcfOperations.enabled&&mgmt.vcfOperations.cloudProxyEnabled?1:0;
   // Counted here (Management VM Network) only when fleetPlacement is Shared — symmetric with opsNodesInMgmtVM
@@ -82,7 +91,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
     'SDDC Manager, vCenter',
     `${nsxManagerCount} NSX Mgr + VIP`,
     nsxEdgeMgmtIPs?`${nsxEdgeMgmtIPs} Edge Mgmt`:'',
-    !fleetDedicated?(is91?`Fleet + Instance + ${svcRuntimeBlockSize} Svc Runtime nodes (incl. Identity Broker)`:'Fleet'):'',
+    !fleetDedicated?(is91?`${msEndpointsNote} + ${msPoolNote}`:'Fleet'):'',
     aviControllerIPs?'AVI Controllers':'',
     opsCollectors?`${opsCollectors} Ops Collectors`:'',
     netsCollectors?`${netsCollectors} Nets Collectors`:'',
@@ -137,7 +146,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
 
   if(fleetDedicated){
     let fleetIPs=fleetIPsBase;
-    const fleetNotes=is91?['Fleet appliance (1 IP)','Instance component (1 IP)',`Services Runtime nodes ${mgmt.svcRuntimeReserve30?'/27 recommended (30 IPs)':'/28 min (12 IPs)'} — incl. Identity Broker`]:['1 Fleet appliance (Simple mode)'];
+    const fleetNotes=is91?[msEndpointsNote,msPoolNote]:['1 Fleet appliance (Simple mode)'];
     // Broadcom VCF 9.1 official Dedicated VLAN + NSX Overlay Segment model: VCF Operations / VCF Automation (9.0) /
     // VCF Operations for Networks are Day-2 components that move to the overlay segment — Fleet/Instance/Services
     // Runtime/Identity Broker (above) stay on the Day-0 dedicated VLAN. For the other 3 placement modes (no overlay
@@ -158,8 +167,7 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
     // stays with Fleet/Instance/Runtime (dedicated VLAN) even in overlay mode, it does not move to the overlay
     // segment ; 9.0 = master+workers architecture, counted like the other platform services below.
     if(mgmt.vcfOperationsForLogs.enabled&&!mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){
-      if(is91){fleetNotes.push('Log Management (Day-N): 6 IPs +2/replica, within this block');}
-      else{
+      if(!is91){
         const n=mgmt.vcfOperationsForLogs.mode==='clustered'?1+mgmt.vcfOperationsForLogs.workerCount+(mgmt.vcfOperationsForLogs.integratedLBVIP?2:1):1;
         if(isOverlayModel){overlayIPs+=n;overlayNotes.push(`VCF Logs: ${n} IPs`);} else {fleetIPs+=n;fleetNotes.push(`VCF Logs: ${n} IPs`);}
       }
@@ -236,20 +244,16 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
     const licIP=ops.licenseServerEnabled?1:0;
     // nc nodes (appliances.js) + License Server appliance, if enabled, follows the same VLAN (appliances.js) + 1
     // VIP (vips.js generates 'VCF Operations VIP' unconditionally whenever VCF Operations is enabled).
-    const opsReqIPs=nc+licIP+1;
-    vlans.push(makeVLAN(domain,'VCF Operations Network','service','Dedicated network for VCF Operations','VCF Operations node(s) + License Server (if enabled) + VIP','scenario-driven','dedicated',opsReqIPs,`${nc} node(s)${licIP?' + License Server':''} + 1 VIP`,buf,bufPct));
+    // 9.1+: the VCF Operations load balancer FQDN is optional and HA-only (TechDocs 9.1) — no VIP in Simple mode.
+    const opsVIP=(is91&&ops.mode!=='enterprise')?0:1;
+    const opsReqIPs=nc+licIP+opsVIP;
+    vlans.push(makeVLAN(domain,'VCF Operations Network','service','Dedicated network for VCF Operations','VCF Operations node(s) + License Server (if enabled) + VIP','scenario-driven','dedicated',opsReqIPs,`${nc} node(s)${licIP?' + License Server':''}${opsVIP?' + 1 VIP':''}`,buf,bufPct));
   }
   if(mgmt.vcfOperationsForLogs.enabled&&mgmt.vcfOperationsForLogs.requiresDedicatedVLAN){
     const logs=mgmt.vcfOperationsForLogs;
     if(is91){
-      // 9.1: appliances.js places a single 'vcf-log-mgmt-01' appliance on this VLAN when requiresDedicatedVLAN is
-      // checked, but vips.js keeps 'VCF Log Management VIP' unconditionally on the Fleet/Runtime VLAN (fleetVLAN) —
-      // it never follows this dedicated VLAN toggle (see vips.js comment: "IPs allocated from the VCF Services
-      // Runtime block"). requiredIPs therefore reflects only the single appliance actually routed here by the
-      // current code (1), not a theoretical VIP that never lands on this VLAN. Also a known sub-estimate versus
-      // the documented 6-base/+2-per-replica Log Management architecture, which the data model does not expose a
-      // replica count for — not invented here, only what the code actually generates.
-      vlans.push(makeVLAN(domain,'Log Management Network','service','Dedicated network for VCF Log Management (9.1)','VCF Log Management appliance — sub-estimated, see code comment','scenario-driven','dedicated',1,'1 IP: Log Management appliance (its VIP stays on the Fleet/Runtime VLAN, see vips.js)',buf,bufPct));
+      // 9.1+: no row. Log Management is a VCF services runtime service (no appliance) — its FQDN IP is counted with
+      // the Management Services endpoints and its node IPs in the runtime pool (core/mgmtservices.js).
     } else {
       // 9.0: master + workers (if clustered) + UI VIP (unconditional) + ILB VIP (if clustered & integratedLBVIP).
       const logsReqIPs=1+(logs.mode==='clustered'?logs.workerCount:0)+1+(logs.mode==='clustered'&&logs.integratedLBVIP?1:0);
@@ -259,8 +263,9 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   if(mgmt.vcfOperationsForNetworks.enabled&&mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN){
     const nets=mgmt.vcfOperationsForNetworks;
     // platformNodeCount platform VMs (collectors always stay on Management VM Network, appliances.js) + 1 VIP
-    // (vips.js generates 'VCF Operations for Networks VIP' unconditionally whenever the service is enabled).
-    const netsReqIPs=nets.platformNodeCount+1;
+    // (vips.js generates 'VCF Operations for Networks VIP' in 9.0 only).
+    // 9.1+: no VCF Operations for Networks VIP in the TechDocs 9.1 FQDN/IP table (platform + collector IPs only).
+    const netsReqIPs=nets.platformNodeCount+(is91?0:1);
     vlans.push(makeVLAN(domain,'VCF Operations for Networks Network','service','Dedicated network for VCF Operations for Networks','Platform VM(s) + VIP (collectors stay on Management VM Network)','scenario-driven','dedicated',netsReqIPs,`${nets.platformNodeCount} platform VM(s) + 1 VIP`,buf,bufPct));
   }
   if(mgmt.vcfIdentityBroker.enabled&&mgmt.vcfIdentityBroker.mode==='appliance'&&mgmt.vcfIdentityBroker.requiresDedicatedVLAN){
