@@ -821,13 +821,6 @@
             <span class="field-note" x-show="managementDomain.storageType==='vmfs'" x-html="t('storage.vmfs_note')"></span>
           </div>
         </div>
-        <div class="mt12">
-          <label class="check-row">
-            <input type="checkbox" x-model="managementDomain.layer2AdjacencyConfirmed" />
-            <span>L2 Adjacency Confirmed (bring-up)</span>
-          </label>
-          <div class="help-desc mt8" x-html="t('l2.help')"></div>
-        </div>
       </div>
 
       <template x-if="managementDomain.topologyMode==='vsan-stretched'">
@@ -1825,6 +1818,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.26.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1260')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.25.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1250')"></td>
@@ -2047,7 +2045,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.25.0';
+import * as Core from './core/index.js?v=1.26.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -2089,7 +2087,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.25.0',
+    appVersion:'1.26.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2224,7 +2222,7 @@ function vcfApp(){
 
       const mVlans=Core.buildManagementVLANs(this.managementDomain,this.project,this.workloadDomains,tFn);
       const wVlans=this.workloadDomains.flatMap(w=>Core.buildWorkloadVLANs(w,this.project,tFn));
-      this.vlans=[...mVlans,...wVlans].map(v=>({...v,...(vlanEdits[`${v.domain}|${v.vlanName}`]||{})}));
+      this.vlans=[...mVlans,...wVlans].map(v=>({...v,...(this.vlanEditFor(vlanEdits,v.domain,v.vlanName)||{})}));
 
       const mApps=Core.buildManagementAppliances(this.managementDomain,this.project,tFn);
       const wApps=this.workloadDomains.flatMap(w=>Core.buildWorkloadAppliances(w,tFn));
@@ -2236,6 +2234,16 @@ function vcfApp(){
 
       this.revalidate();
       this.componentData=Core.computeComponentRequirements(this.project,this.managementDomain,this.workloadDomains);
+    },
+
+    // VLAN inputs are keyed by (domain, row name). Switching a domain between vMSC (one stretched row "X") and
+    // single-site / vSAN stretched ("X" or "X — AZ1" + "X — AZ2") renames rows, so fall back between "X" and
+    // "X — AZ1" to carry the AZ1 values over instead of silently dropping them.
+    vlanEditFor(map,domain,name){
+      const AZ1=' — AZ1';
+      return map[`${domain}|${name}`]
+        ||(name.endsWith(AZ1)?map[`${domain}|${name.slice(0,-AZ1.length)}`]:map[`${domain}|${name}${AZ1}`])
+        ||null;
     },
 
     revalidate(){
@@ -2470,7 +2478,10 @@ function vcfApp(){
           if(s.managementDomain){this.managementDomain={...JSON.parse(JSON.stringify(Core.DEFAULT_MGMT)),...s.managementDomain};migrateVPCs(this.managementDomain.vksVPCs);}
           if(s.workloadDomains){this.workloadDomains=s.workloadDomains.map((w,i)=>({...Core.defaultWorkloadDomain(i+1),...w}));this.workloadDomains.forEach(w=>migrateVPCs(w.vksVPCs));}
           this.compute();
-          if(s.vlans)s.vlans.forEach(sv=>{const v=this.vlans.find(x=>x.domain===sv.domain&&x.vlanName===sv.vlanName);if(v){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';}});
+          if(s.vlans){
+            const saved={};s.vlans.forEach(sv=>{saved[`${sv.domain}|${sv.vlanName}`]=sv;});
+            this.vlans.forEach(v=>{const sv=this.vlanEditFor(saved,v.domain,v.vlanName);if(sv){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';}});
+          }
           if(s.appliances)s.appliances.forEach(sa=>{const a=this.appliances.find(x=>x.applianceName===sa.applianceName);if(a){a.ipAddress=sa.ipAddress||'';a.fqdn=sa.fqdn||'';}});
           if(s.vips)s.vips.forEach(sv=>{const v=this.vips.find(x=>x.vipName===sv.vipName);if(v){v.ipAddress=sv.ipAddress||'';v.fqdn=sv.fqdn||'';}});
           this.normalizeStoredIPs();

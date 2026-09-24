@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.25.0
+# VCF 9.1 Network Planner — v1.26.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -123,6 +123,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.26.0 | Sep 2026 | vMSC = "Stretch all Layer-2 Networks" (Broadcom KB 417356): in the Stretched (vMSC, non-vSAN) topology every network (ESXi Management, vMotion, NFS, NSX Host TEP, Model 4 dedicated VLAN) is a single VLAN with the same VLAN ID and subnet on AZ1 and AZ2, sized for both AZs (4+4 FC vMSC → 4 VLANs); VLAN inputs carry over between AZ1/AZ2 rows and the stretched row (and on JSON import); vSAN Stretched keeps per-AZ networks. Removed the "L2 Adjacency Confirmed (bring-up)" checkbox (no value; bring-up readiness no longer depends on it, Model 4 L2 requirement kept as info) |
 | v1.25.0 | Sep 2026 | Field-feedback fixes (4+4 FC vMSC cluster): Overview shows the real stretched host count (AZ1 + AZ2); no vSAN Witness (VLAN, appliance, card) for a non-vSAN vMSC (Broadcom KB 417356); host-number IP entry now completes the full IP from the VLAN CIDR on Tab/Enter (live preview, real mask arithmetic, errors shown without erasing) and exports contain the full IP; suggested FQDNs accepted with Tab/→ or "Apply suggested FQDNs"; 9.1 validation rules also apply to 9.1.1; validation refreshes on VLAN/IP edits; no Fleet VIP in 9.1+; vMSC help text rewritten; consistent `?v=` cache-busting on every core import |
 | v1.24.0 | Sep 2026 | Added VCF 9.1.1 as a selectable version (Overview → VCF Version), alongside 9.0 and 9.1 — now the default recommended version. VCF 9.1.1 is a maintenance release (updated BoM, supportability fixes) on the same VCF Management Services architecture as 9.1, so it reuses every IP/FQDN/VLAN rule already validated for 9.1, with no calculation changes. Confirmed by the official Broadcom TechDocs Release Notes (VMware Cloud Foundation 9.1.1.0, GA September 3, 2026) |
 | v1.23.0 | Jul 2026 | Visual refresh: the ITQ design system's color palette, fonts (Metropolis / Titillium), and a light/dark theme toggle (used across the other VCF tools in the suite) are now applied to the app, with no layout or functionality changes |
