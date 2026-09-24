@@ -1,6 +1,6 @@
 // Pure appliance/component domain logic: builds management/workload appliance inventories.
 
-import { isVcf91Plus } from './data.js?v=1.24.0';
+import { isVcf91Plus, hasVsanWitness } from './data.js?v=1.25.0';
 
 // ── APPLIANCE ENGINE ────────────────────────────────────────────
 let _appId=0;
@@ -29,7 +29,8 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
   apps.push(mkApp('sddc-manager-01','SDDC Manager',domain,'Management VM Network',true,false,true,'Primary SDDC Manager.'));
   apps.push(mkApp('vcenter-mgmt-01','vCenter Server',domain,'Management VM Network',true,false,true,'Management Domain vCenter.'));
 
-  if(mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched'){
+  // vSAN Witness only for vSAN stretched — a vMSC relies on the array vendor's tiebreaker (mirrors core/vlan.js).
+  if(hasVsanWitness(mgmt.topologyMode)){
     if(mgmt.witnessDedicatedVsanVmk){
       apps.push(mkApp('vsan-witness-mgmt','vSAN Witness Appliance (vmk0 — Management)',domain,'vSAN Witness Traffic — Witness Appliance',true,false,true,'Witness Host management interface. Independent 3rd site — not part of AZ1/AZ2 host count.'));
       apps.push(mkApp('vsan-witness-vsan','vSAN Witness Appliance (vmk1 — vSAN Witness Traffic)',domain,'vSAN Witness Traffic — Witness Appliance',true,false,true,'Dedicated witness traffic interface (vmk1). Requires independent L3 path to both AZ1 and AZ2.'));
@@ -163,7 +164,7 @@ export function buildWorkloadAppliances(wld,t=k=>k){
   const domain=wld.domainName;
   apps.push(mkApp(`vcenter-${domain.toLowerCase()}-01`,'vCenter Server',domain,'Management VM Network',true,false,true,`vCenter for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
 
-  if(wld.topologyMode==='vsan-stretched'||wld.topologyMode==='stretched'){
+  if(hasVsanWitness(wld.topologyMode)){
     if(wld.witnessDedicatedVsanVmk){
       apps.push(mkApp(`vsan-witness-${domain.toLowerCase()}-mgmt`,'vSAN Witness Appliance (vmk0 — Management)',domain,'vSAN Witness Traffic — Witness Appliance',true,false,true,`Witness Host management interface for ${domain}. Independent 3rd site — not part of AZ1/AZ2 host count.`));
       apps.push(mkApp(`vsan-witness-${domain.toLowerCase()}-vsan`,'vSAN Witness Appliance (vmk1 — vSAN Witness Traffic)',domain,'vSAN Witness Traffic — Witness Appliance',true,false,true,`Dedicated witness traffic interface (vmk1) for ${domain}. Requires independent L3 path to both AZ1 and AZ2.`));

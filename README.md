@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.24.0
+# VCF 9.1 Network Planner — v1.25.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -123,6 +123,7 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.25.0 | Sep 2026 | Field-feedback fixes (4+4 FC vMSC cluster): Overview shows the real stretched host count (AZ1 + AZ2); no vSAN Witness (VLAN, appliance, card) for a non-vSAN vMSC (Broadcom KB 417356); host-number IP entry now completes the full IP from the VLAN CIDR on Tab/Enter (live preview, real mask arithmetic, errors shown without erasing) and exports contain the full IP; suggested FQDNs accepted with Tab/→ or "Apply suggested FQDNs"; 9.1 validation rules also apply to 9.1.1; validation refreshes on VLAN/IP edits; no Fleet VIP in 9.1+; vMSC help text rewritten; consistent `?v=` cache-busting on every core import |
 | v1.24.0 | Sep 2026 | Added VCF 9.1.1 as a selectable version (Overview → VCF Version), alongside 9.0 and 9.1 — now the default recommended version. VCF 9.1.1 is a maintenance release (updated BoM, supportability fixes) on the same VCF Management Services architecture as 9.1, so it reuses every IP/FQDN/VLAN rule already validated for 9.1, with no calculation changes. Confirmed by the official Broadcom TechDocs Release Notes (VMware Cloud Foundation 9.1.1.0, GA September 3, 2026) |
 | v1.23.0 | Jul 2026 | Visual refresh: the ITQ design system's color palette, fonts (Metropolis / Titillium), and a light/dark theme toggle (used across the other VCF tools in the suite) are now applied to the app, with no layout or functionality changes |
 | v1.22.0 | Jul 2026 | Targeted VKS + Avi Load Balancer improvement, from official Broadcom documentation (Avi Load Balancer for VCF): Avi Service Engine data interfaces connect to VPC-backed private network segments, and routable VIPs are allocated from the VPC's own external/public IP blocks — no separate Avi-specific VPC or subnet is needed. As soon as VKS and Avi Load Balancer are both selected on a domain (Management or Workload) with no VPC defined yet, a Supervisor Service VPC is now auto-created with its two mandatory subnets — Private (SE data + Supervisor workloads) and Public (routable external VIPs) — instead of leaving the user with an empty "NSX VPCs" list. Non-destructive: only triggers when the domain's VPC list is empty |

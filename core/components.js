@@ -1,8 +1,8 @@
 // Pure calculation: derives per-component IP/FQDN totals for the current project configuration
 // from the static COMPONENT_REFERENCE table.
 
-import { COMPONENT_REFERENCE } from './reference.js?v=1.11.0';
-import { isVcf91Plus } from './data.js?v=1.24.0';
+import { COMPONENT_REFERENCE } from './reference.js?v=1.25.0';
+import { isVcf91Plus, effectiveHostCount } from './data.js?v=1.25.0';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 
@@ -66,8 +66,8 @@ const RULES = {
     // Each domain is its own VLAN/network pool (see core/vlan.js, wld.dedicatedVLANs) —
     // ESXi management VMK IPs for a workload domain are not drawn from the management domain's pool.
     const perDomain = [
-      { domain: MGMT_DOMAIN_LABEL, units: mgmt.hostCount, totalIps: mgmt.hostCount, totalFqdns: mgmt.hostCount },
-      ...workloadDomains.map(w => ({ domain: w.domainName, units: w.hostCount, totalIps: w.hostCount, totalFqdns: w.hostCount })),
+      { domain: MGMT_DOMAIN_LABEL, units: effectiveHostCount(mgmt), totalIps: effectiveHostCount(mgmt), totalFqdns: effectiveHostCount(mgmt) },
+      ...workloadDomains.map(w => ({ domain: w.domainName, units: effectiveHostCount(w), totalIps: effectiveHostCount(w), totalFqdns: effectiveHostCount(w) })),
     ];
     return { ...sumPerDomain(perDomain), perDomain };
   },
