@@ -1,6 +1,6 @@
 // Pure VIP domain logic: builds management/workload virtual IP inventories.
 
-import { isVcf91Plus } from './data.js?v=1.28.0';
+import { isVcf91Plus } from './data.js?v=1.29.0';
 
 // ── VIP ENGINE ──────────────────────────────────────────────────
 let _vipId=0;

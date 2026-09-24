@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.28.0
+# VCF 9.1 Network Planner — v1.29.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -119,10 +119,21 @@ All business logic lives in pure ES modules under `core/`, with zero DOM/Alpine/
 
 > Authentication (Supabase + EmailJS) is fully commented out in the source and can be re-enabled by searching for `AUTH DISABLED` markers.
 
+## Tests
+
+The planning engine (`core/*.js`) is pure ES modules with no dependencies, covered by a `node:test` suite in `tests/`:
+
+```bash
+npm test   # node --test tests/*.test.mjs — Node 20+
+```
+
+The suite runs on every push and pull request (GitHub Actions, `.github/workflows/test.yml`). Validation messages are asserted against the FR translations in `core/i18n.js`, so rewording a message does not break the tests as long as its variables stay the same.
+
 ## Version History
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.29.0 | Sep 2026 | Improvements: ESXi Hosts tab (FQDN + vmk0 IP per host/AZ, completion, suggested FQDNs, auto-fill, Excel sheet); IP plan checks (duplicates, outside CIDR, network/broadcast/gateway, overlapping CIDRs, reused VLAN IDs); Gateway and recommended MTU columns; per-subnet IP map; VPC External (Distributed Transit Gateway) VLAN from the 9.1 VPC Gateway Connectivity choice; browser autosave + "New project"; clickable validation messages; contextual help with TechDocs links; accessibility (ARIA tabs, labelled fields, announced errors); Alpine.js pinned to 3.17.4, favicon; `node --test` suite (`npm test`) + GitHub Actions CI |
 | v1.28.0 | Sep 2026 | vSAN Stretched: L2-stretched vs per-AZ choice per network, modeled on the Broadcom VCF 9.1 "vSAN Stretched Cluster Network Requirements" table. New "AZ1 / AZ2 networks" table (Management Domain and each WLD) with Broadcom-reference (per-AZ, default) / all-L2 / custom models; locked to "Stretch all Layer-2 Networks" in vMSC. Stretched networks become one row sized AZ1+AZ2, inputs carry over. Model 3/4 dedicated VLAN no longer duplicated per AZ. New rules: vSAN Stretched + non-vSAN storage (blocker), vMSC + vSAN storage (warning), stretched WLD without stretched Mgmt Domain (blocker), same CIDR on AZ1/AZ2 (warning). Excel VLAN Summary gains AZ, L2 Stretched and Rec. MTU columns |
 | v1.27.0 | Sep 2026 | VCF 9.1 Management Services aligned with TechDocs (First VCF Instance FQDNs and IP addresses): Fleet, Instance, Services Runtime and Identity Broker FQDNs each get their own IP outside the node range (+2 IPs); the services runtime node range is sized at 12 + Log Management (6 + 2/extra replica) + Real-time Metrics (6, new option), or 30 when reserved (new `core/mgmtservices.js`). New Start/End fields for that range and the 5-node VCF Automation range, with validation (12 min, size, CIDR, overlap, no appliance/VIP IP inside a range), Appliances-tab banner, auto-fill exclusion and a "Mgmt Services Ranges" Excel sheet. Log Management is no longer an appliance (runtime service, FQDN/IP counted outside the range). 9.1+: no VCF Operations VIP in Simple mode, no VCF Operations for Networks VIP. Warning on a .local DNS domain; FQDN examples use example.com |
 | v1.26.0 | Sep 2026 | vMSC = "Stretch all Layer-2 Networks" (Broadcom KB 417356): in the Stretched (vMSC, non-vSAN) topology every network (ESXi Management, vMotion, NFS, NSX Host TEP, Model 4 dedicated VLAN) is a single VLAN with the same VLAN ID and subnet on AZ1 and AZ2, sized for both AZs (4+4 FC vMSC → 4 VLANs); VLAN inputs carry over between AZ1/AZ2 rows and the stretched row (and on JSON import); vSAN Stretched keeps per-AZ networks. Removed the "L2 Adjacency Confirmed (bring-up)" checkbox (no value; bring-up readiness no longer depends on it, Model 4 L2 requirement kept as info) |

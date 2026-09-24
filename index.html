@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VCF 9.1 Network Planner</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1a6b'/%3E%3Cpath d='M8 10h16M8 16h16M8 22h16' stroke='%23ff6b35' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
   <!-- ══ AUTH DISABLED — décommenter pour réactiver l'authentification Supabase ══
   <script>
     window.APP_CONFIG = {
@@ -392,6 +393,31 @@
     .tbl .input.input-missing { border-style: dashed; border-color: var(--gray-border); background: var(--gray-light); }
     .tbl .input.input-missing::placeholder { color: var(--text-muted); }
     .tbl .input.input-error { border-style: solid; border-color: var(--red); }
+    /* Validation → field jump highlight */
+    @keyframes flashRow { 0%,60% { background: rgba(255,107,53,0.28); } 100% { background: transparent; } }
+    .flash, .flash > td { animation: flashRow 2.2s ease-out; }
+    .anomaly-go { margin-left: auto; }
+    /* Contextual help */
+    .help-q { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-left:6px; border-radius:50%;
+      border:1px solid var(--gray-border); background: var(--surface); color: var(--blue-mid); font-size:11px; font-weight:700; cursor:pointer; vertical-align:middle; line-height:1; }
+    .help-q:hover, .help-q:focus-visible { border-color: var(--blue-accent); color: var(--blue-accent); }
+    .help-overlay { position:fixed; inset:0; background: rgba(0,0,0,0.35); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; }
+    .help-dialog { background: var(--surface); color: var(--text-dark); border-radius:10px; max-width:560px; width:100%; padding:16px 18px; box-shadow:0 12px 40px rgba(0,0,0,0.3); max-height:80vh; overflow:auto; }
+    .help-body ul { margin:6px 0 0 16px; }
+    .help-body a { color: var(--blue-accent); }
+    /* Per-subnet IP map */
+    .ipmap { display:grid; grid-template-columns: repeat(32, minmax(18px, 1fr)); gap:2px; }
+    .ipmap-cell { font-size:9px; text-align:center; padding:3px 0; border-radius:3px; font-family:'Courier New',monospace; cursor:default; border:1px solid transparent; }
+    .ipmap-cell.free { background: var(--gray-light); color: var(--text-muted); }
+    .ipmap-cell.assigned { background:#2e7d32; color:#fff; }
+    .ipmap-cell.reserved { background:#f5cc7a; color:#5a3a00; }
+    .ipmap-cell.pool { background:#cfe0f5; color:#1a4a8b; }
+    .ipmap-cell.gateway { background: var(--blue-mid); color:#fff; }
+    .ipmap-cell.edge { background:#9aa5b1; color:#fff; }
+    .ipmap-cell.conflict { background: var(--red); color:#fff; font-weight:700; }
+    .ipmap-legend { display:flex; flex-wrap:wrap; gap:10px; font-size:11px; margin:8px 0; }
+    .ipmap-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; background: var(--c); }
+    @media (max-width: 900px) { .ipmap { grid-template-columns: repeat(16, minmax(18px, 1fr)); } }
     .ip-hint { font-size: 10px; margin-top: 2px; font-family: 'Courier New', monospace; color: var(--text-muted); }
     .ip-hint.err { font-family: inherit; color: var(--red); }
     .tbl-domain { font-weight: 600; color: var(--blue-accent); }
@@ -668,17 +694,38 @@
   </header>
 
   <!-- Toast -->
-  <div class="toast" x-show="toastVisible" x-transition x-text="toastMsg"></div>
+  <div class="toast" role="status" aria-live="polite" x-show="toastVisible" x-transition x-text="toastMsg"></div>
+
+  <!-- Contextual help popover (help.<topic> keys in core/i18n.js) -->
+  <div class="help-overlay" x-show="helpTopic" x-transition.opacity @click.self="closeHelp()" @keydown.escape.window="closeHelp()" style="display:none">
+    <div class="help-dialog" role="dialog" aria-modal="true" :aria-label="helpTopic ? t('help.' + helpTopic + '.title') : ''">
+      <div class="flex-between mb8">
+        <strong x-text="helpTopic ? t('help.' + helpTopic + '.title') : ''"></strong>
+        <button class="btn btn-secondary btn-sm" @click="closeHelp()" :aria-label="t('help.close')">✕</button>
+      </div>
+      <div class="text-sm help-body" x-html="helpTopic ? t('help.' + helpTopic + '.body') : ''"></div>
+    </div>
+  </div>
 
   <!-- Tab Bar -->
-  <div class="tab-bar">
+  <div class="tab-bar" role="tablist" aria-label="Planner sections">
     <template x-for="tab in tabs" :key="tab.id">
-      <button class="tab-btn" :class="{active: activeTab===tab.id}" @click="activeTab=tab.id" x-text="tab.label"></button>
+      <button class="tab-btn" role="tab" :aria-selected="activeTab===tab.id ? 'true' : 'false'" :class="{active: activeTab===tab.id}" @click="activeTab=tab.id" x-text="tab.label"></button>
     </template>
   </div>
 
   <!-- ══ TAB PANELS ══════════════════════════════════════════════ -->
   <div class="main">
+    <!-- Autosave restore banner -->
+    <div class="infobox blue mb12" x-show="restoredBanner" style="display:none">
+      <div class="flex-between">
+        <span class="text-xs" x-text="t('autosave.restored')"></span>
+        <span class="flex-center gap8">
+          <button class="btn btn-secondary btn-sm" @click="newProject()" x-text="confirmNew ? t('autosave.confirm_new') : t('autosave.new')"></button>
+          <button class="btn btn-secondary btn-sm" @click="restoredBanner=false" :aria-label="t('help.close')">✕</button>
+        </span>
+      </div>
+    </div>
 
     <!-- ────────────────────────────────────────────────────────── -->
     <!-- OVERVIEW                                                   -->
@@ -805,7 +852,7 @@
             <div x-show="managementDomain.topologyMode==='stretched'" class="help-desc" x-html="t('topo.vmsc')"></div>
             <div x-show="managementDomain.topologyMode==='partially-stretched'" class="help-desc" x-html="t('topo.partial')"></div>
           </div>
-          <div class="field"><label>TEP Interfaces / Host</label>
+          <div class="field"><label>TEP Interfaces / Host<button class="help-q" @click="openHelp('tep')" :aria-label="t('help.aria')">?</button></label>
             <input class="input" type="number" min="1" max="4" x-model.number="managementDomain.tepInterfacesPerHost" />
             <span class="field-note" x-text="t('ui.tep_note')"></span>
           </div>
@@ -826,7 +873,7 @@
       <template x-if="managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched'">
         <div class="card">
             <div class="flex-between mb8">
-              <div class="sec-title" style="margin-bottom:0" x-text="t('az.net_title')"></div>
+              <div class="sec-title" style="margin-bottom:0"><span x-text="t('az.net_title')"></span><button class="help-q" @click="openHelp('az')" :aria-label="t('help.aria')">?</button></div>
               <div class="flex-center gap8" x-show="managementDomain.topologyMode==='vsan-stretched'">
                 <span class="text-xs text-muted" x-text="t('az.net_preset')"></span>
                 <select class="select" style="width:auto" :value="azPreset(managementDomain)" @change="setAzPreset(managementDomain,$event.target.value)">
@@ -865,7 +912,7 @@
       </template>
       <template x-if="managementDomain.topologyMode==='vsan-stretched'">
         <div class="card">
-          <h2 class="sec-title" x-text="t('witness.section_title')">vSAN Witness</h2>
+          <h2 class="sec-title"><span x-text="t('witness.section_title')">vSAN Witness</span><button class="help-q" @click="openHelp('witness')" :aria-label="t('help.aria')">?</button></h2>
           <div class="mt12">
             <label class="check-row">
               <input type="checkbox" x-model="managementDomain.witnessDedicatedVsanVmk" />
@@ -899,10 +946,23 @@
             <label class="check-row"><input type="checkbox" x-model="managementDomain.sspEnabled" /> SSP / vDefend Enabled</label>
           </div>
         </div>
+        <!-- VCF 9.1 — VPC Gateway Connectivity (P&P workbook, Deploy Management Domain) -->
+        <div class="g4 mt12" x-show="is91()">
+          <div class="field"><label><span x-text="t('vpc.label')"></span><button class="help-q" @click="openHelp('vpc')" :aria-label="t('help.aria')">?</button></label>
+            <select class="select" x-model="managementDomain.vpcConnectivity">
+              <option value="distributed" x-text="t('vpc.distributed')"></option>
+              <option value="centralized" x-text="t('vpc.centralized')"></option>
+            </select>
+          </div>
+          <div class="field" x-show="managementDomain.vpcConnectivity==='distributed'"><label x-text="t('vpc.ips_label')"></label>
+            <input class="input" type="number" min="1" x-model.number="managementDomain.vpcExternalIPs" />
+          </div>
+        </div>
+        <div class="field-note mt4" x-show="is91()" x-text="managementDomain.vpcConnectivity==='distributed' ? t('vpc.note_distributed') : t('vpc.note_centralized')"></div>
       </div>
 
       <div class="card">
-        <h2 class="sec-title" x-text="is91() ? t('fleet.title_91') : t('fleet.title_90')"></h2>
+        <h2 class="sec-title"><span x-text="is91() ? t('fleet.title_91') : t('fleet.title_90')"></span><button class="help-q" @click="openHelp('fleet')" :aria-label="t('help.aria')">?</button></h2>
         <div class="mt12">
           <div class="field">
             <label x-text="is91() ? t('fleet.label_91') : t('fleet.label_90')"></label>
@@ -936,8 +996,8 @@
 
           <!-- VCF 9.1 — Management Services IP ranges (core/mgmtservices.js) -->
           <template x-if="is91() && msPlan">
-            <div class="nest mt12">
-              <div class="nest-title" x-text="t('ms.section_title')"></div>
+            <div class="nest mt12" data-ref="ms-ranges">
+              <div class="nest-title"><span x-text="t('ms.section_title')"></span><button class="help-q" @click="openHelp('ms')" :aria-label="t('help.aria')">?</button></div>
               <div class="text-xs font-bold mb8" x-text="t('ms.pool_title')"></div>
               <div class="g4">
                 <div class="field"><label x-text="t('ms.start')"></label>
@@ -1391,7 +1451,7 @@
             <template x-if="workloadDomains[wi].topologyMode==='vsan-stretched'||workloadDomains[wi].topologyMode==='stretched'">
               <div class="nest mt12">
             <div class="flex-between mb8">
-              <div class="nest-title" style="margin-bottom:0" x-text="t('az.net_title')"></div>
+              <div class="nest-title" style="margin-bottom:0"><span x-text="t('az.net_title')"></span><button class="help-q" @click="openHelp('az')" :aria-label="t('help.aria')">?</button></div>
               <div class="flex-center gap8" x-show="workloadDomains[wi].topologyMode==='vsan-stretched'">
                 <span class="text-xs text-muted" x-text="t('az.net_preset')"></span>
                 <select class="select" style="width:auto" :value="azPreset(workloadDomains[wi])" @change="setAzPreset(workloadDomains[wi],$event.target.value)">
@@ -1525,9 +1585,40 @@
     <!-- ────────────────────────────────────────────────────────── -->
     <div x-show="activeTab==='vlans'">
       <div class="flex-between mb12">
-        <h2 class="sec-title" style="margin-bottom:0">VLAN Design</h2>
+        <h2 class="sec-title" style="margin-bottom:0">VLAN Design<button class="help-q" @click="openHelp('ipmap')" :aria-label="t('help.aria')">?</button></h2>
         <span class="text-muted text-xs">Auto-calculated from configuration — enter VLAN IDs and CIDRs below</span>
       </div>
+
+      <!-- Per-subnet IP map -->
+      <template x-if="ipMapVlan">
+        <div class="card mb12">
+          <div class="flex-between">
+            <strong class="text-sm" x-text="t('ipmap.title',{vlan:ipMapVlan.vlanName,cidr:ipMapVlan.cidr||'—'})"></strong>
+            <button class="btn btn-secondary btn-sm" @click="ipMapFor=null" :aria-label="t('help.close')">✕</button>
+          </div>
+          <template x-if="ipMap && ipMap.error">
+            <div class="text-xs text-muted mt8" x-text="t('ipmap.err_' + ipMap.error.replace('-','_'),{size:ipMap.size})"></div>
+          </template>
+          <template x-if="ipMap && !ipMap.error">
+            <div>
+              <div class="ipmap-legend">
+                <span style="--c:var(--gray-light)" x-text="t('ipmap.free') + ' ' + ipMap.stats.free"></span>
+                <span style="--c:#2e7d32" x-text="t('ipmap.assigned') + ' ' + ipMap.stats.assigned"></span>
+                <span style="--c:#f5cc7a" x-text="t('ipmap.reserved')"></span>
+                <span style="--c:#cfe0f5" x-text="t('ipmap.vlan_range')"></span>
+                <span style="--c:var(--blue-mid)" x-text="t('ipmap.gateway')"></span>
+                <span style="--c:#9aa5b1" x-text="t('ipmap.edge')"></span>
+                <span style="--c:var(--red)" x-text="t('ipmap.conflict') + ' ' + ipMap.stats.conflict"></span>
+              </div>
+              <div class="ipmap" role="img" :aria-label="t('ipmap.title',{vlan:ipMapVlan.vlanName,cidr:ipMapVlan.cidr})">
+                <template x-for="c in ipMap.cells" :key="c.ip">
+                  <div class="ipmap-cell" :class="c.kind" :title="c.ip + (c.label ? ' — ' + c.label : '')" x-text="c.last"></div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
       <div class="tbl-wrap">
         <table class="tbl">
           <thead>
@@ -1536,9 +1627,11 @@
               <th class="resizable" style="width:180px">VLAN Name</th>
               <th class="resizable" style="width:100px">VLAN ID</th>
               <th class="resizable" style="width:140px">CIDR</th>
+              <th class="resizable" style="width:140px" x-text="t('vlan.col_gateway')"></th>
               <th class="resizable" style="width:300px">Range Start / End</th>
               <th class="resizable" style="width:80px">Req. IPs</th>
               <th class="resizable" style="width:90px">Rec. CIDR</th>
+              <th class="resizable" style="width:70px" x-text="t('vlan.col_mtu')"></th>
               <th class="resizable" style="width:90px">Mandatory</th>
               <th class="resizable" style="width:80px">Scope</th>
               <th>Notes</th>
@@ -1546,11 +1639,15 @@
           </thead>
           <tbody>
             <template x-for="(v, vi) in vlans" :key="v.id">
-              <tr>
+              <tr :data-ref="'vlan:' + v.domain + '|' + v.vlanName">
                 <td class="tbl-domain" x-text="v.domain"></td>
-                <td class="font-bold" x-text="v.vlanName"></td>
-                <td><input class="input mono" style="width:80px" placeholder="e.g. 100" x-model="vlans[vi].vlanId" /></td>
-                <td><input class="input mono" style="width:130px" placeholder="10.0.0.0/24" x-model="vlans[vi].cidr" /></td>
+                <td class="font-bold">
+                  <span x-text="v.vlanName"></span>
+                  <button class="btn btn-secondary btn-sm" style="margin-left:4px" x-show="v.cidr" @click="toggleIpMap(v)" :title="t('ipmap.open')" :aria-label="t('ipmap.open') + ' — ' + v.vlanName">🗺</button>
+                </td>
+                <td><input class="input mono" style="width:80px" placeholder="e.g. 100" :aria-label="'VLAN ID — ' + v.vlanName" x-model="vlans[vi].vlanId" /></td>
+                <td><input class="input mono" style="width:130px" placeholder="10.0.0.0/24" :aria-label="'CIDR — ' + v.vlanName" x-model="vlans[vi].cidr" /></td>
+                <td><input class="input mono" style="width:130px" :placeholder="gatewayHint(v)" :aria-label="t('vlan.col_gateway') + ' — ' + v.vlanName" x-model="vlans[vi].gateway" /></td>
                 <td style="white-space:nowrap">
                   <input class="input mono" style="width:105px" placeholder="10.0.1.10" x-model="vlans[vi].rangeStart" />
                   <span class="text-muted text-xs">→</span>
@@ -1560,6 +1657,7 @@
                 </td>
                 <td class="text-center font-bold" x-text="v.requiredIPs"></td>
                 <td class="text-center tbl-mono" x-text="v.recommendedCIDR"></td>
+                <td class="text-center tbl-mono" x-text="v.recommendedMTU || '—'"></td>
                 <td>
                   <span class="badge" :class="v.mandatory==='mandatory'?'badge-mandatory':(v.mandatory==='scenario-driven'?'badge-scenario':'badge-optional')" x-text="v.mandatory"></span>
                 </td>
@@ -1621,7 +1719,7 @@
           </thead>
           <tbody>
             <template x-for="(a, ai) in appliances" :key="a.id">
-              <tr>
+              <tr :data-ref="'app:' + a.applianceName">
                 <td class="tbl-mono tbl-domain">
                   <span x-text="a.applianceName"></span>
                   <span class="text-muted text-xs" x-show="a.vipRequired" title="See VIPs tab for the cluster VIP"> → VIP</span>
@@ -1637,7 +1735,7 @@
                   <template x-if="a.applianceType!=='VCF Identity Broker (Embedded)'">
                     <div>
                       <input class="input mono" style="width:130px"
-                        :class="{'input-missing': !a.ipAddress, 'input-error': ipErrors[a.id]}"
+                        :class="{'input-missing': !a.ipAddress, 'input-error': ipErrors[a.id]}" :aria-invalid="ipErrors[a.id] ? 'true' : 'false'" :aria-label="'IP — ' + a.applianceName"
                         :placeholder="getVLANPrefix(a.domain, a.vlan) || 'TBD'"
                         x-model="appliances[ai].ipAddress"
                         @input="clearIPError(a)" @blur="commitIP(appliances[ai])" @keydown.enter="commitIP(appliances[ai])" />
@@ -1661,6 +1759,60 @@
                   <span class="badge" :class="a.fqdnRequired ? 'badge-mandatory' : 'badge-optional'" x-text="a.fqdnRequired ? 'Yes' : 'No'"></span>
                 </td>
                 <td class="tbl-muted" x-text="a.notes"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!-- ESXi HOSTS                                                 -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div x-show="activeTab==='hosts'">
+      <div class="flex-between mb8">
+        <h2 class="sec-title" style="margin-bottom:0"><span x-text="t('hosts.title')"></span><button class="help-q" @click="openHelp('hosts')" :aria-label="t('help.aria')">?</button></h2>
+        <div class="flex-center gap8">
+          <button class="btn btn-secondary btn-sm" x-show="project.fqdnSuffix" @click="applySuggestedFQDNs('hosts')" x-text="t('fqdn.apply_all')"></button>
+          <span class="text-muted text-xs" x-text="t('hosts.filled',{done:hosts.filter(h=>h.ipAddress).length,total:hosts.length})"></span>
+        </div>
+      </div>
+      <div class="infobox blue mb8"><div class="text-xs" x-html="t('hosts.info')"></div></div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width:160px">Domain</th>
+              <th style="width:50px">AZ</th>
+              <th style="width:150px" x-text="t('hosts.col_host')"></th>
+              <th style="width:190px">VLAN</th>
+              <th style="width:150px" x-text="t('hosts.col_ip')"></th>
+              <th>FQDN</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(h, hi) in hosts" :key="h.id">
+              <tr :data-ref="'host:' + h.id">
+                <td class="tbl-domain" x-text="h.domain"></td>
+                <td class="tbl-muted" x-text="h.az || '—'"></td>
+                <td class="tbl-mono" x-text="h.hostName"></td>
+                <td class="tbl-muted" x-text="h.vlan"></td>
+                <td>
+                  <input class="input mono" style="width:130px"
+                    :class="{'input-missing': !h.ipAddress, 'input-error': ipErrors[h.id]}" :aria-invalid="ipErrors[h.id] ? 'true' : 'false'" :aria-label="'IP — ' + h.hostName"
+                    :placeholder="getVLANPrefix(h.domain, h.vlan) || 'TBD'"
+                    x-model="hosts[hi].ipAddress"
+                    @input="clearIPError(h)" @blur="commitIP(hosts[hi])" @keydown.enter="commitIP(hosts[hi])" />
+                  <div class="ip-hint" x-show="!ipErrors[h.id] && ipPreview(h)" x-text="'→ ' + ipPreview(h)"></div>
+                  <div class="ip-hint err" x-show="ipErrors[h.id]" x-text="ipErrors[h.id] ? t('ip.err.' + ipErrors[h.id]) : ''"></div>
+                </td>
+                <td>
+                  <input class="input mono" style="width:280px" :class="{'input-missing': !h.fqdn}" :aria-label="'FQDN — ' + h.hostName"
+                    :placeholder="buildFQDNPlaceholder(h.hostName)"
+                    x-model="hosts[hi].fqdn"
+                    @keydown.tab="acceptFQDN(hosts[hi], h.hostName)"
+                    @keydown.arrow-right="acceptFQDN(hosts[hi], h.hostName, $event)" />
+                </td>
               </tr>
             </template>
           </tbody>
@@ -1700,14 +1852,14 @@
           </thead>
           <tbody>
             <template x-for="(v, vi) in vips" :key="v.id">
-              <tr>
+              <tr :data-ref="'vip:' + v.vipName">
                 <td class="font-bold tbl-domain" x-text="v.vipName"></td>
                 <td x-text="v.associatedService"></td>
                 <td class="tbl-muted" x-text="v.domain"></td>
                 <td class="tbl-muted" x-text="v.vlan"></td>
                 <td>
                   <input class="input mono" style="width:130px"
-                    :class="{'input-missing': !v.ipAddress, 'input-error': ipErrors[v.id]}"
+                    :class="{'input-missing': !v.ipAddress, 'input-error': ipErrors[v.id]}" :aria-invalid="ipErrors[v.id] ? 'true' : 'false'" :aria-label="'IP — ' + v.vipName"
                     :placeholder="getVLANPrefix(v.domain, v.vlan) || 'TBD'"
                     x-model="vips[vi].ipAddress"
                     @input="clearIPError(v)" @blur="commitIP(vips[vi])" @keydown.enter="commitIP(vips[vi])" />
@@ -1748,6 +1900,7 @@
             <span class="anomaly-sev" :class="m.severity" x-text="m.severity.toUpperCase()"></span>
             <span class="anomaly-title" x-text="m.message"></span>
             <span class="anomaly-meta" x-text="m.domain + ' — ' + m.category"></span>
+            <button class="btn btn-secondary btn-sm anomaly-go" @click="goTo(m)" x-text="t('val.goto')"></button>
           </div>
           <div class="anomaly-body" x-show="m.resolution">
             <div class="anomaly-rec">
@@ -1955,6 +2108,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.29.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1290')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.28.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
@@ -2193,14 +2351,15 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.28.0';
+import * as Core from './core/index.js?v=1.29.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
 });
 
 const alpineScript = document.createElement('script');
-alpineScript.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js';
+// Pinned (not 3.x.x) so a new Alpine release can never change the app's behaviour without a deliberate bump.
+alpineScript.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js';
 document.head.appendChild(alpineScript);
 
 function vcfApp(){
@@ -2235,7 +2394,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.28.0',
+    appVersion:'1.29.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2245,6 +2404,7 @@ function vcfApp(){
         {id:'workloads',   label:'Workload Domains'},
         {id:'vlans',       label:'VLAN Design'},
         {id:'appliances',  label:'Appliances'},
+        {id:'hosts',       label:'ESXi Hosts'},
         {id:'vips',        label:'VIPs'},
         {id:'validation',  label:'Validation'},
         {id:'export',      label:'Export / Import'},
@@ -2261,7 +2421,9 @@ function vcfApp(){
     managementDomain:JSON.parse(JSON.stringify(Core.DEFAULT_MGMT)),
     workloadDomains:[Core.defaultWorkloadDomain(1)],
 
-    vlans:[],appliances:[],vips:[],validationMessages:[],domainSummaries:[],
+    vlans:[],appliances:[],vips:[],hosts:[],validationMessages:[],domainSummaries:[],
+    // VLAN whose IP map is open in the VLAN Design tab ("domain|vlanName"), help popover topic, autosave banner.
+    ipMapFor:null, helpTopic:null, restoredBanner:false, confirmNew:false,
     componentData:{components:[],totalIps:0,totalFqdns:0},
     selectedComponentKey:null,
     // Resolves a component to the figures for one domain. If the component has a perDomain
@@ -2312,15 +2474,19 @@ function vcfApp(){
         document.documentElement.setAttribute('data-theme', v ? 'dark' : 'light');
         localStorage.setItem('vcf-net-planner-theme', v ? 'dark' : 'light');
       });
+      // Autosave: restore the last project saved in this browser (if any) before wiring the watchers.
+      if(!this.restoreAutosave()) this.compute();
       this.$watch('project',()=>this.compute());
       this.$watch('managementDomain',()=>this.compute());
       this.$watch('workloadDomains',()=>this.compute());
-      // VLAN IDs/CIDRs/ranges and appliance/VIP IPs don't change the generated rows, so they only need a re-run of
-      // the validation (the range/CIDR rules read them) — calling compute() here would rebuild the tables mid-typing.
+      // VLAN IDs/CIDRs/ranges and appliance/VIP/host IPs don't change the generated rows, so they only need a re-run
+      // of the validation (the range/CIDR rules read them) — calling compute() here would rebuild the tables mid-typing.
       this.$watch('vlans',()=>this.revalidate());
       this.$watch('appliances',()=>this.revalidate());
       this.$watch('vips',()=>this.revalidate());
-      this.compute();
+      this.$watch('hosts',()=>this.revalidate());
+      this.$watch('activeTab',()=>this.$nextTick(()=>this.labelFields()));
+      this.$nextTick(()=>this.labelFields());
       // AUTH DISABLED — décommenter pour réactiver : this.initAuth();
     },
 
@@ -2360,7 +2526,9 @@ function vcfApp(){
       this.project.workloadDomainCount=this.workloadDomains.length;
 
       const vlanEdits={};
-      this.vlans.forEach(v=>{if(v.vlanId||v.cidr||v.rangeStart||v.rangeEnd)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr,rangeStart:v.rangeStart,rangeEnd:v.rangeEnd||''};});
+      this.vlans.forEach(v=>{if(v.vlanId||v.cidr||v.gateway||v.rangeStart||v.rangeEnd)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr,gateway:v.gateway||'',rangeStart:v.rangeStart,rangeEnd:v.rangeEnd||''};});
+      const hostEdits={};
+      this.hosts.forEach(h=>{if(h.ipAddress||h.fqdn)hostEdits[`${h.domain}|${h.hostName}`]={ipAddress:h.ipAddress,fqdn:h.fqdn};});
       const appEdits={};
       this.appliances.forEach(a=>{if(a.ipAddress||a.fqdn)appEdits[a.applianceName]={ipAddress:a.ipAddress,fqdn:a.fqdn};});
       const vipEdits={};
@@ -2380,6 +2548,8 @@ function vcfApp(){
       const wVips=this.workloadDomains.flatMap(w=>Core.buildWorkloadVIPs(w));
       this.vips=[...mVips,...wVips].map(v=>({...v,...(vipEdits[v.vipName]||{})}));
 
+      this.hosts=Core.buildHostInventory(this.managementDomain,this.workloadDomains).map(h=>({...h,...(hostEdits[`${h.domain}|${h.hostName}`]||{})}));
+
       this.revalidate();
       this.componentData=Core.computeComponentRequirements(this.project,this.managementDomain,this.workloadDomains);
     },
@@ -2395,9 +2565,97 @@ function vcfApp(){
     },
 
     revalidate(){
-      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,(key,vars)=>this.t(key,vars),this.appliances,this.vips);
+      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,(key,vars)=>this.t(key,vars),this.appliances,this.vips,this.hosts);
       this.domainSummaries=Core.buildDomainSummaries(this.project,this.managementDomain,this.workloadDomains,this.vlans,this.vips);
+      this.scheduleAutosave();
     },
+
+    // ── Autosave (per browser) ─────────────────────────────────────
+    // Only a convenience: the JSON export stays the way to keep or share a project. Storage can be unavailable
+    // (private mode, blocked site data), so every access is guarded and failures are silent.
+    AUTOSAVE_KEY:'vcf-net-planner-project',
+    _saveTimer:null,
+    scheduleAutosave(){
+      clearTimeout(this._saveTimer);
+      this._saveTimer=setTimeout(()=>{ try{ localStorage.setItem(this.AUTOSAVE_KEY,JSON.stringify(this.currentState())); }catch{} },600);
+    },
+    restoreAutosave(){
+      let s=null;
+      try{ s=JSON.parse(localStorage.getItem(this.AUTOSAVE_KEY)||'null'); }catch{}
+      if(!s||!s.managementDomain)return false;
+      try{
+        this.loadState(s);
+        // Only announce a restore when the saved project actually holds user input (not a blank default project).
+        const rows=[...(s.vlans||[]),...(s.appliances||[]),...(s.vips||[]),...(s.hosts||[])];
+        this.restoredBanner=!!(s.project?.projectName||s.project?.customerName||rows.some(r=>r.vlanId||r.cidr||r.ipAddress||r.fqdn));
+        return true;
+      }catch{ return false; }
+    },
+    newProject(){
+      if(!this.confirmNew){ this.confirmNew=true; setTimeout(()=>this.confirmNew=false,4000); return; }
+      try{ localStorage.removeItem(this.AUTOSAVE_KEY); }catch{}
+      this.confirmNew=false; this.restoredBanner=false;
+      this.vlans=[];this.appliances=[];this.vips=[];this.hosts=[];
+      this.project=JSON.parse(JSON.stringify(Core.DEFAULT_PROJECT));
+      this.managementDomain=JSON.parse(JSON.stringify(Core.DEFAULT_MGMT));
+      this.workloadDomains=[Core.defaultWorkloadDomain(1)];
+      this.activeTab='overview';
+      this.showToast(this.t('autosave.new_done'));
+    },
+
+    // ── Validation → offending field ───────────────────────────────
+    msgTab(m){
+      if(m.ref?.tab)return m.ref.tab;
+      if(m.category==='vlan')return 'vlans';
+      if(m.category==='vip')return 'vips';
+      if(m.domain==='Global')return 'overview';
+      return m.domain==='Management Domain'?'management':'workloads';
+    },
+    goTo(m){
+      this.activeTab=this.msgTab(m);
+      if(!m.ref?.key)return;
+      this.$nextTick(()=>setTimeout(()=>{
+        const el=document.querySelector(`[data-ref="${CSS.escape(m.ref.key)}"]`);
+        if(!el)return;
+        el.scrollIntoView({behavior:'smooth',block:'center'});
+        el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+        el.querySelector('input:not([disabled]),select')?.focus({preventScroll:true});
+      },50));
+    },
+
+    // ── Contextual help popover ────────────────────────────────────
+    openHelp(topic){ this.helpTopic=topic; },
+    closeHelp(){ this.helpTopic=null; },
+
+    // ── Accessibility: tie every .field <label> to its control ─────
+    _fieldSeq:0,
+    labelFields(){
+      document.querySelectorAll('.field').forEach(f=>{
+        const label=f.querySelector(':scope > label:not(.check-row)');
+        const ctrl=f.querySelector(':scope > input, :scope > select, :scope > textarea');
+        if(!label||!ctrl||label.htmlFor)return;
+        if(!ctrl.id)ctrl.id=`fld-${++this._fieldSeq}`;
+        label.htmlFor=ctrl.id;
+      });
+    },
+
+    // ── Per-subnet IP map (VLAN Design) ────────────────────────────
+    toggleIpMap(v){ const k=`${v.domain}|${v.vlanName}`; this.ipMapFor=this.ipMapFor===k?null:k; },
+    get ipMapVlan(){ return this.ipMapFor?this.vlans.find(v=>`${v.domain}|${v.vlanName}`===this.ipMapFor)||null:null; },
+    get ipMap(){
+      const v=this.ipMapVlan; if(!v)return null;
+      const assigned=[
+        ...this.appliances.map(a=>({ip:a.ipAddress,label:a.applianceName})),
+        ...this.vips.map(x=>({ip:x.ipAddress,label:x.vipName})),
+        ...this.hosts.map(h=>({ip:h.ipAddress,label:h.hostName})),
+      ];
+      const p=this.msPlan, ranges=[];
+      if(p&&p.pool.rangeSize)ranges.push({start:p.pool.start,end:p.pool.end,label:this.t('ms.pool_title'),kind:'reserved'});
+      if(p&&p.vcfa.enabled&&p.vcfa.rangeSize)ranges.push({start:p.vcfa.start,end:p.vcfa.end,label:this.t('ms.vcfa_title'),kind:'reserved'});
+      if(v.rangeStart&&v.rangeEnd)ranges.push({start:v.rangeStart,end:v.rangeEnd,label:this.t('ipmap.vlan_range'),kind:'pool'});
+      return Core.buildIpMap(v,assigned,ranges);
+    },
+    gatewayHint(v){ const c=Core.parseCidr(v.cidr); return c?Core.intToIp(c.firstUsable)+'/'+c.prefix:'10.0.1.1/24'; },
 
     hostsOf(d){ return Core.effectiveHostCount(d); },
 
@@ -2573,15 +2831,12 @@ function vcfApp(){
       const size=Core.rangeSize(vlanRow.rangeStart, vlanRow.rangeEnd);
       if(size===0){ this.showToast(this.t('vlan.autofill_invalid')); return; }
       const addresses=Core.generateIPRange(vlanRow.rangeStart, size).addresses.filter(ip=>!this.isReservedIP(ip));
-      const targets=this.appliances.filter(a=>a.domain===vlanRow.domain && a.vlan===vlanRow.vlanName && !a.ipAddress && a.applianceType!=='VCF Identity Broker (Embedded)');
+      const targets=[...this.appliances,...this.hosts].filter(a=>a.domain===vlanRow.domain && a.vlan===vlanRow.vlanName && !a.ipAddress && a.applianceType!=='VCF Identity Broker (Embedded)');
       if(targets.length===0) return;
       if(targets.length > addresses.length){
         this.showToast(this.t('vlan.autofill_range_too_small',{size:addresses.length,need:targets.length}));
       }
-      targets.slice(0, addresses.length).forEach((a,i)=>{
-        const idx=this.appliances.findIndex(x=>x.id===a.id);
-        this.appliances[idx].ipAddress=addresses[i];
-      });
+      targets.slice(0, addresses.length).forEach((a,i)=>{ a.ipAddress=addresses[i]; });
     },
 
     vlanCidrFor(row){ return Core.findApplianceVLAN(this.vlans,row.domain,row.vlan)?.cidr||''; },
@@ -2611,7 +2866,7 @@ function vcfApp(){
 
     // Safety net for export/import: expands any stored partial IP (e.g. "25" saved by v1.24.0 or older).
     normalizeStoredIPs(){
-      [...this.appliances,...this.vips].forEach(row=>{
+      [...this.appliances,...this.vips,...this.hosts].forEach(row=>{
         const v=(row.ipAddress||'').trim();
         if(!v||Core.ipToInt(v)!==null)return;
         const r=Core.expandHostIP(v,this.vlanCidrFor(row));
@@ -2644,6 +2899,7 @@ function vcfApp(){
     applySuggestedFQDNs(kind){
       const rows=kind==='vips'
         ?this.vips.map(v=>[v,v.vipName])
+        :kind==='hosts'?this.hosts.map(h=>[h,h.hostName])
         :this.appliances.filter(a=>a.fqdnRequired&&a.applianceType!=='VCF Identity Broker (Embedded)').map(a=>[a,a.applianceName]);
       let n=0;
       rows.forEach(([row,name])=>{ if(!row.fqdn){ const s=this.fqdnSuggestion(name); if(s){row.fqdn=s;n++;} } });
@@ -2652,18 +2908,23 @@ function vcfApp(){
 
     exportExcel(){
       this.normalizeStoredIPs();
-      Core.doExcelExport({msPlan:this.msPlan,project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips,validationMessages:this.validationMessages,domainSummaries:this.domainSummaries}, XLSX);
+      Core.doExcelExport({msPlan:this.msPlan,project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips,hosts:this.hosts,validationMessages:this.validationMessages,domainSummaries:this.domainSummaries}, XLSX);
       this.showToast('Excel exported successfully');
+    },
+
+    // Full planner state — the JSON export format, also used by the autosave.
+    currentState(){
+      return {
+        project:{...this.project,workloadDomainCount:this.workloadDomains.length},
+        managementDomain:this.managementDomain,
+        workloadDomains:this.workloadDomains,
+        vlans:this.vlans,appliances:this.appliances,vips:this.vips,hosts:this.hosts
+      };
     },
 
     exportJSON(){
       this.normalizeStoredIPs();
-      const state={
-        project:{...this.project,workloadDomainCount:this.workloadDomains.length},
-        managementDomain:this.managementDomain,
-        workloadDomains:this.workloadDomains,
-        vlans:this.vlans,appliances:this.appliances,vips:this.vips
-      };
+      const state=this.currentState();
       const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
@@ -2677,26 +2938,32 @@ function vcfApp(){
       const reader=new FileReader();
       reader.onload=(e)=>{
         try{
-          const s=JSON.parse(e.target.result);
-          // Pre-v1.21.0 exports used the subnet access mode "isolated", replaced by the Broadcom-documented
-          // "Private TGW" (Private Transit Gateway) term — migrate silently on import.
-          const migrateVPCs=vpcs=>(vpcs||[]).forEach(vpc=>(vpc.subnets||[]).forEach(sn=>{if(sn.accessMode==='isolated')sn.accessMode='private-tgw';}));
-          if(s.project)this.project={...Core.DEFAULT_PROJECT,...s.project};
-          if(s.managementDomain){this.managementDomain={...JSON.parse(JSON.stringify(Core.DEFAULT_MGMT)),...s.managementDomain};migrateVPCs(this.managementDomain.vksVPCs);}
-          if(s.workloadDomains){this.workloadDomains=s.workloadDomains.map((w,i)=>({...Core.defaultWorkloadDomain(i+1),...w}));this.workloadDomains.forEach(w=>migrateVPCs(w.vksVPCs));}
-          this.compute();
-          if(s.vlans){
-            const saved={};s.vlans.forEach(sv=>{saved[`${sv.domain}|${sv.vlanName}`]=sv;});
-            this.vlans.forEach(v=>{const sv=this.vlanEditFor(saved,v.domain,v.vlanName);if(sv){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';}});
-          }
-          if(s.appliances)s.appliances.forEach(sa=>{const a=this.appliances.find(x=>x.applianceName===sa.applianceName);if(a){a.ipAddress=sa.ipAddress||'';a.fqdn=sa.fqdn||'';}});
-          if(s.vips)s.vips.forEach(sv=>{const v=this.vips.find(x=>x.vipName===sv.vipName);if(v){v.ipAddress=sv.ipAddress||'';v.fqdn=sv.fqdn||'';}});
-          this.normalizeStoredIPs();
+          this.loadState(JSON.parse(e.target.result));
           this.showToast('JSON imported successfully');
         }catch{this.showToast('Import failed — invalid JSON file');}
         event.target.value='';
       };
       reader.readAsText(file);
+    },
+
+    // Restores a saved state (JSON import or autosave); throws on malformed input.
+    loadState(s){
+      // Pre-v1.21.0 exports used the subnet access mode "isolated", replaced by the Broadcom-documented
+      // "Private TGW" (Private Transit Gateway) term — migrate silently on import.
+      const migrateVPCs=vpcs=>(vpcs||[]).forEach(vpc=>(vpc.subnets||[]).forEach(sn=>{if(sn.accessMode==='isolated')sn.accessMode='private-tgw';}));
+      if(s.project)this.project={...Core.DEFAULT_PROJECT,...s.project};
+      if(s.managementDomain){this.managementDomain={...JSON.parse(JSON.stringify(Core.DEFAULT_MGMT)),...s.managementDomain};migrateVPCs(this.managementDomain.vksVPCs);}
+      if(s.workloadDomains){this.workloadDomains=s.workloadDomains.map((w,i)=>({...Core.defaultWorkloadDomain(i+1),...w}));this.workloadDomains.forEach(w=>migrateVPCs(w.vksVPCs));}
+      this.compute();
+      if(s.vlans){
+        const saved={};s.vlans.forEach(sv=>{saved[`${sv.domain}|${sv.vlanName}`]=sv;});
+        this.vlans.forEach(v=>{const sv=this.vlanEditFor(saved,v.domain,v.vlanName);if(sv){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.gateway=sv.gateway||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';}});
+      }
+      if(s.appliances)s.appliances.forEach(sa=>{const a=this.appliances.find(x=>x.applianceName===sa.applianceName);if(a){a.ipAddress=sa.ipAddress||'';a.fqdn=sa.fqdn||'';}});
+      if(s.vips)s.vips.forEach(sv=>{const v=this.vips.find(x=>x.vipName===sv.vipName);if(v){v.ipAddress=sv.ipAddress||'';v.fqdn=sv.fqdn||'';}});
+      if(s.hosts)s.hosts.forEach(sh=>{const h=this.hosts.find(x=>x.domain===sh.domain&&x.hostName===sh.hostName);if(h){h.ipAddress=sh.ipAddress||'';h.fqdn=sh.fqdn||'';}});
+      this.normalizeStoredIPs();
+      this.revalidate();
     },
   };
 }

@@ -1,9 +1,9 @@
 // Pure VLAN domain logic: builds management/workload VLAN lists and derives helper lookups.
 
-import { recommendCIDR } from './sizing.js?v=1.28.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, azNetworkMode, RECOMMENDED_MTU } from './data.js?v=1.28.0';
-import { ipToInt, intToIp } from './iprange.js?v=1.28.0';
-import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.28.0';
+import { recommendCIDR } from './sizing.js?v=1.29.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, azNetworkMode, RECOMMENDED_MTU } from './data.js?v=1.29.0';
+import { ipToInt, intToIp } from './iprange.js?v=1.29.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.29.0';
 
 // ── VLAN ENGINE ─────────────────────────────────────────────────
 let _vlanId=0;
@@ -11,7 +11,7 @@ export function resetVlanCounter(){_vlanId=0;}
 export function makeVLAN(domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,notes,bufferEnabled,bufferPercent){
   const rec=recommendCIDR(requiredIPs,bufferEnabled,bufferPercent);
   const az=/ — (AZ[12])$/.exec(vlanName)?.[1]||'';
-  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,az,stretchedL2:false,recommendedMTU:RECOMMENDED_MTU[vlanType]||'',vlanId:'',cidr:'',rangeStart:'',rangeEnd:''};
+  return {id:`vlan-${domain.toLowerCase().replace(/\s/g,'-')}-${++_vlanId}`,domain,vlanName,vlanType,description,purpose,mandatory,scope,requiredIPs,recommendedCIDR:rec.recommendedCIDR,minimumCIDR:rec.recommendedCIDR,notes,az,stretchedL2:false,recommendedMTU:RECOMMENDED_MTU[vlanType]||'',vlanId:'',cidr:'',gateway:'',rangeStart:'',rangeEnd:''};
 }
 
 // In a stretched domain, every VLAN row not tied to one AZ is used by hosts in both AZs, i.e. an L2 network stretched
@@ -148,6 +148,15 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
       ?'2 IPs: vmk0 (management) + vmk1 (dedicated vSAN witness traffic)'
       :'1 IP: vmk0 shared for management + witness traffic (Broadcom default)';
     vlans.push(makeVLAN(domain,'vSAN Witness Traffic — Witness Appliance','vsan-witness','vSAN Witness Host VMkernel (not part of AZ1/AZ2)','Quorum/Witness component — requires independent L3 routing to both AZ1 and AZ2 (not a scalable 3rd site)','mandatory','dedicated',witnessIPs,witnessNotes,buf,bufPct));
+  }
+
+  // 9.1+ VPC Gateway Connectivity (P&P workbook, Deploy Management Domain — its pre-filled value is Centralized, so
+  // that is the default here): "Distributed connectivity" needs an
+  // external VLAN + gateway for the Distributed Transit Gateway at bring-up; "Centralized" is configured after
+  // bring-up on NSX Edges (Edge uplink VLANs below) and adds no VLAN here.
+  if(is91&&mgmt.vpcConnectivity==='distributed'){
+    const n=Math.max(1,Math.floor(Number(mgmt.vpcExternalIPs)||0));
+    vlans.push(makeVLAN(domain,'VPC External (Distributed Transit Gateway)','vpc-external','External network for the NSX Distributed Transit Gateway','VPC Gateway Connectivity — Distributed','scenario-driven','dedicated',n,`${n} IPs planned for the VPC external IP block (public subnets / NAT) — adjust in Management Domain → NSX${l2}`,buf,bufPct));
   }
 
   if(mgmt.nsxEdgeDeployed){
