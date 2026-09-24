@@ -391,6 +391,9 @@
     .tbl .input:focus { border-color: var(--blue-accent); }
     .tbl .input.input-missing { border-style: dashed; border-color: var(--gray-border); background: var(--gray-light); }
     .tbl .input.input-missing::placeholder { color: var(--text-muted); }
+    .tbl .input.input-error { border-style: solid; border-color: var(--red); }
+    .ip-hint { font-size: 10px; margin-top: 2px; font-family: 'Courier New', monospace; color: var(--text-muted); }
+    .ip-hint.err { font-family: inherit; color: var(--red); }
     .tbl-domain { font-weight: 600; color: var(--blue-accent); }
     .tbl-mono { font-family: 'Courier New', monospace; font-size: 11px; }
     .tbl-muted { color: var(--text-muted); font-size: 11px; }
@@ -755,9 +758,9 @@
             </div>
             <div class="dom-card-body">
               <div class="dom-stats">
-                <div class="dom-stat"><div class="dom-stat-val" x-text="s.hostCount"></div><div class="dom-stat-lbl">Hosts</div></div>
-                <div class="dom-stat"><div class="dom-stat-val" x-text="s.vlanCount"></div><div class="dom-stat-lbl">VLANs</div></div>
-                <div class="dom-stat"><div class="dom-stat-val" x-text="s.totalIPCount"></div><div class="dom-stat-lbl">IPs</div></div>
+                <div class="dom-stat"><div class="dom-stat-val" x-text="s.hostCount"></div><div class="dom-stat-lbl" x-text="s.azHostCounts ? t('ov.hosts_az',{az1:s.azHostCounts[0],az2:s.azHostCounts[1]}) : t('ov.hosts')"></div></div>
+                <div class="dom-stat"><div class="dom-stat-val" x-text="s.vlanCount"></div><div class="dom-stat-lbl" x-text="t('ov.vlans')"></div></div>
+                <div class="dom-stat"><div class="dom-stat-val" x-text="s.totalIPCount"></div><div class="dom-stat-lbl" x-text="t('ov.ips')"></div></div>
               </div>
               <div class="dom-services" x-text="s.enabledServices.length ? s.enabledServices.join(' · ') : 'No optional services'"></div>
             </div>
@@ -782,11 +785,11 @@
             <div class="field">
               <label x-text="t('az.host_count_label_short')">AZ1 / AZ2 Host Count</label>
               <div class="flex-center gap12">
-                <input class="input" type="number" min="1" x-model.number="managementDomain.az1HostCount" @input="managementDomain.az2HostCount=managementDomain.az1HostCount; managementDomain.hostCount=managementDomain.az1HostCount+managementDomain.az2HostCount" />
-                <input class="input" type="number" min="1" x-model.number="managementDomain.az2HostCount" @input="managementDomain.hostCount=managementDomain.az1HostCount+managementDomain.az2HostCount" />
+                <input class="input" type="number" min="1" x-model.number="managementDomain.az1HostCount" @input="managementDomain.az2HostCount=managementDomain.az1HostCount" />
+                <input class="input" type="number" min="1" x-model.number="managementDomain.az2HostCount" />
               </div>
-              <span class="field-note" x-text="t('az.symmetry_note',{total:managementDomain.hostCount})"></span>
-              <span class="field-note" style="color:var(--red-accent)" x-show="managementDomain.az1HostCount!==managementDomain.az2HostCount" x-text="t('az.symmetry_warn')"></span>
+              <span class="field-note" x-text="t(managementDomain.topologyMode==='vsan-stretched'?'az.symmetry_note':'az.total_note_vmsc',{total:hostsOf(managementDomain)})"></span>
+              <span class="field-note" style="color:var(--red)" x-show="managementDomain.az1HostCount!==managementDomain.az2HostCount" x-text="t(managementDomain.topologyMode==='vsan-stretched'?'az.symmetry_warn':'az.symmetry_warn_vmsc')"></span>
             </div>
           </template>
           <div class="field">
@@ -827,7 +830,7 @@
         </div>
       </div>
 
-      <template x-if="managementDomain.topologyMode==='vsan-stretched'||managementDomain.topologyMode==='stretched'">
+      <template x-if="managementDomain.topologyMode==='vsan-stretched'">
         <div class="card">
           <h2 class="sec-title" x-text="t('witness.section_title')">vSAN Witness</h2>
           <div class="mt12">
@@ -1228,11 +1231,11 @@
                 <div class="field">
                   <label x-text="t('az.host_count_label_short')">AZ1 / AZ2 Host Count</label>
                   <div class="flex-center gap12">
-                    <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].az1HostCount" @input="workloadDomains[wi].az2HostCount=workloadDomains[wi].az1HostCount; workloadDomains[wi].hostCount=workloadDomains[wi].az1HostCount+workloadDomains[wi].az2HostCount" />
-                    <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].az2HostCount" @input="workloadDomains[wi].hostCount=workloadDomains[wi].az1HostCount+workloadDomains[wi].az2HostCount" />
+                    <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].az1HostCount" @input="workloadDomains[wi].az2HostCount=workloadDomains[wi].az1HostCount" />
+                    <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].az2HostCount" />
                   </div>
-                  <span class="field-note" x-text="t('az.symmetry_note',{total:workloadDomains[wi].hostCount})"></span>
-                  <span class="field-note" style="color:var(--red-accent)" x-show="workloadDomains[wi].az1HostCount!==workloadDomains[wi].az2HostCount" x-text="t('az.symmetry_warn')"></span>
+                  <span class="field-note" x-text="t(workloadDomains[wi].topologyMode==='vsan-stretched'?'az.symmetry_note':'az.total_note_vmsc',{total:hostsOf(workloadDomains[wi])})"></span>
+                  <span class="field-note" style="color:var(--red)" x-show="workloadDomains[wi].az1HostCount!==workloadDomains[wi].az2HostCount" x-text="t(workloadDomains[wi].topologyMode==='vsan-stretched'?'az.symmetry_warn':'az.symmetry_warn_vmsc')"></span>
                 </div>
               </template>
               <div class="field">
@@ -1304,7 +1307,7 @@
             </div>
 
             <!-- vSAN Witness (Stretched Cluster) -->
-            <template x-if="workloadDomains[wi].topologyMode==='vsan-stretched'||workloadDomains[wi].topologyMode==='stretched'">
+            <template x-if="workloadDomains[wi].topologyMode==='vsan-stretched'">
               <div class="nest mt12">
                 <div class="nest-title" x-text="t('witness.section_title')">vSAN Witness</div>
                 <label class="check-row">
@@ -1455,7 +1458,10 @@
     <div x-show="activeTab==='appliances'">
       <div class="flex-between mb8">
         <h2 class="sec-title" style="margin-bottom:0">Appliance Allocation</h2>
-        <span class="text-muted text-xs" x-text="appliancesIPCompletion.done + '/' + appliancesIPCompletion.total + ' IP addresses filled'"></span>
+        <div class="flex-center gap8">
+          <button class="btn btn-secondary btn-sm" x-show="project.fqdnSuffix" @click="applySuggestedFQDNs('appliances')" x-text="t('fqdn.apply_all')"></button>
+          <span class="text-muted text-xs" x-text="appliancesIPCompletion.done + '/' + appliancesIPCompletion.total + ' IP addresses filled'"></span>
+        </div>
       </div>
       <!-- FQDN prefix banner -->
       <div class="card" style="padding:12px 16px;margin-bottom:12px" x-show="project.fqdnSuffix">
@@ -1498,17 +1504,24 @@
                     <input class="input mono" style="width:130px;color:#aaa" value="N/A" disabled />
                   </template>
                   <template x-if="a.applianceType!=='VCF Identity Broker (Embedded)'">
-                    <input class="input mono" style="width:130px"
-                      :class="{'input-missing': !a.ipAddress}"
-                      :placeholder="getVLANPrefix(a.domain, a.vlan) || 'TBD'"
-                      x-model="appliances[ai].ipAddress" />
+                    <div>
+                      <input class="input mono" style="width:130px"
+                        :class="{'input-missing': !a.ipAddress, 'input-error': ipErrors[a.id]}"
+                        :placeholder="getVLANPrefix(a.domain, a.vlan) || 'TBD'"
+                        x-model="appliances[ai].ipAddress"
+                        @input="clearIPError(a)" @blur="commitIP(appliances[ai])" @keydown.enter="commitIP(appliances[ai])" />
+                      <div class="ip-hint" x-show="!ipErrors[a.id] && ipPreview(a)" x-text="'→ ' + ipPreview(a)"></div>
+                      <div class="ip-hint err" x-show="ipErrors[a.id]" x-text="ipErrors[a.id] ? t('ip.err.' + ipErrors[a.id]) : ''"></div>
+                    </div>
                   </template>
                 </td>
                 <td>
                   <input class="input mono" style="width:200px"
                     :class="{'input-missing': !a.fqdn && a.applianceType!=='VCF Identity Broker (Embedded)'}"
                     :placeholder="buildFQDNPlaceholder(a.applianceName)"
-                    x-model="appliances[ai].fqdn" />
+                    x-model="appliances[ai].fqdn"
+                    @keydown.tab="acceptFQDN(appliances[ai], a.applianceName)"
+                    @keydown.arrow-right="acceptFQDN(appliances[ai], a.applianceName, $event)" />
                 </td>
                 <td class="text-center">
                   <span class="badge" :class="a.staticIPRequired ? 'badge-mandatory' : 'badge-optional'" x-text="a.staticIPRequired ? 'Yes' : 'No'"></span>
@@ -1530,11 +1543,14 @@
     <div x-show="activeTab==='vips'">
       <div class="flex-between mb8">
         <h2 class="sec-title" style="margin-bottom:0">Virtual IP (VIP) Allocation</h2>
-        <span class="text-muted text-xs" x-text="vipsIPCompletion.done + '/' + vipsIPCompletion.total + ' IP addresses filled'"></span>
+        <div class="flex-center gap8">
+          <button class="btn btn-secondary btn-sm" x-show="project.fqdnSuffix" @click="applySuggestedFQDNs('vips')" x-text="t('fqdn.apply_all')"></button>
+          <span class="text-muted text-xs" x-text="vipsIPCompletion.done + '/' + vipsIPCompletion.total + ' IP addresses filled'"></span>
+        </div>
       </div>
       <div class="infobox blue mb8" x-show="project.fqdnSuffix || vlans.some(v=>v.cidr)">
         <div class="text-xs">
-          <span x-show="project.fqdnSuffix"><strong>FQDN suffix:</strong> <span class="tbl-mono" x-text="project.fqdnSuffix"></span> — placeholders pre-filled. </span>
+          <span x-show="project.fqdnSuffix"><strong>FQDN suffix:</strong> <span class="tbl-mono" x-text="project.fqdnSuffix"></span> — <span x-text="t('fqdn.accept_hint')"></span> </span>
           <span x-show="vlans.some(v=>v.cidr)" x-html="t('vips.cidr_note')"></span>
         </div>
       </div>
@@ -1560,15 +1576,20 @@
                 <td class="tbl-muted" x-text="v.vlan"></td>
                 <td>
                   <input class="input mono" style="width:130px"
-                    :class="{'input-missing': !v.ipAddress}"
+                    :class="{'input-missing': !v.ipAddress, 'input-error': ipErrors[v.id]}"
                     :placeholder="getVLANPrefix(v.domain, v.vlan) || 'TBD'"
-                    x-model="vips[vi].ipAddress" />
+                    x-model="vips[vi].ipAddress"
+                    @input="clearIPError(v)" @blur="commitIP(vips[vi])" @keydown.enter="commitIP(vips[vi])" />
+                  <div class="ip-hint" x-show="!ipErrors[v.id] && ipPreview(v)" x-text="'→ ' + ipPreview(v)"></div>
+                  <div class="ip-hint err" x-show="ipErrors[v.id]" x-text="ipErrors[v.id] ? t('ip.err.' + ipErrors[v.id]) : ''"></div>
                 </td>
                 <td>
                   <input class="input mono" style="width:200px"
                     :class="{'input-missing': !v.fqdn}"
-                    :placeholder="buildFQDNPlaceholder(v.vipName.toLowerCase().replace(/\\s+/g,'-'))"
-                    x-model="vips[vi].fqdn" />
+                    :placeholder="buildFQDNPlaceholder(v.vipName)"
+                    x-model="vips[vi].fqdn"
+                    @keydown.tab="acceptFQDN(vips[vi], v.vipName)"
+                    @keydown.arrow-right="acceptFQDN(vips[vi], v.vipName, $event)" />
                 </td>
                 <td class="tbl-muted" x-text="v.notes"></td>
               </tr>
@@ -1622,8 +1643,8 @@
 
         <div class="card">
           <h3 class="sec-title" style="font-size:12px;margin-bottom:10px">Excel Export</h3>
-          <p class="text-muted text-sm mb12">Export a full planning workbook with 5 sheets:<br>
-            <strong>Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report</strong>
+          <p class="text-muted text-sm mb12">Export a full planning workbook with 6 sheets:<br>
+            <strong>Domain Summary · VLAN Summary · Appliance Allocation · VIPs · Validation Report · VKS VPCs</strong>
           </p>
           <button class="btn btn-primary" @click="exportExcel()">⬇ Export to Excel (.xlsx)</button>
         </div>
@@ -1803,6 +1824,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.25.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1250')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.24.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
@@ -2021,7 +2047,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.24.0';
+import * as Core from './core/index.js?v=1.25.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -2063,7 +2089,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.24.0',
+    appVersion:'1.25.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2131,6 +2157,8 @@ function vcfApp(){
       return {done:this.vips.filter(v=>v.ipAddress).length, total:this.vips.length};
     },
     toastMsg:'',toastVisible:false,
+    // Per-row IP entry errors (keyed by appliance/VIP id), set on blur/Enter by commitIP, cleared on the next keystroke.
+    ipErrors:{},
 
     init(){
       this.$watch('lang', v => { localStorage.setItem('vcf-lang', v); this.compute(); });
@@ -2141,6 +2169,11 @@ function vcfApp(){
       this.$watch('project',()=>this.compute());
       this.$watch('managementDomain',()=>this.compute());
       this.$watch('workloadDomains',()=>this.compute());
+      // VLAN IDs/CIDRs/ranges and appliance/VIP IPs don't change the generated rows, so they only need a re-run of
+      // the validation (the range/CIDR rules read them) — calling compute() here would rebuild the tables mid-typing.
+      this.$watch('vlans',()=>this.revalidate());
+      this.$watch('appliances',()=>this.revalidate());
+      this.$watch('vips',()=>this.revalidate());
       this.compute();
       // AUTH DISABLED — décommenter pour réactiver : this.initAuth();
     },
@@ -2170,6 +2203,13 @@ function vcfApp(){
 
     compute(){
       this.ensureVKSVPCDefaults();
+      // In stretched modes the stored hostCount is only a copy of AZ1+AZ2 (kept for JSON export and for switching
+      // back to single-site) — resync it here instead of relying on @input, which never fires for untouched defaults.
+      [this.managementDomain,...this.workloadDomains].forEach(d=>{
+        if(!Core.isStretchedTopology(d.topologyMode))return;
+        const n=Core.effectiveHostCount(d);
+        if(d.hostCount!==n)d.hostCount=n;
+      });
       // Keep workloadDomainCount in sync with actual array length
       this.project.workloadDomainCount=this.workloadDomains.length;
 
@@ -2194,10 +2234,16 @@ function vcfApp(){
       const wVips=this.workloadDomains.flatMap(w=>Core.buildWorkloadVIPs(w));
       this.vips=[...mVips,...wVips].map(v=>({...v,...(vipEdits[v.vipName]||{})}));
 
-      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,tFn,this.appliances);
-      this.domainSummaries=Core.buildDomainSummaries(this.project,this.managementDomain,this.workloadDomains,this.vlans,this.vips);
+      this.revalidate();
       this.componentData=Core.computeComponentRequirements(this.project,this.managementDomain,this.workloadDomains);
     },
+
+    revalidate(){
+      this.validationMessages=Core.runValidation(this.project,this.managementDomain,this.workloadDomains,this.vlans,(key,vars)=>this.t(key,vars),this.appliances);
+      this.domainSummaries=Core.buildDomainSummaries(this.project,this.managementDomain,this.workloadDomains,this.vlans,this.vips);
+    },
+
+    hostsOf(d){ return Core.effectiveHostCount(d); },
 
     /* AUTH DISABLED — décommenter pour réactiver l'authentification Supabase
     async initAuth(){
@@ -2323,20 +2369,80 @@ function vcfApp(){
       });
     },
 
-    // Builds FQDN placeholder from appliance/VIP name + project suffix
-    buildFQDNPlaceholder(name){
-      const prefix=this.project.fqdnPrefix?this.project.fqdnPrefix+'-':'';
+    vlanCidrFor(row){ return Core.findApplianceVLAN(this.vlans,row.domain,row.vlan)?.cidr||''; },
+
+    // Live "→ 10.0.1.25" hint while a partial IP (host number or trailing octets) is being typed.
+    ipPreview(row){
+      const v=(row.ipAddress||'').trim();
+      if(!v||Core.ipToInt(v)!==null)return '';
+      const r=Core.expandHostIP(v,this.vlanCidrFor(row));
+      return r.error?'':r.ip;
+    },
+
+    // On blur/Enter: expands a partial IP to the full address from the VLAN CIDR; on error keeps the typed value
+    // and flags the field instead of erasing it.
+    commitIP(row){
+      const r=Core.expandHostIP(row.ipAddress,this.vlanCidrFor(row));
+      if(r.error){ this.ipErrors={...this.ipErrors,[row.id]:r.error}; return; }
+      if(r.ip!==row.ipAddress)row.ipAddress=r.ip;
+      this.clearIPError(row);
+    },
+
+    clearIPError(row){
+      if(!this.ipErrors[row.id])return;
+      const {[row.id]:_,...rest}=this.ipErrors;
+      this.ipErrors=rest;
+    },
+
+    // Safety net for export/import: expands any stored partial IP (e.g. "25" saved by v1.24.0 or older).
+    normalizeStoredIPs(){
+      [...this.appliances,...this.vips].forEach(row=>{
+        const v=(row.ipAddress||'').trim();
+        if(!v||Core.ipToInt(v)!==null)return;
+        const r=Core.expandHostIP(v,this.vlanCidrFor(row));
+        if(!r.error)row.ipAddress=r.ip;
+      });
+    },
+
+    fqdnSlug(name){ return String(name).toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,''); },
+
+    // Suggested FQDN from appliance/VIP name + project prefix/suffix; '' when no suffix is set.
+    fqdnSuggestion(name){
       const suffix=this.project.fqdnSuffix;
-      if(suffix)return prefix+name+'.'+suffix;
-      return 'host.domain.local';
+      if(!suffix)return '';
+      const prefix=this.project.fqdnPrefix?this.project.fqdnPrefix+'-':'';
+      return prefix+this.fqdnSlug(name)+'.'+suffix;
+    },
+
+    buildFQDNPlaceholder(name){ return this.fqdnSuggestion(name)||'host.domain.local'; },
+
+    // Tab / → on an empty FQDN field copies the suggestion into the value (Tab still moves focus afterwards).
+    acceptFQDN(row,name,event){
+      if(row.fqdn)return;
+      const s=this.fqdnSuggestion(name);
+      if(!s)return;
+      row.fqdn=s;
+      if(event)event.preventDefault();
+    },
+
+    // Fills every empty FQDN of the tab with its suggestion — never overwrites a value already entered.
+    applySuggestedFQDNs(kind){
+      const rows=kind==='vips'
+        ?this.vips.map(v=>[v,v.vipName])
+        :this.appliances.filter(a=>a.fqdnRequired&&a.applianceType!=='VCF Identity Broker (Embedded)').map(a=>[a,a.applianceName]);
+      let n=0;
+      rows.forEach(([row,name])=>{ if(!row.fqdn){ const s=this.fqdnSuggestion(name); if(s){row.fqdn=s;n++;} } });
+      this.showToast(this.t('fqdn.applied',{n}));
     },
 
     exportExcel(){
+      this.normalizeStoredIPs();
       Core.doExcelExport({project:this.project,managementDomain:this.managementDomain,workloadDomains:this.workloadDomains,vlans:this.vlans,appliances:this.appliances,vips:this.vips,validationMessages:this.validationMessages,domainSummaries:this.domainSummaries}, XLSX);
       this.showToast('Excel exported successfully');
     },
 
     exportJSON(){
+      this.normalizeStoredIPs();
       const state={
         project:{...this.project,workloadDomainCount:this.workloadDomains.length},
         managementDomain:this.managementDomain,
@@ -2367,6 +2473,7 @@ function vcfApp(){
           if(s.vlans)s.vlans.forEach(sv=>{const v=this.vlans.find(x=>x.domain===sv.domain&&x.vlanName===sv.vlanName);if(v){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';}});
           if(s.appliances)s.appliances.forEach(sa=>{const a=this.appliances.find(x=>x.applianceName===sa.applianceName);if(a){a.ipAddress=sa.ipAddress||'';a.fqdn=sa.fqdn||'';}});
           if(s.vips)s.vips.forEach(sv=>{const v=this.vips.find(x=>x.vipName===sv.vipName);if(v){v.ipAddress=sv.ipAddress||'';v.fqdn=sv.fqdn||'';}});
+          this.normalizeStoredIPs();
           this.showToast('JSON imported successfully');
         }catch{this.showToast('Import failed — invalid JSON file');}
         event.target.value='';

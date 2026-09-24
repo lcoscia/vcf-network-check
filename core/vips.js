@@ -1,6 +1,6 @@
 // Pure VIP domain logic: builds management/workload virtual IP inventories.
 
-import { isVcf91Plus } from './data.js?v=1.24.0';
+import { isVcf91Plus } from './data.js?v=1.25.0';
 
 // ── VIP ENGINE ──────────────────────────────────────────────────
 let _vipId=0;
@@ -23,7 +23,7 @@ export function buildManagementVIPs(mgmt,project){
   const is91=isVcf91Plus(project.vcfVersion);
   const fleetDedicated=['dedicated-fleet-vlan','nsx-vlan-segment','nsx-overlay-segment'].includes(mgmt.fleetPlacement);
   const isOverlayModel=mgmt.fleetPlacement==='nsx-overlay-segment';
-  // Mirrors core/vlan.js and core/appliances.js: Fleet VIP / Log Management VIP (Day-0) always resolve to the
+  // Mirrors core/vlan.js and core/appliances.js: Fleet VIP (9.0) / Log Management VIP (Day-0) always resolve to the
   // dedicated VLAN, never the overlay segment, regardless of fleetPlacement.
   const dedicatedVLANName=isOverlayModel?'VCF Management Dedicated VLAN':mgmt.fleetPlacement==='nsx-vlan-segment'?'Fleet NSX VLAN Segment':(is91?'VCF Management Services Runtime':'Fleet Network');
   const overlayVLANName='Fleet NSX Overlay Segment';
@@ -31,7 +31,8 @@ export function buildManagementVIPs(mgmt,project){
   function platVLAN(req,name){if(req)return name;if(!fleetDedicated)return 'Management VM Network';return isOverlayModel?overlayVLANName:dedicatedVLANName;}
 
   vips.push(mkVIP('NSX Manager VIP','NSX Manager',domain,'Management VM Network',mgmt.nsxManagerMode==='clustered'?'Cluster VIP for NSX Manager 3-node cluster.':'Standalone NSX Manager — VIP reserved for future scale-out.'));
-  vips.push(mkVIP('Fleet VIP','Fleet',domain,fleetVLAN,mgmt.fleetMode==='clustered'?'Fleet HA cluster VIP.':'Fleet standalone VIP. Reserved for DNS stability.'));
+  // 9.1+: no Fleet VIP — only the 'Fleet components' FQDN, which already has its own IP on fleet-01 (Appliances tab).
+  if(!is91) vips.push(mkVIP('Fleet VIP','Fleet',domain,fleetVLAN,mgmt.fleetMode==='clustered'?'Fleet HA cluster VIP.':'Fleet standalone VIP. Reserved for DNS stability.'));
   if(mgmt.aviDeployed) vips.push(mkVIP('AVI Controller Cluster VIP','Avi Load Balancer',domain,'Management VM Network','AVI Controller cluster VIP.'));
   if(mgmt.vcfOperations.enabled){const v=platVLAN(mgmt.vcfOperations.requiresDedicatedVLAN,'VCF Operations Network');vips.push(mkVIP('VCF Operations VIP','VCF Operations',domain,v,mgmt.vcfOperations.mode==='enterprise'?'Enterprise analytics cluster VIP.':'Standalone VCF Operations VIP — reserved for DNS.'));}
   if(mgmt.vcfOperationsForLogs.enabled){

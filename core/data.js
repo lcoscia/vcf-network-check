@@ -13,4 +13,17 @@ export const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-stand
 // 9.1.1 is a maintenance BoM release (supportability fixes) on the same VCF Management
 // Services architecture as 9.1 — every 9.1-branch IP/FQDN rule in this engine applies to it too.
 export function isVcf91Plus(vcfVersion){ return vcfVersion === '9.1' || vcfVersion === '9.1.1'; }
+
+// Both stretched topologies split hosts across AZ1/AZ2; only 'vsan-stretched' has a vSAN Witness —
+// a vMSC ('stretched', non-vSAN FC/NFS/iSCSI array) relies on the storage vendor's tiebreaker instead.
+export function isStretchedTopology(topologyMode){ return topologyMode === 'vsan-stretched' || topologyMode === 'stretched'; }
+export function hasVsanWitness(topologyMode){ return topologyMode === 'vsan-stretched'; }
+
+// Single source of truth for a domain's host count. In stretched modes hostCount is only a stored
+// convenience copy that may be stale (e.g. AZ fields left at their defaults), so derive AZ1+AZ2 instead.
+// Number() guards against x-model.number yielding '' for a cleared field ('' + 4 === '4').
+export function effectiveHostCount(d){
+  if(isStretchedTopology(d.topologyMode)) return (Number(d.az1HostCount)||0)+(Number(d.az2HostCount)||0);
+  return Number(d.hostCount)||0;
+}
 export const DEFAULT_MGMT={hostCount:4,nsxManagerMode:'clustered',fleetMode:'standalone',fleetPlacement:'shared-mgmt-vlan',svcRuntimeReserve30:false,nsxEdgeDeployed:false,nsxEdgeNodeCount:2,aviDeployed:false,vksEnabled:false,vksLBType:'nsx-lb',sspEnabled:false,tepInterfacesPerHost:2,edgeUplinksDedicated:true,additionalServices:[],topologyMode:'single-site',layer2AdjacencyConfirmed:false,az1HostCount:4,az2HostCount:4,witnessDedicatedVsanVmk:false,storageType:'vsan-esa',vcfOperations:{enabled:true,mode:'enterprise',remoteCollectorCount:2,requiresDedicatedVLAN:false,cloudProxyEnabled:true,licenseServerEnabled:true},vcfOperationsForLogs:{enabled:true,mode:'clustered',workerCount:2,integratedLBVIP:true,requiresDedicatedVLAN:false},vcfOperationsForNetworks:{enabled:true,platformNodeCount:1,collectorCount:1,requiresDedicatedVLAN:false},vcfAutomation:{enabled:true,mode:'clustered',orchestratorMode:'embedded',orchestratorNodeCount:1,requiresDedicatedVLAN:false},vcfIdentityBroker:{enabled:true,mode:'appliance',haEnabled:false,requiresDedicatedVLAN:false},vksVPCs:[]};
