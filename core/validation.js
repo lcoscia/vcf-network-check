@@ -1,7 +1,7 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
-import { ipInCidr, rangeSize } from './iprange.js?v=1.25.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount } from './data.js?v=1.25.0';
+import { ipInCidr, rangeSize } from './iprange.js?v=1.26.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount } from './data.js?v=1.26.0';
 
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;
@@ -52,12 +52,10 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   }
   if(mgmt.nsxEdgeDeployed&&mgmt.nsxEdgeNodeCount<2) msgs.push(mkMsg('warning','nsx',domain,'Single NSX Edge node — no HA. Recommend 2+ Edge nodes.','Increase Edge node count to 2.'));
   if(!mgmt.fleetPlacement) msgs.push(mkMsg('blocker','vlan',domain,'Fleet placement is undefined.','Select Fleet placement.'));
-  if(!mgmt.layer2AdjacencyConfirmed) msgs.push(mkMsg('warning','bring-up',domain,'L2 adjacency for bring-up not confirmed.','Confirm L2 adjacency.'));
   if(mgmt.topologyMode==='vsan-stretched'){
     msgs.push(mkMsg('warning','bring-up',domain,t('val.vsan_warn'),t('val.vsan_warn_res')));
-    if(!mgmt.layer2AdjacencyConfirmed)msgs.push(mkMsg('blocker','bring-up',domain,t('val.vsan_l2_block'),t('val.vsan_l2_res')));
   }
-  if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,'Stretched topology (vMSC): ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
+  if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,t('val.vmsc_l2_warn'),t('val.vmsc_l2_res')));
   if(isStretchedTopology(mgmt.topologyMode)) stretchedHostChecks(msgs,domain,'',mgmt);
   if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,t('val.overlay_block'),t('val.overlay_res')));
   // Model 4 (Dedicated VLAN + NSX Stretched Overlay Segment): fleetPlacement==='nsx-overlay-segment' combined with
@@ -66,7 +64,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   // overlay segment. See core/vlan.js for the AZ1/AZ2 dedicated-VLAN row duplication in this mode.
   const isModel4=mgmt.fleetPlacement==='nsx-overlay-segment'&&(mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched');
   if(isModel4){
-    if(!mgmt.layer2AdjacencyConfirmed) msgs.push(mkMsg('blocker','vlan',domain,t('val.stretched_l2_block'),t('val.stretched_l2_res')));
+    msgs.push(mkMsg('info','vlan',domain,t('val.stretched_l2_info'),t('val.stretched_l2_res')));
     msgs.push(mkMsg('info','vlan',domain,t('val.overlay_federation_info')));
   }
   // "NSX VLAN Segment" is not one of the 4 officially documented VCF 9.1 network models — kept only for backward
@@ -101,7 +99,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   // 9.1 — VCF Automation /29 block is a separate allocation from the Services Runtime block
   if(is91&&mgmt.vcfAutomation.enabled) msgs.push(mkMsg('info','vlan',domain,t('val.auto_block_info'),t('val.auto_block_res')));
   if(mgmt.vcfAutomation.enabled&&!mgmt.vcfIdentityBroker.enabled) msgs.push(mkMsg('warning','scenario',domain,'VCF Automation enabled but VCF Identity Broker not configured.','Enable VCF Identity Broker.'));
-  const bringUpReady=mgmtHosts>=mgmtMinHosts&&mgmt.layer2AdjacencyConfirmed&&mgmt.tepInterfacesPerHost>=2;
+  const bringUpReady=mgmtHosts>=mgmtMinHosts&&mgmt.tepInterfacesPerHost>=2;
   msgs.push(bringUpReady?mkMsg('info','bring-up',domain,'Bring-up readiness check PASSED.'):mkMsg('blocker','bring-up',domain,'Bring-up readiness check FAILED.','Address all blockers before VCF Cloud Builder.'));
 
   workloads.forEach((wld,idx)=>{
@@ -116,7 +114,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
     if(wld.edgeRequired&&wld.edgeNodeCount<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": only 1 Edge node. Min 2 recommended.`,'Increase Edge count.'));
     if(wld.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
     if(wld.topologyMode==='vsan-stretched') msgs.push(mkMsg('warning','bring-up',d,t('val.vsan_warn'),t('val.vsan_warn_res')));
-    if(wld.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',d,'Stretched topology (vMSC): ensure all VLANs are extended across all sites.','Verify VLAN extension.'));
+    if(wld.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',d,`"${d}": ${t('val.vmsc_l2_warn')}`,t('val.vmsc_l2_res')));
     if(isStretchedTopology(wld.topologyMode)) stretchedHostChecks(msgs,d,`"${d}": `,wld);
   });
 
@@ -149,7 +147,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[])
   const orphanAppliances=findOrphanApplianceVlans(vlans,appliances);
   const orphanGroups=new Map();
   orphanAppliances.forEach(a=>{
-    const key=`${a.domain} ${a.vlan}`;
+    const key=`${a.domain}\u0000${a.vlan}`;
     if(!orphanGroups.has(key))orphanGroups.set(key,{domain:a.domain,vlan:a.vlan,count:0});
     orphanGroups.get(key).count++;
   });

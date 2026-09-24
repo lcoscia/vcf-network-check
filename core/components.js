@@ -1,8 +1,8 @@
 // Pure calculation: derives per-component IP/FQDN totals for the current project configuration
 // from the static COMPONENT_REFERENCE table.
 
-import { COMPONENT_REFERENCE } from './reference.js?v=1.25.0';
-import { isVcf91Plus, effectiveHostCount } from './data.js?v=1.25.0';
+import { COMPONENT_REFERENCE } from './reference.js?v=1.26.0';
+import { isVcf91Plus, effectiveHostCount } from './data.js?v=1.26.0';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 
