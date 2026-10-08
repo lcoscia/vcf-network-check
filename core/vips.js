@@ -39,7 +39,7 @@ export function buildManagementVIPs(mgmt,project){
   if(mgmt.vcfOperationsForLogs.enabled){
     if(is91){
       // 9.1: Log Management = 1 FQDN (LB endpoint), IPs (6 base +2/replica) allocated from the VCF Services Runtime block — no separate UI/ILB VIPs
-      vips.push(mkVIP('VCF Log Management VIP','VCF Log Management',domain,fleetVLAN,'Log Management endpoint (1 FQDN + 1 IP) — must be OUTSIDE the Services Runtime node pool. Its 6 node IPs (+2 per extra replica) are taken from that pool.'));
+      vips.push(mkVIP('VCF Log Management VIP','Log Management',domain,fleetVLAN,'Log Management endpoint (1 FQDN + 1 IP) — must be OUTSIDE the Services Runtime node pool. Its 6 node IPs (+2 per extra replica) are taken from that pool.'));
     } else {
       const v=platVLAN(mgmt.vcfOperationsForLogs.requiresDedicatedVLAN,'VCF Operations for Logs Network');
       vips.push(mkVIP('VCF Operations for Logs UI VIP','VCF Operations for Logs',domain,v,mgmt.vcfOperationsForLogs.mode==='clustered'?'UI/API VIP for Logs cluster.':'Standalone Logs VIP — reserved for DNS.'));

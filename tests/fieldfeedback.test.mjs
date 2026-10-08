@@ -66,11 +66,11 @@ test('Mgmt Services → VLAN Design: dedicated VLAN model targets the dedicated 
 test('Log Management label follows the VCF version', ()=>{
   const m=clone(C.DEFAULT_MGMT);
   const label=v=>C.computeComponentRequirements({...P,vcfVersion:v},m,[]).components.find(c=>c.id==='ops-for-logs').label;
-  assert.equal(label('9.1'),'VCF Log Management');
-  assert.equal(label('9.1.1'),'VCF Log Management');
+  assert.equal(label('9.1'),'Log Management');
+  assert.equal(label('9.1.1'),'Log Management');
   assert.equal(label('9.0'),'VCF Operations for Logs');
   const svc=v=>C.buildDomainSummaries({...P,vcfVersion:v},m,[],[],[])[0].enabledServices;
-  assert.ok(svc('9.1.1').includes('VCF Log Management'));
+  assert.ok(svc('9.1.1').includes('Log Management'));
   assert.ok(svc('9.0').includes('VCF Ops for Logs'));
 });
 

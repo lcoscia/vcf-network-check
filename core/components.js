@@ -186,7 +186,7 @@ export function computeComponentRequirements(project, mgmt, workloadDomains) {
     const rule = RULES[r.id];
     const { units, totalIps, totalFqdns, perDomain } = rule(mgmt, workloadDomains, project);
     return {
-      // ops-for-logs: "VCF Log Management" in 9.1+ (field feedback v1.30.0)
+      // ops-for-logs: "Log Management" in 9.1+ (field feedback v1.30.0)
       id: r.id, label: r.id === 'ops-for-logs' ? logsLabel(project?.vcfVersion) : r.label, scope: r.scope,
       ipsPerUnit: r.ipsPerUnit, fqdnsPerUnit: r.fqdnsPerUnit,
       units, totalIps, totalFqdns,
