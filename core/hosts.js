@@ -5,7 +5,7 @@
 // TEP addresses are NOT per-host inputs: SDDC Manager hands them out from the network pool / IP pool ranges of the
 // matching VLANs (VLAN Design tab), so they are not itemized here.
 
-import { effectiveHostCount, isStretchedTopology, azNetworkMode } from './data.js?v=1.30.0';
+import { effectiveHostCount, isStretchedTopology, azNetworkMode } from './data.js?v=1.31.0';
 
 function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,''); }
 
@@ -18,7 +18,8 @@ function domainHosts(d, domainName, prefix){
     const az=stretched?(i<=az1?'AZ1':'AZ2'):'';
     rows.push({
       id:`host-${slug(domainName)}-${i}`,
-      domain:domainName, index:i, az,
+      // azIndex: position within the AZ (workbook host names restart at esx01 in AZ2 — core/fqdn.js).
+      domain:domainName, index:i, az, azIndex:az==='AZ2'?i-az1:i,
       hostName:`${prefix}-${String(i).padStart(2,'0')}`,
       vlan:perAZ?`ESXi Management — ${az}`:'ESXi Management',
       ipAddress:'', fqdn:'',

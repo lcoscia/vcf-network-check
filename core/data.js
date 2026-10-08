@@ -8,7 +8,11 @@ export const CIDR_TABLE = [
 ];
 export const GATEWAY_SPARE = 2;
 
-export const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-standard',deploymentType:'greenfield',workloadDomainCount:1,subnetBufferEnabled:true,subnetBufferPercent:20,fqdnSuffix:'',fqdnPrefix:'',vcfVersion:'9.1.1'};
+// JSON export envelope (v1.31.0) — read by the sibling "VCF Planning & Preparation" importer (core/np-import.js there).
+export const EXPORT_SCHEMA=1;
+export function exportMeta(version){ return {tool:'VCF Network Planner',version,schema:EXPORT_SCHEMA}; }
+
+export const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-standard',deploymentType:'greenfield',workloadDomainCount:1,subnetBufferEnabled:true,subnetBufferPercent:20,fqdnSuffix:'',fqdnPrefix:'',siteCode:'',instanceName:'',parentDomain:'',dnsServers:[],ntpServers:[],vcfVersion:'9.1.1'};
 
 // 9.1.1 is a maintenance BoM release (supportability fixes) on the same VCF Management
 // Services architecture as 9.1 — every 9.1-branch IP/FQDN rule in this engine applies to it too.
