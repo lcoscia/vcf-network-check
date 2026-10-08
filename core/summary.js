@@ -1,6 +1,6 @@
 // Pure aggregation logic: rolls up VLAN/VIP/host data into per-domain summary cards.
 
-import { effectiveHostCount, isStretchedTopology } from './data.js?v=1.29.0';
+import { effectiveHostCount, isStretchedTopology, logsLabel } from './data.js?v=1.30.0';
 
 // Host count plus the AZ1/AZ2 split (null when single-site) for the Overview card.
 function hostFields(d){
@@ -13,7 +13,7 @@ export function buildDomainSummaries(project,mgmt,workloads,vlans,vips){
   const mgmtVlans=vlans.filter(v=>v.domain==='Management Domain');
   const services=[];
   if(mgmt.vcfOperations.enabled)services.push('VCF Operations');
-  if(mgmt.vcfOperationsForLogs.enabled)services.push('VCF Ops for Logs');
+  if(mgmt.vcfOperationsForLogs.enabled)services.push(logsLabel(project.vcfVersion,true));
   if(mgmt.vcfOperationsForNetworks.enabled)services.push('VCF Ops for Networks');
   if(mgmt.vcfAutomation.enabled)services.push('VCF Automation');
   if(mgmt.vcfIdentityBroker.enabled)services.push('VCF Identity Broker');

@@ -1,13 +1,16 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
-import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap, parseCidr, cidrsOverlap, gatewayIP } from './iprange.js?v=1.29.0';
-import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.29.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount } from './data.js?v=1.29.0';
+import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap, parseCidr, cidrsOverlap, gatewayIP } from './iprange.js?v=1.30.0';
+import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.30.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, logsLabel } from './data.js?v=1.30.0';
 
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;
 // ref (optional): {tab, key} — lets the Validation tab jump to the offending row (data-ref="key" in index.html).
-export function mkMsg(severity,category,domain,message,resolution,ref=null){return {id:`val-${++_valId}`,severity,category,domain,message,resolution,ref};}
+// advisory (v1.30.0): precautionary reminder that fires on a correct configuration — nothing to fix. Rendered as
+// "POUR INFO / FYI" with a reassuring sentence in the Validation tab (field feedback: "qu'ai-je mal renseigné ?").
+export function mkMsg(severity,category,domain,message,resolution,ref=null,advisory=false){return {id:`val-${++_valId}`,severity,category,domain,message,resolution,ref,advisory};}
+const mkNote=(category,domain,message,resolution=null,ref=null)=>mkMsg('info',category,domain,message,resolution,ref,true);
 
 // Anti-regression safety net: flags any appliance whose `vlan` name doesn't match any generated VLAN row.
 // Domain-agnostic by design, mirroring the fallback in getVLANPrefix (core/vlan.js): matches on vlanName only,
@@ -32,7 +35,7 @@ function stretchedHostChecks(msgs,d,label,dom){
   }
   if(vsan){
     const tier=az1<=10?'<200ms RTT':az1<=15?'<100ms RTT':'exceeds the documented 15-host/site tier';
-    msgs.push(mkMsg('info','bring-up',d,`${label}Witness latency tier for ${az1} hosts/site: ${tier} required between each AZ and the vSAN Witness (min 10 Gbps between AZ1 and AZ2).`,'Confirm the WAN/L3 link to the Witness meets this RTT.'));
+    msgs.push(mkNote('bring-up',d,`${label}Witness latency tier for ${az1} hosts/site: ${tier} required between each AZ and the vSAN Witness (min 10 Gbps between AZ1 and AZ2).`,'Confirm the WAN/L3 link to the Witness meets this RTT.'));
   }
 }
 
@@ -94,7 +97,7 @@ function mgmtServicesChecks(msgs,domain,plan,vlans,appliances,vips,t,hosts=[]){
     return app?(vlans.find(v=>v.domain===domain&&v.vlanName===app.vlan)?.cidr||''):'';
   };
   const {pool,vcfa}=plan;
-  if(pool.required>SVC_RUNTIME_MIN_IPS) msgs.push(mkMsg('info','vlan',domain,t('val.ms_pool_sized',{required:pool.required,size:pool.size}),t('val.ms_pool_sized_res'),MS));
+  if(pool.required>SVC_RUNTIME_MIN_IPS) msgs.push(mkNote('vlan',domain,t('val.ms_pool_sized',{required:pool.required,size:pool.size}),t('val.ms_pool_sized_res'),MS));
   const ranges=[];
   if(!pool.start&&!pool.end) msgs.push(mkMsg('info','vlan',domain,t('val.ms_range_missing',{size:pool.size}),t('val.ms_range_missing_res'),MS));
   else if(pool.rangeSize===0) msgs.push(mkMsg('warning','vlan',domain,t('val.ms_range_invalid'),t('val.ms_range_invalid_res'),MS));
@@ -137,15 +140,15 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
   const mgmtMinHosts=(mgmt.storageType==='nfs'||mgmt.storageType==='vmfs')?2:3;
   if(mgmtHosts<mgmtMinHosts) msgs.push(mkMsg('blocker','bring-up',domain,`Management Domain has ${mgmtHosts} hosts. Minimum ${mgmtMinHosts} required (${mgmtMinHosts===2?'NFS/VMFS "Simple" deployment minimum':'vSAN ESA/OSA cluster technical minimum'}).`,`Add hosts to reach at least ${mgmtMinHosts}${mgmtMinHosts===3?' (vSAN minimum) or 4 (recommended)':''}.`));
   else if(mgmtHosts===3&&(mgmt.storageType==='vsan-esa'||mgmt.storageType==='vsan-osa')){
-    if(project.scenario==='consolidated-3node-vsan-esa') msgs.push(mkMsg('info','bring-up',domain,'3-host vSAN cluster meets the documented Consolidated Architecture / VCF Edge minimum (Broadcom TechDocs VCF 9.1).','No action required — 4 hosts recommended for N+1 resilience if scaling later.'));
+    if(project.scenario==='consolidated-3node-vsan-esa') msgs.push(mkNote('bring-up',domain,'3-host vSAN cluster meets the documented Consolidated Architecture / VCF Edge minimum (Broadcom TechDocs VCF 9.1).','No action required — 4 hosts recommended for N+1 resilience if scaling later.'));
     else msgs.push(mkMsg('warning','bring-up',domain,'Management Domain has 3 hosts — meets the vSAN technical minimum but 4 hosts is the standard recommended baseline for N+1 resilience.','Consider adding a 4th host, or select the "Consolidated / 3-Node vSAN ESA" scenario if 3 hosts is intentional.'));
   }
   if(mgmt.nsxEdgeDeployed&&mgmt.nsxEdgeNodeCount<2) msgs.push(mkMsg('warning','nsx',domain,'Single NSX Edge node — no HA. Recommend 2+ Edge nodes.','Increase Edge node count to 2.'));
   if(!mgmt.fleetPlacement) msgs.push(mkMsg('blocker','vlan',domain,'Fleet placement is undefined.','Select Fleet placement.'));
-  if(mgmt.topologyMode==='vsan-stretched'){
-    msgs.push(mkMsg('warning','bring-up',domain,t('val.vsan_warn'),t('val.vsan_warn_res')));
-  }
-  if(mgmt.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',domain,t('val.vmsc_l2_warn'),t('val.vmsc_l2_res')));
+  // Requirement reminders that fire on any stretched config (nothing wrong in the input) — advisory, not warnings:
+  // L3 per-AZ networks are the Broadcom reference for vSAN stretched (per-network choice since v1.28.0).
+  if(mgmt.topologyMode==='vsan-stretched') msgs.push(mkNote('bring-up',domain,t('val.vsan_warn'),t('val.vsan_warn_res')));
+  if(mgmt.topologyMode==='stretched') msgs.push(mkNote('bring-up',domain,t('val.vmsc_l2_warn'),t('val.vmsc_l2_res')));
   if(isStretchedTopology(mgmt.topologyMode)) stretchedHostChecks(msgs,domain,'',mgmt);
   topologyStorageChecks(msgs,domain,'',mgmt,t);
   if(mgmt.fleetPlacement==='nsx-overlay-segment'&&!mgmt.nsxEdgeDeployed) msgs.push(mkMsg('blocker','nsx',domain,t('val.overlay_block'),t('val.overlay_res')));
@@ -155,8 +158,8 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
   // overlay segment. See core/vlan.js for the AZ1/AZ2 dedicated-VLAN row duplication in this mode.
   const isModel4=mgmt.fleetPlacement==='nsx-overlay-segment'&&(mgmt.topologyMode==='vsan-stretched'||mgmt.topologyMode==='stretched');
   if(isModel4){
-    msgs.push(mkMsg('info','vlan',domain,t('val.stretched_l2_info'),t('val.stretched_l2_res')));
-    msgs.push(mkMsg('info','vlan',domain,t('val.overlay_federation_info')));
+    msgs.push(mkNote('vlan',domain,t('val.stretched_l2_info'),t('val.stretched_l2_res')));
+    msgs.push(mkNote('vlan',domain,t('val.overlay_federation_info')));
   }
   // "NSX VLAN Segment" is not one of the 4 officially documented VCF 9.1 network models — kept only for backward
   // compatibility with existing 9.1 projects that already selected it before the option was removed from the select.
@@ -169,7 +172,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
   if(mgmt.fleetPlacement==='dedicated-fleet-vlan'||mgmt.fleetPlacement==='shared-mgmt-vlan'){
     const legacyFlags=[
       ['VCF Operations',mgmt.vcfOperations.requiresDedicatedVLAN],
-      ['VCF Operations for Logs',mgmt.vcfOperationsForLogs.requiresDedicatedVLAN],
+      [logsLabel(project.vcfVersion),mgmt.vcfOperationsForLogs.requiresDedicatedVLAN],
       ['VCF Operations for Networks',mgmt.vcfOperationsForNetworks.requiresDedicatedVLAN],
       ['VCF Automation',mgmt.vcfAutomation.requiresDedicatedVLAN],
       ['VCF Identity Broker',mgmt.vcfIdentityBroker.requiresDedicatedVLAN],
@@ -188,10 +191,10 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
   // 9.1 — Identity Broker, Log Management and Real-time Metrics (Day-N) IPs are all allocated from the Services Runtime block; may push it from /28 to /27
   if(is91) mgmtServicesChecks(msgs,domain,buildMgmtServicesPlan(mgmt,project),vlans,appliances,vips,t,hosts);
   // 9.1 — VCF Automation /29 block is a separate allocation from the Services Runtime block
-  if(is91&&mgmt.vcfAutomation.enabled) msgs.push(mkMsg('info','vlan',domain,t('val.auto_block_info'),t('val.auto_block_res')));
+  if(is91&&mgmt.vcfAutomation.enabled) msgs.push(mkNote('vlan',domain,t('val.auto_block_info'),t('val.auto_block_res')));
   if(mgmt.vcfAutomation.enabled&&!mgmt.vcfIdentityBroker.enabled) msgs.push(mkMsg('warning','scenario',domain,'VCF Automation enabled but VCF Identity Broker not configured.','Enable VCF Identity Broker.'));
   const bringUpReady=mgmtHosts>=mgmtMinHosts&&mgmt.tepInterfacesPerHost>=2;
-  msgs.push(bringUpReady?mkMsg('info','bring-up',domain,'Bring-up readiness check PASSED.'):mkMsg('blocker','bring-up',domain,'Bring-up readiness check FAILED.','Address all blockers before VCF Cloud Builder.'));
+  msgs.push(bringUpReady?mkNote('bring-up',domain,'Bring-up readiness check PASSED.'):mkMsg('blocker','bring-up',domain,'Bring-up readiness check FAILED.','Address all blockers before VCF Cloud Builder.'));
 
   workloads.forEach((wld,idx)=>{
     const d=wld.domainName||`Workload ${idx+1}`;
@@ -204,8 +207,8 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
     if(wld.vksEnabled&&wld.vksLBType==='avi'&&!wld.aviEnabled) msgs.push(mkMsg('warning','scenario',d,t('val.vks_avi_mismatch'),t('val.vks_avi_mismatch_res')));
     if(wld.edgeRequired&&wld.edgeNodeCount<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": only 1 Edge node. Min 2 recommended.`,'Increase Edge count.'));
     if(wld.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
-    if(wld.topologyMode==='vsan-stretched') msgs.push(mkMsg('warning','bring-up',d,t('val.vsan_warn'),t('val.vsan_warn_res')));
-    if(wld.topologyMode==='stretched') msgs.push(mkMsg('warning','bring-up',d,`"${d}": ${t('val.vmsc_l2_warn')}`,t('val.vmsc_l2_res')));
+    if(wld.topologyMode==='vsan-stretched') msgs.push(mkNote('bring-up',d,`"${d}": ${t('val.vsan_warn')}`,t('val.vsan_warn_res')));
+    if(wld.topologyMode==='stretched') msgs.push(mkNote('bring-up',d,`"${d}": ${t('val.vmsc_l2_warn')}`,t('val.vmsc_l2_res')));
     if(isStretchedTopology(wld.topologyMode)) stretchedHostChecks(msgs,d,`"${d}": `,wld);
     topologyStorageChecks(msgs,d,`"${d}": `,wld,t);
     // TechDocs 9.1 (Stretching Clusters): the default management domain cluster must be stretched first.
@@ -266,7 +269,7 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
   if(project.scenario==='consolidated-3node-vsan-esa'){
     if(mgmtHosts!==3) msgs.push(mkMsg('info','scenario','Management Domain',`Scenario "Consolidated / 3-Node vSAN ESA" typically uses exactly 3 hosts (current: ${mgmtHosts}).`,'Set Management Domain host count to 3, or switch scenario.'));
     if(mgmt.storageType!=='vsan-esa') msgs.push(mkMsg('warning','scenario','Management Domain','Scenario "Consolidated / 3-Node vSAN ESA" expects vSAN ESA storage.','Set Storage Type to vSAN ESA.'));
-    if(workloads.length>0) msgs.push(mkMsg('info','scenario','Global','Consolidated Architecture: Workload Domain(s) typically run as resource pools on the shared 3-host Management cluster rather than separate clusters.','Refer to VCF 9.1 Consolidated Architecture design guidance.'));
+    if(workloads.length>0) msgs.push(mkNote('scenario','Global','Consolidated Architecture: Workload Domain(s) typically run as resource pools on the shared 3-host Management cluster rather than separate clusters.','Refer to VCF 9.1 Consolidated Architecture design guidance.'));
   }
   // TechDocs 9.1: "Domain suffixes such as .local are not supported."
   const localFqdn=[project.fqdnSuffix,...appliances.map(a=>a.fqdn),...vips.map(v=>v.fqdn)].some(f=>/\.local\.?$/i.test((f||'').trim()));

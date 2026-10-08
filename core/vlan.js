@@ -1,9 +1,9 @@
 // Pure VLAN domain logic: builds management/workload VLAN lists and derives helper lookups.
 
-import { recommendCIDR } from './sizing.js?v=1.29.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, azNetworkMode, RECOMMENDED_MTU } from './data.js?v=1.29.0';
-import { ipToInt, intToIp } from './iprange.js?v=1.29.0';
-import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.29.0';
+import { recommendCIDR } from './sizing.js?v=1.30.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, azNetworkMode, RECOMMENDED_MTU } from './data.js?v=1.30.0';
+import { ipToInt, intToIp } from './iprange.js?v=1.30.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.30.0';
 
 // ── VLAN ENGINE ─────────────────────────────────────────────────
 let _vlanId=0;

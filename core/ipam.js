@@ -1,7 +1,7 @@
 // Pure per-subnet IP map: classifies every address of a VLAN CIDR (network/broadcast, gateway, reserved ranges,
 // assigned appliance/VIP/host IPs, duplicates, free) for the VLAN Design tab's IP map.
 
-import { ipToInt, intToIp, parseCidr, gatewayIP } from './iprange.js?v=1.29.0';
+import { ipToInt, intToIp, parseCidr, gatewayIP } from './iprange.js?v=1.30.0';
 
 export const IP_MAP_MAX = 1024; // up to a /22 is drawn cell by cell
 
