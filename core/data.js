@@ -14,6 +14,12 @@ export const DEFAULT_PROJECT={projectName:'',customerName:'',scenario:'vcf-stand
 // Services architecture as 9.1 — every 9.1-branch IP/FQDN rule in this engine applies to it too.
 export function isVcf91Plus(vcfVersion){ return vcfVersion === '9.1' || vcfVersion === '9.1.1'; }
 
+// VCF 9.1+ renames "VCF Operations for Logs" to "Log Management" (a VCF services runtime service, no appliance).
+// Field feedback (v1.30.0): every component label must follow the selected version. short = compact 9.0 form.
+export function logsLabel(vcfVersion, short=false){
+  return isVcf91Plus(vcfVersion) ? 'Log Management' : (short ? 'VCF Ops for Logs' : 'VCF Operations for Logs');
+}
+
 // Both stretched topologies split hosts across AZ1/AZ2; only 'vsan-stretched' has a vSAN Witness —
 // a vMSC ('stretched', non-vSAN FC/NFS/iSCSI array) relies on the storage vendor's tiebreaker instead.
 export function isStretchedTopology(topologyMode){ return topologyMode === 'vsan-stretched' || topologyMode === 'stretched'; }

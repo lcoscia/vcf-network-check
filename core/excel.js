@@ -43,7 +43,7 @@ export function doExcelExport(state, XLSXLib) {
   const ws4 = XLSXLib.utils.aoa_to_sheet(vipd); ws4['!cols'] = [32, 24, 28, 28, 18, 36, 40].map(colW); applyHdr(XLSXLib, ws4, 'A1:G1');
   XLSXLib.utils.book_append_sheet(wb, ws4, 'VIPs');
 
-  const vald = [['Severity', 'Category', 'Domain', 'Message', 'Resolution'], ...state.validationMessages.map(m => [xs(m.severity.toUpperCase()), xs(m.category), xs(m.domain), xs(m.message), xs(m.resolution)])];
+  const vald = [['Severity', 'Category', 'Domain', 'Message', 'Resolution'], ...state.validationMessages.map(m => [xs(m.advisory ? 'INFO (FYI — nothing to fix)' : m.severity.toUpperCase()), xs(m.category), xs(m.domain), xs(m.message), xs(m.resolution)])];
   const ws5 = XLSXLib.utils.aoa_to_sheet(vald); ws5['!cols'] = [12, 14, 28, 60, 50].map(colW); applyHdr(XLSXLib, ws5, 'A1:E1');
   XLSXLib.utils.book_append_sheet(wb, ws5, 'Validation Report');
 

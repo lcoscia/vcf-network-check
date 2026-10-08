@@ -1,9 +1,9 @@
 // Pure calculation: derives per-component IP/FQDN totals for the current project configuration
 // from the static COMPONENT_REFERENCE table.
 
-import { COMPONENT_REFERENCE } from './reference.js?v=1.29.0';
-import { isVcf91Plus, effectiveHostCount } from './data.js?v=1.29.0';
-import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.29.0';
+import { COMPONENT_REFERENCE } from './reference.js?v=1.30.0';
+import { isVcf91Plus, effectiveHostCount, logsLabel } from './data.js?v=1.30.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.30.0';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 
@@ -186,7 +186,8 @@ export function computeComponentRequirements(project, mgmt, workloadDomains) {
     const rule = RULES[r.id];
     const { units, totalIps, totalFqdns, perDomain } = rule(mgmt, workloadDomains, project);
     return {
-      id: r.id, label: r.label, scope: r.scope,
+      // ops-for-logs: "Log Management" in 9.1+ (field feedback v1.30.0)
+      id: r.id, label: r.id === 'ops-for-logs' ? logsLabel(project?.vcfVersion) : r.label, scope: r.scope,
       ipsPerUnit: r.ipsPerUnit, fqdnsPerUnit: r.fqdnsPerUnit,
       units, totalIps, totalFqdns,
       present: units > 0,

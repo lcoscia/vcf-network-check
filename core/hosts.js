@@ -5,7 +5,7 @@
 // TEP addresses are NOT per-host inputs: SDDC Manager hands them out from the network pool / IP pool ranges of the
 // matching VLANs (VLAN Design tab), so they are not itemized here.
 
-import { effectiveHostCount, isStretchedTopology, azNetworkMode } from './data.js?v=1.29.0';
+import { effectiveHostCount, isStretchedTopology, azNetworkMode } from './data.js?v=1.30.0';
 
 function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,''); }
 

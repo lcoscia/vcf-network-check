@@ -469,6 +469,9 @@
     .anomaly-sev.blocker { background: var(--red); }
     .anomaly-sev.warning { background: var(--orange); color: #4a3400; }
     .anomaly-sev.info    { background: var(--blue-accent); }
+    .anomaly-block.advisory { border-color: var(--green); }
+    .anomaly-sev.advisory   { background: var(--green); }
+    .anomaly-note { font-size: 11px; color: var(--text-muted); font-style: italic; }
     .anomaly-title { font-weight: 700; font-size: 13px; flex: 1; }
     .anomaly-meta  { font-size: 11px; color: var(--text-muted); }
     .anomaly-body  { padding: 10px 16px; font-size: 12px; color: #444; }
@@ -1646,7 +1649,7 @@
                   <button class="btn btn-secondary btn-sm" style="margin-left:4px" x-show="v.cidr" @click="toggleIpMap(v)" :title="t('ipmap.open')" :aria-label="t('ipmap.open') + ' — ' + v.vlanName">🗺</button>
                 </td>
                 <td><input class="input mono" style="width:80px" placeholder="e.g. 100" :aria-label="'VLAN ID — ' + v.vlanName" x-model="vlans[vi].vlanId" /></td>
-                <td><input class="input mono" style="width:130px" placeholder="10.0.0.0/24" :aria-label="'CIDR — ' + v.vlanName" x-model="vlans[vi].cidr" /></td>
+                <td><input class="input mono" style="width:130px" placeholder="10.0.0.0/24" :aria-label="'CIDR — ' + v.vlanName" x-model="vlans[vi].cidr" @change="normalizeStoredIPs()" /></td>
                 <td><input class="input mono" style="width:130px" :placeholder="gatewayHint(v)" :aria-label="t('vlan.col_gateway') + ' — ' + v.vlanName" x-model="vlans[vi].gateway" /></td>
                 <td style="white-space:nowrap">
                   <input class="input mono" style="width:105px" placeholder="10.0.1.10" x-model="vlans[vi].rangeStart" />
@@ -1654,6 +1657,12 @@
                   <input class="input mono" style="width:105px" placeholder="10.0.1.21" x-model="vlans[vi].rangeEnd" />
                   <button class="btn btn-secondary btn-sm" x-show="v.rangeStart && !v.rangeEnd" @click="suggestRangeEnd(v)" :title="t('vlan.suggest_tooltip')">✨ Suggest</button>
                   <button class="btn btn-secondary btn-sm" x-show="v.rangeStart && v.rangeEnd" @click="autoFillFromRange(v)" :title="t('vlan.autofill_tooltip')">↳ Auto-fill</button>
+                  <template x-if="msVlanTarget(v)">
+                    <div class="field-note" style="white-space:normal">
+                      <span x-show="msVlanSynced(v)" x-text="t('vlan.ms_synced')"></span>
+                      <button class="btn btn-secondary btn-sm" x-show="!msVlanSynced(v)" @click="applyMsVlanRange(v)" :title="t('vlan.ms_apply_tooltip',{start:msVlanTarget(v).start,end:msVlanTarget(v).end})" x-text="t('vlan.ms_apply')"></button>
+                    </div>
+                  </template>
                 </td>
                 <td class="text-center font-bold" x-text="v.requiredIPs"></td>
                 <td class="text-center tbl-mono" x-text="v.recommendedCIDR"></td>
@@ -1890,21 +1899,24 @@
         <span class="val-summary-label">Validation Results</span>
         <span class="val-count blocker" x-text="validationMessages.filter(m=>m.severity==='blocker').length + ' Blocker(s)'"></span>
         <span class="val-count warning" x-text="validationMessages.filter(m=>m.severity==='warning').length + ' Warning(s)'"></span>
-        <span class="val-count info"    x-text="validationMessages.filter(m=>m.severity==='info').length + ' Info'"></span>
+        <span class="val-count info"    x-text="validationMessages.filter(m=>m.severity==='info'&&!m.advisory).length + ' Info'"></span>
+        <span class="val-count advisory" style="background:var(--green);color:white" x-text="validationMessages.filter(m=>m.advisory).length + ' ' + t('val.advisory_badge')"></span>
         <span class="val-count ok" x-show="validationMessages.filter(m=>m.severity==='blocker').length===0">✓ No Blockers</span>
       </div>
+      <div class="text-xs text-muted mb8" x-text="t('val.legend')"></div>
 
       <template x-for="m in validationMessages" :key="m.id">
-        <div class="anomaly-block" :class="m.severity">
+        <div class="anomaly-block" :class="m.advisory ? 'advisory' : m.severity">
           <div class="anomaly-head">
-            <span class="anomaly-sev" :class="m.severity" x-text="m.severity.toUpperCase()"></span>
+            <span class="anomaly-sev" :class="m.advisory ? 'advisory' : m.severity" x-text="m.advisory ? t('val.advisory_badge') : m.severity.toUpperCase()"></span>
             <span class="anomaly-title" x-text="m.message"></span>
             <span class="anomaly-meta" x-text="m.domain + ' — ' + m.category"></span>
             <button class="btn btn-secondary btn-sm anomaly-go" @click="goTo(m)" x-text="t('val.goto')"></button>
           </div>
-          <div class="anomaly-body" x-show="m.resolution">
-            <div class="anomaly-rec">
-              <strong>Resolution:</strong> <span x-text="m.resolution"></span>
+          <div class="anomaly-body" x-show="m.resolution || m.advisory">
+            <div class="anomaly-note" x-show="m.advisory" x-text="t('val.advisory_note')"></div>
+            <div class="anomaly-rec" x-show="m.resolution">
+              <strong x-text="t('val.resolution')"></strong> <span x-text="m.resolution"></span>
             </div>
           </div>
         </div>
@@ -2108,6 +2120,11 @@
               <th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--gray-border);">Notes</th>
             </tr></thead>
             <tbody>
+              <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.30.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Oct 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1300')"></td>
+              </tr>
               <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.29.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Sep 2026</td>
@@ -2351,7 +2368,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.29.0';
+import * as Core from './core/index.js?v=1.30.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -2394,7 +2411,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.29.0',
+    appVersion:'1.30.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2526,7 +2543,7 @@ function vcfApp(){
       this.project.workloadDomainCount=this.workloadDomains.length;
 
       const vlanEdits={};
-      this.vlans.forEach(v=>{if(v.vlanId||v.cidr||v.gateway||v.rangeStart||v.rangeEnd)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr,gateway:v.gateway||'',rangeStart:v.rangeStart,rangeEnd:v.rangeEnd||''};});
+      this.vlans.forEach(v=>{if(v.vlanId||v.cidr||v.gateway||v.rangeStart||v.rangeEnd)vlanEdits[`${v.domain}|${v.vlanName}`]={vlanId:v.vlanId,cidr:v.cidr,gateway:v.gateway||'',rangeStart:v.rangeStart,rangeEnd:v.rangeEnd||'',rangeAuto:v.rangeAuto||null};});
       const hostEdits={};
       this.hosts.forEach(h=>{if(h.ipAddress||h.fqdn)hostEdits[`${h.domain}|${h.hostName}`]={ipAddress:h.ipAddress,fqdn:h.fqdn};});
       const appEdits={};
@@ -2550,6 +2567,7 @@ function vcfApp(){
 
       this.hosts=Core.buildHostInventory(this.managementDomain,this.workloadDomains).map(h=>({...h,...(hostEdits[`${h.domain}|${h.hostName}`]||{})}));
 
+      this.syncMsVlanRange();
       this.revalidate();
       this.componentData=Core.computeComponentRequirements(this.project,this.managementDomain,this.workloadDomains);
     },
@@ -2711,6 +2729,16 @@ function vcfApp(){
       if(end)this.managementDomain[endKey]=end;
     },
 
+    // v1.30.0 — the "VCF Management Services IP Ranges" feed the Range Start / End of the VLAN Design row hosting the
+    // Management Services (core/mgmtservices.js syncMgmtServicesVlanRange): only when empty or still auto-filled.
+    syncMsVlanRange(){ return Core.syncMgmtServicesVlanRange(this.vlans,this.appliances,this.msPlan); },
+    msVlanTarget(v){
+      const row=Core.mgmtServicesVlanRow(this.vlans,this.appliances);
+      return row&&row.id===v.id?Core.mgmtServicesVlanRange(this.msPlan,v.requiredIPs):null;
+    },
+    msVlanSynced(v){ const r=this.msVlanTarget(v); return !!r&&v.rangeStart===r.start&&v.rangeEnd===r.end; },
+    applyMsVlanRange(v){ const r=this.msVlanTarget(v); if(r){v.rangeStart=r.start;v.rangeEnd=r.end;v.rangeAuto={...r};} },
+
     // Addresses auto-fill must never hand out: the services runtime pool and the VCF Automation node range.
     isReservedIP(ip){
       const p=this.msPlan; if(!p)return false;
@@ -2870,7 +2898,7 @@ function vcfApp(){
         const v=(row.ipAddress||'').trim();
         if(!v||Core.ipToInt(v)!==null)return;
         const r=Core.expandHostIP(v,this.vlanCidrFor(row));
-        if(!r.error)row.ipAddress=r.ip;
+        if(!r.error){ row.ipAddress=r.ip; this.clearIPError(row); }
       });
     },
 
@@ -2957,12 +2985,14 @@ function vcfApp(){
       this.compute();
       if(s.vlans){
         const saved={};s.vlans.forEach(sv=>{saved[`${sv.domain}|${sv.vlanName}`]=sv;});
-        this.vlans.forEach(v=>{const sv=this.vlanEditFor(saved,v.domain,v.vlanName);if(sv){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.gateway=sv.gateway||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';}});
+        this.vlans.forEach(v=>{const sv=this.vlanEditFor(saved,v.domain,v.vlanName);if(sv){v.vlanId=sv.vlanId||'';v.cidr=sv.cidr||'';v.gateway=sv.gateway||'';v.rangeStart=sv.rangeStart||'';v.rangeEnd=sv.rangeEnd||'';v.rangeAuto=sv.rangeAuto||null;}});
       }
       if(s.appliances)s.appliances.forEach(sa=>{const a=this.appliances.find(x=>x.applianceName===sa.applianceName);if(a){a.ipAddress=sa.ipAddress||'';a.fqdn=sa.fqdn||'';}});
       if(s.vips)s.vips.forEach(sv=>{const v=this.vips.find(x=>x.vipName===sv.vipName);if(v){v.ipAddress=sv.ipAddress||'';v.fqdn=sv.fqdn||'';}});
       if(s.hosts)s.hosts.forEach(sh=>{const h=this.hosts.find(x=>x.domain===sh.domain&&x.hostName===sh.hostName);if(h){h.ipAddress=sh.ipAddress||'';h.fqdn=sh.fqdn||'';}});
       this.normalizeStoredIPs();
+      // Pre-v1.30.0 JSON: fill the Management Services VLAN range from the Management Domain ranges if still empty.
+      this.syncMsVlanRange();
       this.revalidate();
     },
   };
