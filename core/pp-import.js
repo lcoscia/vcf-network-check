@@ -150,14 +150,22 @@ export function planningPrepToState(d){
   const s0=get('vcfSvcRangeStart'), s1=get('vcfSvcRangeEnd');
   if(s0){mgmt.svcRuntimeRangeStart=s0;ok('form.vcfSvcRangeStart','managementDomain.svcRuntimeRangeStart',s0);}
   if(s1){mgmt.svcRuntimeRangeEnd=s1;ok('form.vcfSvcRangeEnd','managementDomain.svcRuntimeRangeEnd',s1);}
+  // P&P ≥ v1.2.0 (a844e75): one VCF Automation range vcfAutoRangeStart / vcfAutoRangeEnd (From / To). Older P&P JSON
+  // carried 5 single fields vcfAutoIpPool1..5 — read as a fallback (lowest → highest).
   const pool=[1,2,3,4,5].map(i=>get(`vcfAutoIpPool${i}`)).filter(ip=>ipToN(ip)!==null);
-  if(pool.length){
+  const r0=get('vcfAutoRangeStart'), r1=get('vcfAutoRangeEnd');
+  if(r0||r1){
+    if(r0){mgmt.vcfaRangeStart=r0;ok('form.vcfAutoRangeStart','managementDomain.vcfaRangeStart',r0);}
+    if(r1){mgmt.vcfaRangeEnd=r1;ok('form.vcfAutoRangeEnd','managementDomain.vcfaRangeEnd',r1);}
+    if(pool.length) skip('form.vcfAutoIpPool1..5','legacy VCF Automation IP fields ignored — the From / To range is used');
+  } else if(pool.length){
     const ns=pool.map(ipToN), lo=Math.min(...ns), hi=Math.max(...ns);
     mgmt.vcfaRangeStart=pool[ns.indexOf(lo)]; mgmt.vcfaRangeEnd=pool[ns.indexOf(hi)];
-    ok('form.vcfAutoIpPool1..5','managementDomain.vcfaRangeStart/End',`${mgmt.vcfaRangeStart} – ${mgmt.vcfaRangeEnd}`);
+    ok('form.vcfAutoIpPool1..5 (legacy)','managementDomain.vcfaRangeStart/End',`${mgmt.vcfaRangeStart} – ${mgmt.vcfaRangeEnd}`);
     if(hi-lo+1!==5) skip('form.vcfAutoIpPool1..5',`VCF Automation pool spans ${hi-lo+1} addresses (expected 5: 3 active + 2 buffer) — imported as the range lowest → highest`);
   }
-  if(get('cloudProxyFqdn')&&get('vcfOpsCollectorFqdn')) skip('form.cloudProxyFqdn','P&P has both a Cloud Proxy and a VCF Operations Collector FQDN — Network Planner has one Cloud Proxy row: the Collector value is used');
+  // P&P ≥ a844e75 has a single Cloud Proxy (Collector) entry vcfOpsCollector*; cloudProxyFqdn/Ip of older JSON is a fallback.
+  if(get('cloudProxyFqdn')&&get('vcfOpsCollectorFqdn')) skip('form.cloudProxyFqdn','legacy P&P Cloud Proxy FQDN ignored — the single Cloud Proxy (Collector) entry is used');
 
   // ── Workload domain ──
   const wldInc=get('wldInclude');

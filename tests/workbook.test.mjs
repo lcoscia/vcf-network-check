@@ -97,7 +97,7 @@ const PP={meta:{tool:'VCF 9.1 Web Planner',version:'1.9.1.002'},globalSettings:{
   deploymentScale:C.SCALE_VSAN_STRETCHED,vsanStretchInclude:'Include',mgmtHostCount:'4',mgmtAz2HostCount:'4',principalStorage:'vSAN-ESA',
   nsxMgrCount:'NSX Management Cluster (3 nodes)',nsxEdgeInclude:'Include',vcfMgmtInclude:'Exclude',vcfOpsHaMode:'HA Cluster',vcfOpsCollectorInclude:'Include',
   vcfLogsInclude:'Include',vcfLogsReplicaCount:'3',vcfNetOpsInclude:'Include',idBrokerInclude:'Include',aviInclude:'Exclude',
-  vcfSvcRangeStart:'10.11.10.31',vcfSvcRangeEnd:'10.11.10.60',vcfAutoIpPool1:'10.11.10.61',vcfAutoIpPool2:'10.11.10.62',vcfAutoIpPool3:'10.11.10.63',vcfAutoIpPool4:'10.11.10.64',vcfAutoIpPool5:'10.11.10.65',
+  vcfSvcRangeStart:'10.11.10.31',vcfSvcRangeEnd:'10.11.10.60',vcfAutoRangeStart:'10.11.10.61',vcfAutoRangeEnd:'10.11.10.65',
   esxMgmtVlan:'1111',esxMgmtGateway:'10.11.11.1',esxMgmtCidr:'10.11.11.0/24',vmMgmtVlan:'1110',vmMgmtCidr:'10.11.10.0/24',vmMgmtGateway:'10.11.10.1',
   vmotionVlan:'1112',vmotionCidr:'10.11.12.0/24',vmotionIpStart:'10.11.12.101',vmotionIpEnd:'10.11.12.104',
   az2EsxMgmtVlan:'1211',az2EsxMgmtCidr:'10.12.11.0/24',az2OverlayVlan:'1214',nsxEdgeUplink1Vlan:'1117',
@@ -142,4 +142,23 @@ test('P&P import: vMSC topology, storage and AZ2 rows', ()=>{
   const r=C.planningPrepToState(d);
   assert.equal(r.managementDomain.topologyMode,'stretched'); assert.equal(r.managementDomain.storageType,'nfs');
   assert.ok(r.report.skipped.some(s=>/az2Host1/.test(s.path)));
+});
+
+test('P&P import: legacy vcfAutoIpPool1..5 and cloudProxy fields still read', ()=>{
+  const d=clone(PP);
+  delete d.form.vcfAutoRangeStart; delete d.form.vcfAutoRangeEnd;
+  Object.assign(d.form,{vcfAutoIpPool1:'10.11.10.71',vcfAutoIpPool2:'10.11.10.72',vcfAutoIpPool3:'10.11.10.73',vcfAutoIpPool4:'10.11.10.74',vcfAutoIpPool5:'10.11.10.75'});
+  delete d.form.vcfOpsCollectorFqdn; delete d.form.vcfOpsCollectorIp;
+  Object.assign(d.form,{cloudProxyFqdn:'sfo-m01-cpxy01.sfo.rainpole.io',cloudProxyIp:'10.11.10.81'});
+  const r=C.planningPrepToState(d);
+  assert.equal(r.managementDomain.vcfaRangeStart,'10.11.10.71'); assert.equal(r.managementDomain.vcfaRangeEnd,'10.11.10.75');
+  assert.ok(!r.report.skipped.some(s=>/vcfAutoIpPool/.test(s.path)));
+  const R=rows(r.managementDomain,r.project,r.workloadDomains);
+  C.applyPlanningPrepEdits(r.edits,R,r.report,undefined);
+  assert.equal(R.appliances.find(x=>x.applianceName==='vcf-ops-cloud-proxy-01').ipAddress,'10.11.10.81');
+  // From / To wins over legacy fields when both are present
+  const both=clone(PP); both.form.vcfAutoIpPool1='10.11.10.99';
+  const rb=C.planningPrepToState(both);
+  assert.equal(rb.managementDomain.vcfaRangeStart,'10.11.10.61');
+  assert.ok(rb.report.skipped.some(s=>/vcfAutoIpPool/.test(s.path)));
 });
