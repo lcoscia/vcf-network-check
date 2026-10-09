@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.30.0
+# VCF 9.1 Network Planner — v1.31.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -129,10 +129,17 @@ npm test   # node --test tests/*.test.mjs — Node 20+
 
 The suite runs on every push and pull request (GitHub Actions, `.github/workflows/test.yml`). Validation messages are asserted against the FR translations in `core/i18n.js`, so rewording a message does not break the tests as long as its variables stay the same.
 
+## Interoperability with VCF Planning & Preparation
+
+- **FQDN convention** (`core/fqdn.js`) — same table as the P&P tool: instance components `<site>-<inst>-vc01`, `nsx01a/b/c` (VIP `nsx01`), `en01/02`, `<site>-vcf01` (SDDC Manager), `<site>-ic01`, `<site>-sr01`, `<site>-cp01` in the child zone (`<site>.<parent>`); fleet components `flt-ops01a/b/c` (LB `flt-ops01`), `flt-fc01`, `flt-lc01`, `flt-idb01`, `flt-logs01`, `flt-auto01`, `flt-vcfa-sr01`, `flt-net01a` in the parent zone; hosts `<site>0<az>-<inst>-r01-esxNN` (restart at 01 in AZ2), witness `<site>-<inst>-cl01-vsw01`. Projects without a site code keep `[prefix-]name.suffix`.
+- **Export JSON** — `meta: {tool:'VCF Network Planner', version, schema:1}`; `project.siteCode / instanceName / parentDomain / dnsServers[] / ntpServers[]`. `vlanName`, `applianceName` and `vipName` are the keys of the P&P importer and are frozen by `tests/workbook.test.mjs`.
+- **Import JSON** auto-detects a P&P export (`{meta, globalSettings, form, sizing}`) — `core/pp-import.js`: `deploymentScale` → `topologyMode` (vSAN stretched / vMSC), `mgmtHostCount` / `mgmtAz2HostCount`, `principalStorage`, `deploymentRegion` / `deploymentInstance` / `domainName` / `subDomainName`, DNS / NTP, component includes, `vcfSvcRangeStart/End`, `vcfAutoRangeStart/End` (legacy `vcfAutoIpPool1..5` as fallback) → VCF Automation range, `vcfLogsReplicaCount − 1` → extra replicas, `<prefix>Vlan/Gateway/Cidr/IpStart/IpEnd` → VLAN rows, `m01Host{i}` / `az2Host{i}` / `w01Host{i}` → hosts, appliance / VIP FQDN+IP (reverse of the P&P `np-import.js` table; the P&P "VCF Operations Collector" = NP Cloud Proxy / first Remote Collector). Passwords, VDS, BGP… are listed as ignored in the report.
+
 ## Version History
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.31.0 | Oct 2026 | Broadcom P&P 9.1 workbook FQDN convention (site code / instance / parent domain, `sfo-m01-vc01`, `sfo-vcf01`, `flt-*` fleet FQDNs in the parent zone, `sfo0<az>-m01-r01-esxNN` hosts restarting at 01 in AZ2; proposals only, legacy prefix projects migrated softly — `core/fqdn.js`); DNS / NTP server fields; JSON export `meta` block + frozen row names for the VCF Planning & Preparation importer; import of a P&P JSON with applied / ignored report (`core/pp-import.js`). |
 | v1.30.0 | Oct 2026 | Field feedback: Management Services IP ranges feed the hosting VLAN Design range (empty/auto-filled only, never overwrites manual input); "Log Management" label in 9.1/9.1.x; Validation: precautionary messages flagged "FYI — nothing to fix" with a legend, vSAN stretched reminder reworded; host numbers re-expanded when a CIDR is entered. |
 | v1.29.0 | Sep 2026 | Improvements: ESXi Hosts tab (FQDN + vmk0 IP per host/AZ, completion, suggested FQDNs, auto-fill, Excel sheet); IP plan checks (duplicates, outside CIDR, network/broadcast/gateway, overlapping CIDRs, reused VLAN IDs); Gateway and recommended MTU columns; per-subnet IP map; VPC External (Distributed Transit Gateway) VLAN from the 9.1 VPC Gateway Connectivity choice; browser autosave + "New project"; clickable validation messages; contextual help with TechDocs links; accessibility (ARIA tabs, labelled fields, announced errors); Alpine.js pinned to 3.17.4, favicon; `node --test` suite (`npm test`) + GitHub Actions CI |
 | v1.28.0 | Sep 2026 | vSAN Stretched: L2-stretched vs per-AZ choice per network, modeled on the Broadcom VCF 9.1 "vSAN Stretched Cluster Network Requirements" table. New "AZ1 / AZ2 networks" table (Management Domain and each WLD) with Broadcom-reference (per-AZ, default) / all-L2 / custom models; locked to "Stretch all Layer-2 Networks" in vMSC. Stretched networks become one row sized AZ1+AZ2, inputs carry over. Model 3/4 dedicated VLAN no longer duplicated per AZ. New rules: vSAN Stretched + non-vSAN storage (blocker), vMSC + vSAN storage (warning), stretched WLD without stretched Mgmt Domain (blocker), same CIDR on AZ1/AZ2 (warning). Excel VLAN Summary gains AZ, L2 Stretched and Rec. MTU columns |

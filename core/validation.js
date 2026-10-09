@@ -1,8 +1,8 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
-import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap, parseCidr, cidrsOverlap, gatewayIP } from './iprange.js?v=1.30.0';
-import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.30.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, logsLabel } from './data.js?v=1.30.0';
+import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap, parseCidr, cidrsOverlap, gatewayIP } from './iprange.js?v=1.31.0';
+import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.31.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, logsLabel } from './data.js?v=1.31.0';
 
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;

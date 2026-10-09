@@ -1,6 +1,6 @@
 // Pure aggregation logic: rolls up VLAN/VIP/host data into per-domain summary cards.
 
-import { effectiveHostCount, isStretchedTopology, logsLabel } from './data.js?v=1.30.0';
+import { effectiveHostCount, isStretchedTopology, logsLabel } from './data.js?v=1.31.0';
 
 // Host count plus the AZ1/AZ2 split (null when single-site) for the Overview card.
 function hostFields(d){
