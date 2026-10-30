@@ -1,6 +1,6 @@
 // Pure aggregation logic: rolls up VLAN/VIP/host data into per-domain summary cards.
 
-import { effectiveHostCount, isStretchedTopology, logsLabel } from './data.js?v=1.31.0';
+import { effectiveHostCount, isStretchedTopology, logsLabel, isImportWld } from './data.js?v=1.32.0';
 
 // Host count plus the AZ1/AZ2 split (null when single-site) for the Overview card.
 function hostFields(d){
@@ -24,7 +24,7 @@ export function buildDomainSummaries(project,mgmt,workloads,vlans,vips){
     const wVlans=vlans.filter(v=>v.domain===wld.domainName);
     const ws=[];
     if(wld.nsxEnabled)ws.push('NSX');if(wld.aviEnabled)ws.push('AVI');if(wld.vksEnabled)ws.push('VKS');if(wld.edgeRequired)ws.push('Edge');
-    summaries.push({domain:wld.domainName,domainType:'workload',...hostFields(wld),enabledServices:ws,vlanCount:wVlans.length,totalIPCount:wVlans.reduce((a,v)=>a+v.requiredIPs,0),vipCount:vips.filter(v=>v.domain===wld.domainName).length,notes:wld.notes||wld.domainRole});
+    summaries.push({domain:wld.domainName,domainType:isImportWld(wld)?'workload-import':'workload',...hostFields(wld),enabledServices:ws,vlanCount:wVlans.length,totalIPCount:wVlans.reduce((a,v)=>a+v.requiredIPs,0),vipCount:vips.filter(v=>v.domain===wld.domainName).length,notes:wld.notes||wld.domainRole});
   });
   return summaries;
 }

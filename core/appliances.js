@@ -1,6 +1,6 @@
 // Pure appliance/component domain logic: builds management/workload appliance inventories.
 
-import { isVcf91Plus, hasVsanWitness } from './data.js?v=1.31.0';
+import { isVcf91Plus, hasVsanWitness, isImportWld, wldHasOwnNsxManager, wldNsxManagerExisting, wldInfraVlan } from './data.js?v=1.32.0';
 
 // ── APPLIANCE ENGINE ────────────────────────────────────────────
 let _appId=0;
@@ -160,7 +160,11 @@ export function buildManagementAppliances(mgmt,project,t=k=>k){
 export function buildWorkloadAppliances(wld,t=k=>k){
   const apps=[];
   const domain=wld.domainName;
-  apps.push(mkApp(`vcenter-${domain.toLowerCase()}-01`,'vCenter Server',domain,'Management VM Network',true,false,true,`vCenter for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
+  const imp=isImportWld(wld), infra=wldInfraVlan(wld);
+  if(imp){
+    const vc=mkApp(`vcenter-${domain.toLowerCase()}-01`,'vCenter Server',domain,infra,true,false,true,`Existing vCenter ${wld.importVcVersion} imported as ${domain} — keeps its current FQDN and IP.`);
+    vc.existing=true; apps.push(vc);
+  } else apps.push(mkApp(`vcenter-${domain.toLowerCase()}-01`,'vCenter Server',domain,'Management VM Network',true,false,true,`vCenter for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
 
   if(hasVsanWitness(wld.topologyMode)){
     if(wld.witnessDedicatedVsanVmk){
@@ -171,19 +175,31 @@ export function buildWorkloadAppliances(wld,t=k=>k){
     }
   }
 
-  if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
-    const nc=wld.nsxManagerMode==='clustered'?3:1;
-    for(let i=1;i<=nc;i++) apps.push(mkApp(`nsx-manager-${domain.toLowerCase()}-0${i}`,'NSX Manager',domain,'Management VM Network',true,i===1,true,`NSX Mgr ${i}/${nc} for ${domain}. IP in Mgmt Domain Mgmt VM Network.`));
+  if(wldHasOwnNsxManager(wld)){
+    const nc=wld.nsxManagerMode==='clustered'?3:1, ex=wldNsxManagerExisting(wld);
+    for(let i=1;i<=nc;i++){
+      const note=!imp?`NSX Mgr ${i}/${nc} for ${domain}. IP in Mgmt Domain Mgmt VM Network.`
+        :ex?`Existing NSX Mgr ${i}/${nc} registered with the imported vCenter — keeps its FQDN and IP.`
+        :`NSX Mgr ${i}/${nc} deployed by the import of ${domain} (FQDN in forward + reverse DNS before the import).`;
+      const a=mkApp(`nsx-manager-${domain.toLowerCase()}-0${i}`,'NSX Manager',domain,imp?infra:'Management VM Network',true,i===1,true,note);
+      if(ex) a.existing=true; apps.push(a);
+    }
   }
+  // Import: no Edge is deployed by the import itself — Edges of an already-registered NSX are existing (synced into the
+  // VCF inventory with importEdgeSync), otherwise they are a Day-2 deployment after the import.
   if(wld.nsxEnabled&&wld.edgeRequired){
-    for(let i=1;i<=wld.edgeNodeCount;i++) apps.push(mkApp(`nsx-edge-${domain.toLowerCase()}-0${i}`,'NSX Edge Node',domain,'VM / Application Network',true,false,true,`Edge node ${i}: eth0→VM/App Net, TEP→Edge TEP, fp-eth0/1→Uplink 1/2.`));
+    const ex=imp&&wld.importNsx==='existing';
+    for(let i=1;i<=wld.edgeNodeCount;i++){
+      const a=mkApp(`nsx-edge-${domain.toLowerCase()}-0${i}`,'NSX Edge Node',domain,'VM / Application Network',true,false,true,ex?`Existing Edge node ${i} of the imported NSX${wld.importEdgeSync?' — synced into the VCF inventory (passwords reset)':''}.`:imp?`Edge node ${i}: Day-2 deployment after the import (not deployed by the import).`:`Edge node ${i}: eth0→VM/App Net, TEP→Edge TEP, fp-eth0/1→Uplink 1/2.`);
+      if(ex) a.existing=true; apps.push(a);
+    }
   }
   if(wld.aviEnabled){
     apps.push(mkApp(`avi-se-${domain.toLowerCase()}-01`,'AVI Service Engine',domain,'AVI VIP Network',true,false,false,`AVI SE for ${domain}.`));
     apps.push(mkApp(`avi-se-${domain.toLowerCase()}-02`,'AVI Service Engine',domain,'AVI VIP Network',true,false,false,'AVI SE pair for HA.'));
   }
   if(wld.vksEnabled) apps.push(mkApp(`vks-supervisor-${domain.toLowerCase()}`,'VKS Supervisor',domain,'VKS Infrastructure',true,false,true,`VKS Supervisor for ${domain}.`));
-  if(wld.sspEnabled&&wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
+  if(wld.sspEnabled&&wldHasOwnNsxManager(wld)){
     apps.push(mkApp(`ssp-node-pool-${domain.toLowerCase()}`,'SSP Node Pool (3 controllers + workers)',domain,'SSP Network',true,false,false,`Pool of 9 IPs for ${domain} (3 controllers + minimum 4 workers, per Broadcom's documented 4-worker minimum).`));
     apps.push(mkApp(`ssp-service-pool-${domain.toLowerCase()}`,'SSP Service IP Pool',domain,'SSP Network',true,true,true,`Contiguous pool of 5 IPs for ${domain}: SSP Instance (NSX metrics ingestion) + SSP Messaging (flow data).`));
   }

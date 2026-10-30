@@ -1,9 +1,9 @@
 // Pure VLAN domain logic: builds management/workload VLAN lists and derives helper lookups.
 
-import { recommendCIDR } from './sizing.js?v=1.31.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, azNetworkMode, RECOMMENDED_MTU } from './data.js?v=1.31.0';
-import { ipToInt, intToIp } from './iprange.js?v=1.31.0';
-import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.31.0';
+import { recommendCIDR } from './sizing.js?v=1.32.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, azNetworkMode, RECOMMENDED_MTU, isImportWld, wldHasOwnNsxManager, wldNsxManagerExisting, wldHasHostTep, wldInfraVlan } from './data.js?v=1.32.0';
+import { ipToInt, intToIp } from './iprange.js?v=1.32.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.32.0';
 
 // ── VLAN ENGINE ─────────────────────────────────────────────────
 let _vlanId=0;
@@ -74,7 +74,8 @@ export function buildManagementVLANs(mgmt, project, workloadDomains=[], t=k=>k) 
   const additionalSvcIPs=mgmt.additionalServices.filter(s=>!s.requiresDedicatedVLAN).reduce((a,s)=>a+s.applianceCount,0);
   const aviControllerIPs=mgmt.aviDeployed?3+1:0;
   const wldNSXManagerIPs=workloadDomains.reduce((sum,wld)=>{
-    if(!wld.nsxEnabled||wld.nsxManagerMode==='shared')return sum;
+    // Imported WLD: only an NSX Manager deployed by the import onto the Management Domain takes new IPs here.
+    if(!wldHasOwnNsxManager(wld)||wldNsxManagerExisting(wld)||wldInfraVlan(wld)!=='Management VM Network')return sum;
     return sum+(wld.nsxManagerMode==='clustered'?3:1)+1;
   },0);
   const opsCollectors=(!is91&&mgmt.vcfOperations.enabled)?mgmt.vcfOperations.remoteCollectorCount:0;
@@ -347,7 +348,9 @@ export function buildWorkloadVLANs(wld, project, t=k=>k) {
   }
 
   if(wld.nsxEnabled){
-    if(perAZ('hostTep')){
+    if(!wldHasHostTep(wld)){
+      // Imported WLD without dedicated TEPs: no Host TEP VMkernel (9.1.1 VLAN-backed VPC, or overlay on vmk0)
+    } else if(perAZ('hostTep')){
       const tepAZ1=wld.az1HostCount*wld.tepInterfacesPerHost, tepAZ2=wld.az2HostCount*wld.tepInterfacesPerHost;
       vlans.push(makeVLAN(domain,'NSX Host TEP — AZ1','nsx-tep','NSX Host TEP pool','Geneve overlay — Availability Zone 1','mandatory',scope,tepAZ1,`${wld.az1HostCount} × ${wld.tepInterfacesPerHost} = ${tepAZ1} IPs (AZ1)${azNote}`,buf,bufPct));
       vlans.push(makeVLAN(domain,'NSX Host TEP — AZ2','nsx-tep','NSX Host TEP pool','Geneve overlay — Availability Zone 2','mandatory',scope,tepAZ2,`${wld.az2HostCount} × ${wld.tepInterfacesPerHost} = ${tepAZ2} IPs (AZ2)${azNote}`,buf,bufPct));
@@ -371,13 +374,31 @@ export function buildWorkloadVLANs(wld, project, t=k=>k) {
   }
   if(wld.aviEnabled)vlans.push(makeVLAN(domain,'AVI VIP Network','avi','AVI VIP pool','VIP pool for AVI load balancer services','scenario-driven','dedicated',32,'Adjust to service count',buf,bufPct));
   if(wld.vksEnabled)vlans.push(makeVLAN(domain,'VKS Infrastructure','vks','VKS Supervisor — 5 IPs (recommended as a contiguous block)','Kubernetes Supervisor','scenario-driven','dedicated',5,'5 IPs (recommended contiguous block): 3 control plane + 1 floating + 1 patching. Note: workload network, AVI VIP pool, ingress/egress CIDR and pod CIDR are separate additional requirements.',buf,bufPct));
-  if(wld.sspEnabled&&wld.nsxEnabled&&wld.nsxManagerMode!=='shared'){
+  if(wld.sspEnabled&&wldHasOwnNsxManager(wld)){
     // Mirrors appliances.js buildWorkloadAppliances: SSP Node Pool (9 IPs) + SSP Service IP Pool (5 IPs) on
     // 'SSP Network', gated on nsxEnabled && nsxManagerMode!=='shared'. No dedicated SSP VIP in vips.js.
     vlans.push(makeVLAN(domain,'SSP Network','service','Dedicated network for Security Services Platform (SSP)','SSP Node Pool + SSP Service IP Pool','scenario-driven','dedicated',14,'9 IPs Node Pool (3 controllers + min. 4 workers) + 5 IPs Service Pool (Instance + Messaging)',buf,bufPct));
   }
   wld.additionalServices.filter(s=>s.requiresDedicatedVLAN).forEach(svc=>vlans.push(makeVLAN(domain,`${svc.name} Network`,'service',`Dedicated VLAN for ${svc.name}`,`Service VLAN`,'optional','dedicated',svc.applianceCount+(svc.requiresVIP?svc.vipCount:0),svc.notes||'',buf,bufPct)));
+  if(isImportWld(wld)) markImportExisting(wld,vlans,buf,bufPct);
   return markStretched(vlans,isStretched);
+}
+
+// Imported WLD: the host networks already exist (documented with their current VLAN/CIDR, flagged existing:true). When the
+// vCenter runs on its own cluster, its IP and the NSX Manager IPs (existing or deployed by the import) live on ESXi Management.
+const IMPORT_EXISTING_TYPES=['management','vm-network','vmotion','vsan','nfs'];
+function markImportExisting(wld,vlans,buf,bufPct){
+  vlans.forEach(v=>{
+    if(IMPORT_EXISTING_TYPES.includes(v.vlanType)||(v.vlanType.startsWith('nsx-')&&wld.importNsx==='existing'&&v.vlanName!=='NSX Host TEP'&&!v.vlanName.startsWith('NSX Host TEP —'))) v.existing=true;
+  });
+  const infra=wldInfraVlan(wld);
+  if(infra==='Management VM Network') return;
+  const v=vlans.find(x=>x.vlanName===infra); if(!v) return;
+  const nsx=wldHasOwnNsxManager(wld)?(wld.nsxManagerMode==='clustered'?3:1)+1:0;
+  const extra=1+nsx;
+  const rec=recommendCIDR(v.requiredIPs+extra,buf,bufPct);
+  v.requiredIPs+=extra; v.recommendedCIDR=rec.recommendedCIDR; v.minimumCIDR=rec.recommendedCIDR;
+  v.notes+=` + vCenter${nsx?` + ${nsx-1} NSX Mgr + VIP${wld.importNsx==='new'?' (deployed by the import)':''}`:''}`;
 }
 
 // VLAN row an appliance/VIP lives on. Falls back to a name-only match on purpose: Workload Domain appliances

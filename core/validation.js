@@ -1,8 +1,8 @@
 // Pure validation engine: runs design-rule checks across project/domain/VLAN state and returns structured messages.
 
-import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap, parseCidr, cidrsOverlap, gatewayIP } from './iprange.js?v=1.31.0';
-import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.31.0';
-import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, logsLabel } from './data.js?v=1.31.0';
+import { ipInCidr, rangeSize, ipToInt, ipInRange, rangesOverlap, parseCidr, cidrsOverlap, gatewayIP } from './iprange.js?v=1.32.0';
+import { buildMgmtServicesPlan, SVC_RUNTIME_MIN_IPS } from './mgmtservices.js?v=1.32.0';
+import { isVcf91Plus, isStretchedTopology, hasVsanWitness, effectiveHostCount, logsLabel, isImportWld, IMPORT_CHECKLIST, MAX_VI_WLDS } from './data.js?v=1.32.0';
 
 // ── VALIDATION ENGINE ────────────────────────────────────────────
 let _valId=0;
@@ -81,6 +81,31 @@ function ipPlanChecks(msgs,vlans,appliances,vips,hosts,t){
 }
 
 // Stretched topology vs principal storage: a vSAN stretched cluster needs vSAN storage; a vMSC is the non-vSAN option.
+// Imported Workload Domain (VCF Operations › Import a vCenter) — TechDocs 9.1 "Import an Existing vCenter to Create a
+// Workload Domain" + KBs 427706 / 408239 / 438505 / 445210. Messages stay English (repo convention).
+function importWldChecks(msgs,d,wld,project,mgmt,t){
+  const ref={tab:'workloads',key:`wld-import:${wld.id}`};
+  const ck=wld.importChecklist||{};
+  IMPORT_CHECKLIST.forEach(c=>{
+    if(!ck[c.key]) msgs.push(mkMsg(c.sev,'bring-up',d,`"${d}" (import): ${t(`val.imp.${c.key}`)}`,`${t('val.imp.chk_res')} (${c.src})`,ref));
+  });
+  const vc8=wld.importVcVersion==='8.0u3';
+  const v911=project.vcfVersion==='9.1.1';
+  if(wld.importNsx==='new'&&vc8&&wld.nsxManagerMode!=='clustered') msgs.push(mkMsg('blocker','nsx',d,`"${d}" (import): a single-node NSX Manager requires vCenter 9.0 or later — vCenter 8.x always gets a 3-node NSX Management Cluster.`,'Select the NSX Management Cluster (3 nodes).',ref));
+  if(wld.importNsx==='new'&&vc8&&isVcf91Plus(project.vcfVersion)) msgs.push(mkMsg('warning','nsx',d,`"${d}" (import): NSX 9.1 is not compatible with vCenter 8.0 U3 — the import precheck fails when a new NSX 9.1 is deployed (KB 445210).`,'Upgrade the vCenter to 9.x before the import, or import into a fleet whose NSX bundle matches vCenter 8.x.',ref));
+  if(wld.importNsx==='shared'&&project.vcfVersion==='9.0') msgs.push(mkMsg('blocker','nsx',d,`"${d}" (import): VCF 9.0 cannot share the Management Domain NSX Manager with an imported vCenter (KB 438505).`,'Create a new NSX Manager instance, or target VCF 9.1.',ref));
+  if(wld.importOverlay==='mgmt-vmk'&&v911) msgs.push(mkMsg('blocker','nsx',d,`"${d}" (import): VCF 9.1.1 removed the "overlay on ESX management VMkernel" option — imports default to a VLAN-backed VPC without TEPs.`,'Choose "No TEP" or "Dedicated TEPs (API)".',ref));
+  if(isStretchedTopology(wld.topologyMode)){
+    const min=v911?2:3, az1=Number(wld.az1HostCount)||0, az2=Number(wld.az2HostCount)||0;
+    if(hasVsanWitness(wld.topologyMode)&&(az1<min||az2<min)) msgs.push(mkMsg('blocker','bring-up',d,`"${d}" (import): a stretched vSAN cluster needs at least ${min} hosts per AZ to be imported.`,`Set ${min}+ hosts in AZ1 and AZ2.`,ref));
+  }
+  if(effectiveHostCount(wld)<2) msgs.push(mkMsg('warning','bring-up',d,`"${d}" (import): the import precheck expects at least one cluster with more than one host.`,'Add a host to the cluster before the import.',ref));
+  if(wld.storageType==='vsan-osa') msgs.push(mkNote('bring-up',d,`"${d}" (import): vSAN OSA — deduplication without compression is not supported by the import (both on, both off, or compression only).`,null,ref));
+  if(wld.importNsx==='existing'&&wld.edgeRequired&&!wld.importEdgeSync) msgs.push(mkNote('nsx',d,`"${d}" (import): existing NSX Edges stay outside the VCF inventory unless "Edge cluster sync" is selected.`,null,ref));
+  if(project.vcfVersion!=='9.1.1'&&wld.importNsx!=='existing') msgs.push(mkNote('nsx',d,`"${d}" (import): VCF ${project.vcfVersion} activates NSX on every distributed port group with an allow-all Distributed Firewall rule (no longer done in 9.1.1).`,null,ref));
+  msgs.push(mkNote('bring-up',d,`"${d}" (import): ${wld.importOverlay==='dedicated-tep'?'dedicated Host TEPs need an MTU of 1600+ (1700 recommended) on the TEP VLAN':'no Host TEP — the existing MTU of 1500 can stay as is'}. Hosts of imported clusters are added/removed in the vSphere Client, not through VCF workflows (new clusters can use VCF workflows).`,null,ref));
+}
+
 function topologyStorageChecks(msgs,d,label,dom,t){
   const vsan=dom.storageType==='vsan-esa'||dom.storageType==='vsan-osa';
   if(dom.topologyMode==='vsan-stretched'&&!vsan) msgs.push(mkMsg('blocker','bring-up',d,`${label}${t('val.topo_vsan_storage')}`,t('val.topo_vsan_storage_res')));
@@ -200,20 +225,24 @@ export function runValidation(project,mgmt,workloads,vlans,t=k=>k,appliances=[],
     const d=wld.domainName||`Workload ${idx+1}`;
     if(!wld.domainName||!wld.domainName.trim()) msgs.push(mkMsg('blocker','vlan',d,`Workload Domain ${idx+1} has no name.`,'Set a domain name.'));
     const wldHosts=effectiveHostCount(wld);
-    if(wldHosts<3) msgs.push(mkMsg('warning','bring-up',d,`"${d}" has only ${wldHosts} hosts. Min 3 recommended.`,'Add another host.'));
+    const imp=isImportWld(wld);
+    if(imp) importWldChecks(msgs,d,wld,project,mgmt,t);
+    if(wldHosts<3&&!imp) msgs.push(mkMsg('warning','bring-up',d,`"${d}" has only ${wldHosts} hosts. Min 3 recommended.`,'Add another host.'));
     if(wld.edgeRequired&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','nsx',d,`"${d}": Edge required but NSX not enabled.`,'Enable NSX.'));
     if(wld.vksEnabled&&!wld.nsxEnabled) msgs.push(mkMsg('blocker','scenario',d,`"${d}": VKS enabled but NSX not enabled.`,'Enable NSX.'));
     if(wld.vksEnabled&&(!wld.vksVPCs||wld.vksVPCs.length===0)) msgs.push(mkMsg('info','vlan',d,t('val.vks_no_vpc'),t('val.vks_no_vpc_res')));
     if(wld.vksEnabled&&wld.vksLBType==='avi'&&!wld.aviEnabled) msgs.push(mkMsg('warning','scenario',d,t('val.vks_avi_mismatch'),t('val.vks_avi_mismatch_res')));
     if(wld.edgeRequired&&wld.edgeNodeCount<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": only 1 Edge node. Min 2 recommended.`,'Increase Edge count.'));
-    if(wld.tepInterfacesPerHost<2) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
+    if(wld.tepInterfacesPerHost<2&&(!imp||wld.importOverlay==='dedicated-tep')) msgs.push(mkMsg('warning','nsx',d,`"${d}": TEP < 2 per host.`,'Set TEP to 2+.'));
     if(wld.topologyMode==='vsan-stretched') msgs.push(mkNote('bring-up',d,`"${d}": ${t('val.vsan_warn')}`,t('val.vsan_warn_res')));
     if(wld.topologyMode==='stretched') msgs.push(mkNote('bring-up',d,`"${d}": ${t('val.vmsc_l2_warn')}`,t('val.vmsc_l2_res')));
     if(isStretchedTopology(wld.topologyMode)) stretchedHostChecks(msgs,d,`"${d}": `,wld);
     topologyStorageChecks(msgs,d,`"${d}": `,wld,t);
     // TechDocs 9.1 (Stretching Clusters): the default management domain cluster must be stretched first.
-    if(isStretchedTopology(wld.topologyMode)&&!isStretchedTopology(mgmt.topologyMode)) msgs.push(mkMsg('blocker','bring-up',d,`"${d}": ${t('val.wld_stretch_first')}`,t('val.wld_stretch_first_res')));
+    if(isStretchedTopology(wld.topologyMode)&&!isStretchedTopology(mgmt.topologyMode)&&!imp) msgs.push(mkMsg('blocker','bring-up',d,`"${d}": ${t('val.wld_stretch_first')}`,t('val.wld_stretch_first_res')));
   });
+
+  if(workloads.length>MAX_VI_WLDS) msgs.push(mkMsg('blocker','scenario','Global',`${workloads.length} Workload Domains — a VCF instance supports at most ${MAX_VI_WLDS} VI workload domains.`,'Split the domains across several VCF instances.'));
 
   ipPlanChecks(msgs,vlans,appliances,vips,hosts,t);
 

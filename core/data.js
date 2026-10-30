@@ -56,3 +56,42 @@ export function effectiveHostCount(d){
   return Number(d.hostCount)||0;
 }
 export const DEFAULT_MGMT={hostCount:4,nsxManagerMode:'clustered',fleetMode:'standalone',fleetPlacement:'shared-mgmt-vlan',svcRuntimeReserve30:false,svcRuntimeRangeStart:'',svcRuntimeRangeEnd:'',vcfaRangeStart:'',vcfaRangeEnd:'',logMgmtExtraReplicas:0,realtimeMetricsEnabled:false,vpcConnectivity:'centralized',vpcExternalIPs:16,nsxEdgeDeployed:false,nsxEdgeNodeCount:2,aviDeployed:false,vksEnabled:false,vksLBType:'nsx-lb',sspEnabled:false,tepInterfacesPerHost:2,edgeUplinksDedicated:true,additionalServices:[],topologyMode:'single-site',az1HostCount:4,az2HostCount:4,witnessDedicatedVsanVmk:false,azNetworks:{hostMgmt:'per-az',vmotion:'per-az',vsan:'per-az',hostTep:'per-az'},storageType:'vsan-esa',vcfOperations:{enabled:true,mode:'enterprise',remoteCollectorCount:2,requiresDedicatedVLAN:false,cloudProxyEnabled:true,licenseServerEnabled:true},vcfOperationsForLogs:{enabled:true,mode:'clustered',workerCount:2,integratedLBVIP:true,requiresDedicatedVLAN:false},vcfOperationsForNetworks:{enabled:true,platformNodeCount:1,collectorCount:1,requiresDedicatedVLAN:false},vcfAutomation:{enabled:true,mode:'clustered',orchestratorMode:'embedded',orchestratorNodeCount:1,requiresDedicatedVLAN:false},vcfIdentityBroker:{enabled:true,mode:'appliance',haEnabled:false,requiresDedicatedVLAN:false},vksVPCs:[]};
+
+// ── IMPORTED WORKLOAD DOMAIN (v1.32.0) ───────────────────────────
+// VCF Operations › Add Workload Domain › Import a vCenter (TechDocs 9.1 "Import an Existing vCenter to Create a Workload
+// Domain"; P&P workbook "Deploy Workload Domain" B10 = "Import Workload Domain", rows B23-B50). The vCenter, hosts, VDS and
+// VMkernel networks already exist and are only documented (rows flagged existing:true); the import deploys nothing but
+// NSX Manager (importNsx 'new'), unless the vCenter is already registered with one ('existing') or joins one ('shared').
+export function isImportWld(d){ return d?.deployMode === 'import'; }
+// NSX Manager rows exist for this WLD (new or already-deployed ones); 'shared' = no NSX Manager of its own.
+export function wldHasOwnNsxManager(d){
+  if(!d.nsxEnabled||d.nsxManagerMode==='shared') return false;
+  return !isImportWld(d) || d.importNsx !== 'shared';
+}
+export function wldNsxManagerExisting(d){ return isImportWld(d) && d.importNsx === 'existing'; }
+// Host TEP VMkernels: always for a deployed WLD with NSX; for an import only with dedicated TEPs — 9.1.1 imports as a
+// VLAN-backed VPC with no TEP ('no-tep'), 9.0/9.1.0 can run the overlay on the ESX management vmk ('mgmt-vmk').
+export function wldHasHostTep(d){ return !!d.nsxEnabled && (!isImportWld(d) || d.importOverlay === 'dedicated-tep'); }
+// Network the WLD vCenter / NSX Managers sit on: the Management VM Network, or — for an imported vCenter that runs on its
+// own cluster — the WLD's (existing) ESXi Management network.
+export function wldInfraVlan(d){
+  if(isImportWld(d) && d.importVcLocation === 'self') return azNetworkMode(d,'hostMgmt')==='per-az' ? 'ESXi Management — AZ1' : 'ESXi Management';
+  return 'Management VM Network';
+}
+
+// Broadcom prerequisites of the import (TechDocs 9.1 import page + KBs). Unchecked item → validation message.
+export const IMPORT_CHECKLIST = [
+  {key:'versions',        sev:'error',   src:'TechDocs 9.1'},
+  {key:'vlcmImages',      sev:'error',   src:'TechDocs 9.1'},
+  {key:'drsFull',         sev:'error',   src:'TechDocs 9.1'},
+  {key:'vds8',            sev:'error',   src:'TechDocs 9.1 / KB 408239'},
+  {key:'noVss',           sev:'warning', src:'KB 427706'},
+  {key:'noElm',           sev:'error',   src:'TechDocs 9.1'},
+  {key:'noVcha',          sev:'error',   src:'TechDocs 9.1'},
+  {key:'notSddcManaged',  sev:'error',   src:'TechDocs 9.1'},
+  {key:'staticVmk',       sev:'error',   src:'TechDocs 9.1'},
+  {key:'singleVmkPerType',sev:'error',   src:'TechDocs 9.1'},
+  {key:'allClusters',     sev:'warning', src:'TechDocs 9.1'},
+  {key:'dnsFwdRev',       sev:'error',   src:'TechDocs 9.1 / KB 425102'},
+];
+export const MAX_VI_WLDS = 24;

@@ -4,8 +4,8 @@
 // applyPlanningPrepEdits() writes those edits onto the generated VLAN / appliance / VIP / host rows. Both fill a
 // report { applied:[{path,target,value}], skipped:[{path,reason}] } shown after the import.
 
-import { DEFAULT_PROJECT, DEFAULT_MGMT } from './data.js?v=1.31.0';
-import { defaultWorkloadDomain } from './reference.js?v=1.31.0';
+import { DEFAULT_PROJECT, DEFAULT_MGMT } from './data.js?v=1.32.0';
+import { defaultWorkloadDomain } from './reference.js?v=1.32.0';
 
 export const SCALE_VSAN_STRETCHED='Stretched cluster — vSAN stretched (2 AZ + witness)';
 export const SCALE_VMSC='Stretched cluster — vMSC (stretch all L2, VMFS-FC / NFSv3)';

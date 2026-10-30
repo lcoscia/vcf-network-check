@@ -1,9 +1,9 @@
 // Pure calculation: derives per-component IP/FQDN totals for the current project configuration
 // from the static COMPONENT_REFERENCE table.
 
-import { COMPONENT_REFERENCE } from './reference.js?v=1.31.0';
-import { isVcf91Plus, effectiveHostCount, logsLabel } from './data.js?v=1.31.0';
-import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.31.0';
+import { COMPONENT_REFERENCE } from './reference.js?v=1.32.0';
+import { isVcf91Plus, effectiveHostCount, logsLabel, wldHasOwnNsxManager } from './data.js?v=1.32.0';
+import { buildMgmtServicesPlan } from './mgmtservices.js?v=1.32.0';
 
 const MGMT_DOMAIN_LABEL = 'Management Domain';
 
@@ -50,7 +50,7 @@ const RULES = {
   },
   'nsx-manager'(mgmt, workloadDomains) {
     const mgmtNodes = (mgmt.nsxManagerMode === 'clustered' ? 3 : 1) + 1;
-    const wlds = workloadDomains.filter(w => w.nsxEnabled && w.nsxManagerMode !== 'shared');
+    const wlds = workloadDomains.filter(wldHasOwnNsxManager);
     const perDomain = [
       { domain: MGMT_DOMAIN_LABEL, units: 1, totalIps: mgmtNodes, totalFqdns: mgmtNodes },
       ...wlds.map(w => {
@@ -128,7 +128,7 @@ const RULES = {
     // exclusion so domains on a shared NSX Manager (reusing another domain's SSP instance)
     // are not double-counted.
     const r = ref('ssp');
-    const wlds = workloadDomains.filter(w => w.sspEnabled && w.nsxEnabled && w.nsxManagerMode !== 'shared');
+    const wlds = workloadDomains.filter(w => w.sspEnabled && wldHasOwnNsxManager(w));
     const mgmtSsp = mgmt.sspEnabled ? 1 : 0;
     const perDomain = [
       { domain: MGMT_DOMAIN_LABEL, units: mgmtSsp, totalIps: mgmtSsp * r.ipsPerUnit, totalFqdns: mgmtSsp * r.fqdnsPerUnit },
