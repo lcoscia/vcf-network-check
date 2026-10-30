@@ -1,6 +1,6 @@
 // Pure VIP domain logic: builds management/workload virtual IP inventories.
 
-import { isVcf91Plus } from './data.js?v=1.31.0';
+import { isVcf91Plus, isImportWld, wldHasOwnNsxManager, wldNsxManagerExisting, wldInfraVlan } from './data.js?v=1.32.0';
 
 // ── VIP ENGINE ──────────────────────────────────────────────────
 let _vipId=0;
@@ -67,7 +67,11 @@ export function buildManagementVIPs(mgmt,project){
 export function buildWorkloadVIPs(wld){
   const vips=[];
   const domain=wld.domainName;
-  if(wld.nsxEnabled&&wld.nsxManagerMode!=='shared') vips.push(mkVIP(`${domain} NSX Manager VIP`,'NSX Manager',domain,'Management VM Network',wld.nsxManagerMode==='clustered'?`NSX Manager cluster VIP for ${domain}.`:`NSX Manager VIP for ${domain} (reserved for DNS).`));
+  if(wldHasOwnNsxManager(wld)){
+    const imp=isImportWld(wld), ex=wldNsxManagerExisting(wld);
+    const v=mkVIP(`${domain} NSX Manager VIP`,'NSX Manager',domain,imp?wldInfraVlan(wld):'Management VM Network',ex?`Existing NSX Manager VIP of the imported vCenter.`:imp?`Appliance Cluster FQDN (VIP) of the NSX Manager deployed by the import of ${domain}.`:wld.nsxManagerMode==='clustered'?`NSX Manager cluster VIP for ${domain}.`:`NSX Manager VIP for ${domain} (reserved for DNS).`);
+    if(ex) v.existing=true; vips.push(v);
+  }
   if(wld.aviEnabled) vips.push(mkVIP(`${domain} AVI VIP Pool`,'AVI Load Balancer',domain,'AVI VIP Network',`LB VIP pool for ${domain} workloads.`));
   if(wld.vksEnabled){const lb=vksLBLabel(wld.vksLBType);vips.push(mkVIP(`${domain} VKS Supervisor VIP`,'VKS Supervisor',domain,'VKS Infrastructure',`Kubernetes API VIP for ${domain}.`));vips.push(mkVIP(`${domain} VKS Ingress VIP Pool`,'VKS Ingress',domain,'VKS Infrastructure',`${lb} VIP pool for ${domain} VKS ingress (Supervisor Service VPC public/private subnets).`));}
   wld.additionalServices.forEach(svc=>{if(svc.requiresVIP&&svc.vipCount>0){const v=svc.requiresDedicatedVLAN?`${svc.name} Network`:'VM / Application Network';for(let i=1;i<=svc.vipCount;i++) vips.push(mkVIP(`${domain} ${svc.name} VIP ${i}`,svc.name,domain,v,`VIP for ${svc.name} in ${domain}.`));}});

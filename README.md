@@ -1,4 +1,4 @@
-# VCF 9.1 Network Planner — v1.31.0
+# VCF 9.1 Network Planner — v1.32.0
 
 Single-page network design tool for VMware Cloud Foundation 9 pre-deployment planning. No login required — open `index.html` (served via a static HTTP server, see [Usage](#usage)) in a browser.
 
@@ -139,6 +139,7 @@ The suite runs on every push and pull request (GitHub Actions, `.github/workflow
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.32.0 | Oct 2026 | "Import" Workload Domain (VCF Operations › Import a vCenter): Deploy / Import selector per WLD; existing vCenter, hosts and VMkernel networks documented and flagged `existing` (kept in duplicate / overlap checks); only NSX Manager deployed (new / existing / shared, 1 or 3 nodes + VIP); overlay without TEP (9.1.1 default), dedicated TEPs or on vmk0; Broadcom prerequisite checklist + import validations (TechDocs 9.1, KB 427706 / 408239 / 438505 / 445210); max 24 VI WLDs (`core/data.js` `isImportWld`). |
 | v1.31.0 | Oct 2026 | Broadcom P&P 9.1 workbook FQDN convention (site code / instance / parent domain, `sfo-m01-vc01`, `sfo-vcf01`, `flt-*` fleet FQDNs in the parent zone, `sfo0<az>-m01-r01-esxNN` hosts restarting at 01 in AZ2; proposals only, legacy prefix projects migrated softly — `core/fqdn.js`); DNS / NTP server fields; JSON export `meta` block + frozen row names for the VCF Planning & Preparation importer; import of a P&P JSON with applied / ignored report (`core/pp-import.js`). |
 | v1.30.0 | Oct 2026 | Field feedback: Management Services IP ranges feed the hosting VLAN Design range (empty/auto-filled only, never overwrites manual input); "Log Management" label in 9.1/9.1.x; Validation: precautionary messages flagged "FYI — nothing to fix" with a legend, vSAN stretched reminder reworded; host numbers re-expanded when a CIDR is entered. |
 | v1.29.0 | Sep 2026 | Improvements: ESXi Hosts tab (FQDN + vmk0 IP per host/AZ, completion, suggested FQDNs, auto-fill, Excel sheet); IP plan checks (duplicates, outside CIDR, network/broadcast/gateway, overlapping CIDRs, reused VLAN IDs); Gateway and recommended MTU columns; per-subnet IP map; VPC External (Distributed Transit Gateway) VLAN from the 9.1 VPC Gateway Connectivity choice; browser autosave + "New project"; clickable validation messages; contextual help with TechDocs links; accessibility (ARIA tabs, labelled fields, announced errors); Alpine.js pinned to 3.17.4, favicon; `node --test` suite (`npm test`) + GitHub Actions CI |

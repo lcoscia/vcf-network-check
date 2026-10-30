@@ -436,6 +436,8 @@
     .badge-optional  { background: #f0e8ff; color: #5a1a9b; }
     .badge-shared    { background: #e8f4ff; color: #1a4a8b; }
     .badge-dedicated { background: #e8fff4; color: #1a5c2e; }
+    .badge-existing  { background: #eceff3; color: #3d4a5c; margin-left: 4px; }
+    .badge-import    { background: #fff3d9; color: #7a4e00; }
 
     /* ── VALIDATION BLOCKS ─────────────────────────────────────── */
     .val-summary {
@@ -850,8 +852,8 @@
           <div class="dom-card">
             <div class="dom-card-head">
               <span class="dom-name" x-text="s.domain"></span>
-              <span class="badge" :class="s.domainType==='management' ? 'badge-mgmt' : 'badge-workload'"
-                x-text="s.domainType==='management' ? 'Management' : 'Workload'"></span>
+              <span class="badge" :class="s.domainType==='management' ? 'badge-mgmt' : s.domainType==='workload-import' ? 'badge-import' : 'badge-workload'"
+                x-text="s.domainType==='management' ? 'Management' : s.domainType==='workload-import' ? 'Workload · '+t('badge.import') : 'Workload'"></span>
             </div>
             <div class="dom-card-body">
               <div class="dom-stats">
@@ -1414,6 +1416,63 @@
           </div>
           <div class="wld-card-body">
             <div class="g4 mb12">
+              <div class="field"><label x-text="t('wld.mode')"></label>
+                <select class="select" :value="workloadDomains[wi].deployMode" @change="setDeployMode(wi,$event.target.value)">
+                  <option value="deploy" x-text="t('wld.mode.deploy')"></option>
+                  <option value="import" x-text="t('wld.mode.import')"></option>
+                </select>
+              </div>
+              <div class="field" style="grid-column:span 3" x-show="workloadDomains[wi].deployMode==='import'"><span class="field-note" x-text="t('wld.mode.note')"></span></div>
+            </div>
+            <!-- Imported WLD (v1.32.0): VCF Operations › Import a vCenter — core/data.js isImportWld -->
+            <div x-show="workloadDomains[wi].deployMode==='import'" class="nest mb12" :data-ref="'wld-import:' + workloadDomains[wi].id">
+              <div class="nest-title" x-text="t('wld.import.title')"></div>
+              <div class="g4">
+                <div class="field"><label x-text="t('wld.import.vc_version')"></label>
+                  <select class="select" x-model="workloadDomains[wi].importVcVersion" @change="if(workloadDomains[wi].importVcVersion==='8.0u3'){workloadDomains[wi].nsxManagerMode='clustered'}">
+                    <option value="8.0u3">vCenter 8.0 U3</option>
+                    <option value="9.0">vCenter 9.0</option>
+                    <option value="9.1">vCenter 9.1</option>
+                  </select>
+                </div>
+                <div class="field"><label x-text="t('wld.import.vc_location')"></label>
+                  <select class="select" x-model="workloadDomains[wi].importVcLocation">
+                    <option value="self" x-text="t('wld.import.loc.self')"></option>
+                    <option value="mgmt" x-text="t('wld.import.loc.mgmt')"></option>
+                  </select>
+                </div>
+                <div class="field"><label x-text="t('wld.import.nsx')"></label>
+                  <select class="select" x-model="workloadDomains[wi].importNsx">
+                    <option value="new" x-text="t('wld.import.nsx.new')"></option>
+                    <option value="existing" x-text="t('wld.import.nsx.existing')"></option>
+                    <option value="shared" x-text="t('wld.import.nsx.shared')"></option>
+                  </select>
+                </div>
+                <div class="field" x-show="workloadDomains[wi].importNsx!=='shared'"><label x-text="t('wld.import.nsx_size')"></label>
+                  <select class="select" x-model="workloadDomains[wi].nsxManagerMode">
+                    <option value="clustered" x-text="t('wld.import.nsx_cluster')"></option>
+                    <option value="standalone" x-text="t('wld.import.nsx_single')" :disabled="workloadDomains[wi].importVcVersion==='8.0u3'"></option>
+                  </select>
+                </div>
+                <div class="field"><label x-text="t('wld.import.overlay')"></label>
+                  <select class="select" x-model="workloadDomains[wi].importOverlay">
+                    <option value="no-tep" x-text="t('wld.import.ov.no-tep')"></option>
+                    <option value="dedicated-tep" x-text="t('wld.import.ov.dedicated-tep')"></option>
+                    <option value="mgmt-vmk" x-text="t('wld.import.ov.mgmt-vmk')" :disabled="project.vcfVersion==='9.1.1'"></option>
+                  </select>
+                </div>
+                <div class="field" x-show="workloadDomains[wi].importNsx==='existing'" style="justify-content:flex-end">
+                  <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].importEdgeSync" /> <span x-text="t('wld.import.edge_sync')"></span></label>
+                </div>
+              </div>
+              <div class="nest-title mt12" x-text="t('wld.import.checklist')"></div>
+              <div class="g2">
+                <template x-for="c in importChecklistItems" :key="c.key">
+                  <label class="check-row"><input type="checkbox" :checked="!!workloadDomains[wi].importChecklist?.[c.key]" @change="workloadDomains[wi].importChecklist={...(workloadDomains[wi].importChecklist||{}),[c.key]:$event.target.checked}" /> <span x-text="t('wld.import.chk.'+c.key)"></span> <span class="field-note" x-text="'('+c.src+')'"></span></label>
+                </template>
+              </div>
+            </div>
+            <div class="g4 mb12">
               <div class="field" x-show="workloadDomains[wi].topologyMode==='single-site'||workloadDomains[wi].topologyMode==='partially-stretched'"><label>Host Count</label>
                 <input class="input" type="number" min="2" x-model.number="workloadDomains[wi].hostCount" />
                 <span class="field-note" x-text="t('wld.host_note')"></span>
@@ -1453,7 +1512,7 @@
                 <div x-show="workloadDomains[wi].domainRole==='ai-workloads'" class="role-desc" x-text="t('wld.role.ai')"></div>
                 <div x-show="workloadDomains[wi].domainRole==='mixed'" class="role-desc" x-text="t('wld.role.mixed')"></div>
               </div>
-              <div class="field"><label>TEP Interfaces / Host</label>
+              <div class="field" x-show="workloadDomains[wi].deployMode!=='import'||workloadDomains[wi].importOverlay==='dedicated-tep'"><label>TEP Interfaces / Host</label>
                 <input class="input" type="number" min="1" x-model.number="workloadDomains[wi].tepInterfacesPerHost" />
               </div>
               <div class="field">
@@ -1470,7 +1529,7 @@
             </div>
             <div class="flex-center gap12 mb12">
               <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].dedicatedVLANs" /> Dedicated VLANs</label>
-              <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].nsxEnabled" /> NSX Enabled</label>
+              <label class="check-row" x-show="workloadDomains[wi].deployMode!=='import'"><input type="checkbox" x-model="workloadDomains[wi].nsxEnabled" /> NSX Enabled</label>
               <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].aviEnabled" /> AVI / NSX ALB</label>
               <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].vksEnabled" /> VKS Enabled</label>
               <label class="check-row"><input type="checkbox" x-model="workloadDomains[wi].sspEnabled" /> SSP / vDefend</label>
@@ -1480,7 +1539,7 @@
             <div x-show="workloadDomains[wi].nsxEnabled" class="nest mt12">
               <div class="nest-title">NSX Options</div>
               <div class="g4">
-                <div class="field"><label>NSX Manager Mode</label>
+                <div class="field" x-show="workloadDomains[wi].deployMode!=='import'"><label>NSX Manager Mode</label>
                   <select class="select" x-model="workloadDomains[wi].nsxManagerMode">
                     <option value="shared">Shared (Mgmt Domain NSX)</option>
                     <option value="standalone">Standalone (1 node)</option>
@@ -1693,6 +1752,7 @@
                 <td class="tbl-domain" x-text="v.domain"></td>
                 <td class="font-bold">
                   <span x-text="v.vlanName"></span>
+                  <span class="badge badge-existing" x-show="v.existing" x-text="t('badge.existing')"></span>
                   <button class="btn btn-secondary btn-sm" style="margin-left:4px" x-show="v.cidr" @click="toggleIpMap(v)" :title="t('ipmap.open')" :aria-label="t('ipmap.open') + ' — ' + v.vlanName">🗺</button>
                 </td>
                 <td><input class="input mono" style="width:80px" placeholder="e.g. 100" :aria-label="'VLAN ID — ' + v.vlanName" x-model="vlans[vi].vlanId" /></td>
@@ -1778,6 +1838,7 @@
               <tr :data-ref="'app:' + a.applianceName">
                 <td class="tbl-mono tbl-domain">
                   <span x-text="a.applianceName"></span>
+                  <span class="badge badge-existing" x-show="a.existing" x-text="t('badge.existing')"></span>
                   <span class="text-muted text-xs" x-show="a.vipRequired" title="See VIPs tab for the cluster VIP"> → VIP</span>
                 </td>
                 <td x-text="a.applianceType"></td>
@@ -1851,7 +1912,7 @@
               <tr :data-ref="'host:' + h.id">
                 <td class="tbl-domain" x-text="h.domain"></td>
                 <td class="tbl-muted" x-text="h.az || '—'"></td>
-                <td class="tbl-mono" x-text="h.hostName"></td>
+                <td class="tbl-mono"><span x-text="h.hostName"></span> <span class="badge badge-existing" x-show="h.existing" x-text="t('badge.existing')"></span></td>
                 <td class="tbl-muted" x-text="h.vlan"></td>
                 <td>
                   <input class="input mono" style="width:130px"
@@ -1909,7 +1970,7 @@
           <tbody>
             <template x-for="(v, vi) in vips" :key="v.id">
               <tr :data-ref="'vip:' + v.vipName">
-                <td class="font-bold tbl-domain" x-text="v.vipName"></td>
+                <td class="font-bold tbl-domain"><span x-text="v.vipName"></span> <span class="badge badge-existing" x-show="v.existing" x-text="t('badge.existing')"></span></td>
                 <td x-text="v.associatedService"></td>
                 <td class="tbl-muted" x-text="v.domain"></td>
                 <td class="tbl-muted" x-text="v.vlan"></td>
@@ -2169,6 +2230,11 @@
             </tr></thead>
             <tbody>
               <tr style="border-bottom:1px solid var(--gray-border);">
+                <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.32.0</span></td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Oct 2026</td>
+                <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1320')"></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--gray-border);">
                 <td style="padding:8px 10px;"><span style="font-family:monospace;font-weight:700;color:var(--blue-accent);">v1.31.0</span></td>
                 <td style="padding:8px 10px;color:var(--text-muted);">Oct 2026</td>
                 <td style="padding:8px 10px;color:var(--text-muted);" x-html="t('ver.1310')"></td>
@@ -2421,7 +2487,7 @@
      ENGINES + APP LOGIC
      ═══════════════════════════════════════════════════════════════ -->
 <script type="module">
-import * as Core from './core/index.js?v=1.31.0';
+import * as Core from './core/index.js?v=1.32.0';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('vcfApp', () => vcfApp());
@@ -2464,7 +2530,7 @@ function vcfApp(){
     },
 
     // App state
-    appVersion:'1.31.0',
+    appVersion:'1.32.0',
     activeTab:'overview',
     get tabs() {
       return [
@@ -2873,6 +2939,19 @@ function vcfApp(){
       window.open(url,'_blank','noopener');
     },
 
+    importChecklistItems:Core.IMPORT_CHECKLIST,
+    // v1.32.0: Deploy ⇄ Import. An imported vCenter is always NSX-prepared; the NSX Management Cluster is Broadcom's
+    // recommended (and workbook default) size, and the only one for vCenter 8.x.
+    setDeployMode(wi,mode){
+      const w=this.workloadDomains[wi];
+      w.deployMode=mode;
+      if(mode==='import'){
+        w.nsxEnabled=true;
+        if(w.nsxManagerMode==='shared') w.importNsx='shared';
+        w.nsxManagerMode='clustered';
+      }
+    },
+
     addWorkloadDomain(){
       const idx=this.workloadDomains.length+1;
       this.workloadDomains.push(Core.defaultWorkloadDomain(idx));
@@ -2965,6 +3044,7 @@ function vcfApp(){
     // parent domain; projects without a site code keep the legacy [prefix-]name.suffix. '' when nothing is set.
     fqdnSuggestion(name,row){
       row=row||this.appliances.find(a=>a.applianceName===name)||this.vips.find(v=>v.vipName===name)||this.hosts.find(h=>h.hostName===name)||{};
+      if(row.existing)return ''; // v1.32.0: imported WLD — existing vCenter/hosts/NSX keep their current FQDN
       const kind=row.vipName!==undefined?'vips':row.hostName!==undefined?'hosts':'appliances';
       const wi=row.domain&&row.domain!=='Management Domain'?this.workloadDomains.findIndex(w=>w.domainName===row.domain)+1:0;
       return Core.suggestFqdn(this.project,kind,name,row,wi);
